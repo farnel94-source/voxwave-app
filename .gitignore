@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Env
+.env
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Whisper models
+models/
+
+# Build
+*.app
+*.exe
+
+# Test
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Node / Claude Code config
+node_modules/
+bootstrap.js
+package.json
+.claude/
+scripts/setup-claude.js
+scripts/validate-claude-config.js

@@ -1,0 +1,111 @@
+# -*- mode: python ; coding: utf-8 -*-
+"""PyInstaller spec pour VoxTool."""
+
+import os
+import sys
+
+block_cipher = None
+
+# Répertoire racine du projet
+ROOT = os.path.dirname(os.path.abspath(SPEC))
+
+a = Analysis(
+    [os.path.join(ROOT, 'src', '__main__.py')],
+    pathex=[ROOT],
+    binaries=[],
+    datas=[
+        (os.path.join(ROOT, 'config.yaml'), '.'),
+        (os.path.join(ROOT, '.env.example'), '.'),
+    ],
+    hiddenimports=[
+        'faster_whisper',
+        'sounddevice',
+        'numpy',
+        'groq',
+        'openai',
+        'pystray',
+        'PIL',
+        'PIL.Image',
+        'PIL.ImageDraw',
+        'cryptography',
+        'cryptography.fernet',
+        'pynput',
+        'pynput.keyboard',
+        'pyperclip',
+        'yaml',
+        'click',
+        'requests',
+        'dotenv',
+        'src',
+        'src.app',
+        'src.audio',
+        'src.audio.capture',
+        'src.audio.processor',
+        'src.audio.feedback',
+        'src.audio.device_manager',
+        'src.transcription',
+        'src.transcription.whisper_engine',
+        'src.transcription.groq_engine',
+        'src.transcription.hybrid_engine',
+        'src.cleaning',
+        'src.cleaning.regex_cleaner',
+        'src.cleaning.llm_cleaner',
+        'src.injection',
+        'src.injection.keyboard',
+        'src.hotkey',
+        'src.hotkey.listener',
+        'src.gui',
+        'src.gui.icons',
+        'src.gui.tray_icon',
+        'src.config',
+        'src.config.defaults',
+        'src.config.validator',
+        'src.utils',
+        'src.utils.retry',
+        'src.utils.exceptions',
+        'src.licensing',
+        'src.licensing.lemonsqueezy',
+        'src.licensing.storage',
+        'src.licensing.validator',
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[
+        'matplotlib',
+        'scipy',
+        'pandas',
+        'pytest',
+        'black',
+        'flake8',
+    ],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name='VoxTool',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=None,
+)
