@@ -5,12 +5,15 @@ DEFAULT_CONFIG: dict = {
     "language": "fr",
     "model": "base",
     "injection": "paste",
+    "hotkey_debounce": 0.5,
     "audio": {
         "sample_rate": 16000,
         "channels": 1,
         "chunk_size": 512,
         "silence_threshold": 0.01,
         "min_speech_duration": 0.5,
+        "min_audio_duration": 0.5,
+        "max_audio_duration": 120.0,
         "device_id": None,
         "feedback": {
             "enabled": True,
@@ -44,6 +47,7 @@ DEFAULT_CONFIG: dict = {
     "licensing": {
         "provider": "lemonsqueezy",
         "free_limit": 1000,
+        "free_daily_limit": 50,
         "cache_duration": 86400,
     },
 }

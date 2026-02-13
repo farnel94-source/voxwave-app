@@ -1,4 +1,4 @@
-"""Tests supplémentaires pour app.py — initialization et helpers."""
+"""Tests supplementaires pour app.py — initialization et helpers."""
 
 from unittest.mock import patch, MagicMock
 
@@ -26,6 +26,7 @@ class TestVoxToolInit:
         assert app.config == sample_config
         assert app.capture is None
         assert app.tray is None
+        assert app.waveform is None
 
     def test_create_transcription_engine_local(self, sample_config):
         sample_config["whisper"]["language"] = "fr"
@@ -55,6 +56,7 @@ class TestVoxToolInit:
         app.pipeline = MagicMock()
         app.injector = MagicMock()
         app.tray = MagicMock()
+        app.waveform = MagicMock()
         app.license_validator = MagicMock()
         app.license_validator.increment_usage.return_value = True
 
@@ -67,12 +69,15 @@ class TestVoxToolInit:
         app._process_audio(long_audio)
         # Should have been processed (not rejected)
         app.engine.transcribe.assert_called_once()
+        # Widget returns to idle after processing
+        app.waveform.show_idle.assert_called()
 
     def test_shutdown(self, sample_config):
         app = VoxTool(sample_config)
         app.listener = MagicMock()
         app.capture = MagicMock()
         app.capture.is_recording = True
+        app.waveform = MagicMock()
         app._shutdown()
         app.listener.stop.assert_called_once()
         app.capture.stop.assert_called_once()
@@ -82,6 +87,14 @@ class TestVoxToolInit:
         app.listener = MagicMock()
         app.capture = MagicMock()
         app.capture.is_recording = False
+        app.waveform = MagicMock()
         app._shutdown()
         app.listener.stop.assert_called_once()
-        app.capture.stop.assert_not_called()
+        app.capture.stop.assert_called_once()
+
+    def test_is_hallucination(self):
+        from src.transcription.hallucinations import is_hallucination
+        assert is_hallucination("merci.") is True
+        assert is_hallucination("Bonjour le monde") is False
+        assert is_hallucination("oui.") is True
+        assert is_hallucination("...") is True

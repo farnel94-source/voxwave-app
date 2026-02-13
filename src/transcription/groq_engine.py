@@ -9,13 +9,13 @@ import io
 import json
 import logging
 import os
-import re
 import time
 import wave
 from typing import Optional
 
 import numpy as np
 
+from src.transcription.hallucinations import strip_hallucination_tails
 from src.utils.exceptions import TranscriptionError
 from src.utils.retry import retry_with_backoff
 
@@ -30,6 +30,7 @@ class GroqWhisperEngine:
         model: str = "whisper-large-v3-turbo",
         language: str = "fr",
         api_key: Optional[str] = None,
+        sample_rate: int = 16000,
     ) -> None:
         """Initialise le moteur Groq.
 
@@ -37,14 +38,26 @@ class GroqWhisperEngine:
             model: Modèle Whisper sur Groq.
             language: Langue de transcription.
             api_key: Clé API Groq (ou variable d'env GROQ_API_KEY).
+            sample_rate: Taux d'échantillonnage audio (depuis config.yaml).
         """
         self.model = model
         self.language = language
-        self.api_key = api_key or os.getenv("GROQ_API_KEY")
+        self.sample_rate = sample_rate
+        self.api_key = (api_key or os.getenv("GROQ_API_KEY") or "").strip()
         if not self.api_key:
             raise ValueError("GROQ_API_KEY non configurée")
         self._client = None
+        self._last_detected_language: Optional[str] = None
         logger.info(f"GroqWhisperEngine: model={model}, lang={language}")
+
+    def preload(self) -> None:
+        """No-op : Groq n'a pas de modele local a precharger."""
+        pass
+
+    @property
+    def last_detected_language(self) -> Optional[str]:
+        """Dernière langue détectée par Groq."""
+        return self._last_detected_language
 
     def _get_client(self):
         """Retourne le client Groq (singleton)."""
@@ -115,7 +128,7 @@ class GroqWhisperEngine:
             TranscriptionError: Si la transcription échoue après retries.
         """
         start = time.time()
-        wav_buf = self._audio_to_wav_bytes(audio)
+        wav_buf = self._audio_to_wav_bytes(audio, sample_rate=self.sample_rate)
 
         try:
             transcription = self._call_groq_api(wav_buf)
@@ -148,38 +161,23 @@ class GroqWhisperEngine:
                 if avg_logprob < -1.0:
                     logger.warning(f"Confiance très basse ({avg_logprob:.2f}), texte peu fiable")
 
-        text = self._strip_hallucinations(text)
+        # Extraire la langue détectée
+        detected_lang = None
+        if isinstance(transcription, str):
+            try:
+                detected_lang = json.loads(transcription).get("language")
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        else:
+            detected_lang = getattr(transcription, "language", None)
+        if detected_lang:
+            self._last_detected_language = detected_lang
+            if detected_lang != self.language:
+                logger.info(f"Langue détectée: {detected_lang} (config: {self.language})")
+
+        text = strip_hallucination_tails(text)
         elapsed = time.time() - start
-        duration = len(audio) / 16000
+        duration = len(audio) / self.sample_rate
         logger.info(f"Groq transcription: {elapsed:.2f}s pour {duration:.2f}s audio")
         return text
 
-    # Patterns que Whisper/Groq hallucine en fin de transcription
-    _HALLUCINATION_TAILS = re.compile(
-        r"\s*(?:"
-        r"Sous-titrag[^\n]*"
-        r"|Sous-titres[^\n]*"
-        r"|Merci d'avoir regardé[^\n]*"
-        r"|Merci de votre attention[^\n]*"
-        r"|Thanks for watching[^\n]*"
-        r"|Thank you for watching[^\n]*"
-        r"|Please subscribe[^\n]*"
-        r"|N'oubliez pas de vous abonner[^\n]*"
-        r"|\.{3,}"
-        r")\s*$",
-        re.IGNORECASE,
-    )
-
-    def _strip_hallucinations(self, text: str) -> str:
-        """Supprime les hallucinations typiques de Whisper en fin de texte.
-
-        Args:
-            text: Texte brut de Groq.
-
-        Returns:
-            Texte nettoyé.
-        """
-        cleaned = self._HALLUCINATION_TAILS.sub("", text).strip()
-        if cleaned:
-            return cleaned
-        return text

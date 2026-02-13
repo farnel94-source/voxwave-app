@@ -1,4 +1,4 @@
-"""VoxTool — Point d'entrée principal.
+"""VoxTool — Point d'entree principal.
 
 Usage:
     python -m voxtool
@@ -11,6 +11,7 @@ import os
 import sys
 import threading
 import time
+from typing import Optional
 
 # Fix encodage Unicode sur Windows (emojis dans le terminal)
 if sys.platform == "win32":
@@ -20,6 +21,8 @@ if sys.platform == "win32":
 import click
 import yaml
 from dotenv import load_dotenv
+
+from src.transcription.hallucinations import is_hallucination
 
 load_dotenv()
 
@@ -41,19 +44,23 @@ def load_config(config_path: str = "config.yaml") -> dict:
         config_path: Chemin vers config.yaml.
 
     Returns:
-        Configuration validée et complétée avec les défauts.
+        Configuration validee et completee avec les defauts.
     """
     from src.config.validator import ConfigValidator
     from src.config.defaults import DEFAULT_CONFIG
+    from src.utils.platform import resource_path
+
+    # En mode PyInstaller, config.yaml est dans le bundle
+    resolved_path = resource_path(config_path)
 
     try:
-        with open(config_path, "r") as f:
+        with open(resolved_path, "r") as f:
             user_config = yaml.safe_load(f) or {}
     except FileNotFoundError:
-        logger.warning(f"Config {config_path} introuvable, utilisation des défauts")
+        logger.warning(f"Config {config_path} introuvable, utilisation des defauts")
         user_config = {}
     except yaml.YAMLError as e:
-        logger.error(f"Erreur parsing config: {e}, utilisation des défauts")
+        logger.error(f"Erreur parsing config: {e}, utilisation des defauts")
         user_config = {}
 
     return ConfigValidator.validate_and_merge(user_config)
@@ -71,7 +78,11 @@ class VoxTool:
         self.listener = None
         self.feedback = None
         self.tray = None
+        self.waveform = None
         self.license_validator = None
+        self._qt_app = None
+        self._processing_thread: Optional[threading.Thread] = None
+        self._processing_lock = threading.Lock()
 
     def initialize(self) -> None:
         """Initialise tous les composants."""
@@ -91,7 +102,7 @@ class VoxTool:
             volume=feedback_config.get("volume", 0.5),
         )
 
-        # Valider le device_id si spécifié
+        # Valider le device_id si specifie
         from src.audio.device_manager import AudioDeviceManager
         device_id = self.config["audio"].get("device_id")
         device_id = AudioDeviceManager.validate_device(device_id)
@@ -110,13 +121,17 @@ class VoxTool:
         self.engine = self._create_transcription_engine(transcription_provider)
 
         # Choix du pipeline de nettoyage
-        cleaning_provider = self.config.get("cleaning", {}).get("provider", "local")
-        cloud_model = self.config.get("cleaning", {}).get("cloud_model", "gpt-4o-mini")
+        cleaning_config = self.config.get("cleaning", {})
+        cleaning_provider = cleaning_config.get("provider", "local")
+        cloud_model = cleaning_config.get("cloud_model", "gpt-4o-mini")
+        filler_words = cleaning_config.get("filler_words")
         self.pipeline = CleaningPipeline(
-            mode=self.config["cleaning"]["mode"],
-            llm_model=self.config["cleaning"]["llm_model"],
+            mode=cleaning_config["mode"],
+            llm_model=cleaning_config["llm_model"],
             cloud_model=cloud_model,
             cleaning_provider=cleaning_provider,
+            language=self.config["whisper"]["language"],
+            filler_words=filler_words,
         )
 
         self.injector = TextInjector(mode=self.config["injection"])
@@ -124,17 +139,27 @@ class VoxTool:
             hotkey=self.config["hotkey"],
             on_start=self._on_start,
             on_stop=self._on_stop,
+            debounce_delay=self.config.get("hotkey_debounce", 0.5),
         )
 
         # Licensing
         from src.licensing.validator import LicenseValidator
         licensing_config = self.config.get("licensing", {})
         self.license_validator = LicenseValidator(
+            free_daily_limit=licensing_config.get("free_daily_limit", 50),
             free_limit=licensing_config.get("free_limit", 1000),
             cache_duration=licensing_config.get("cache_duration", 86400),
         )
 
-        # System tray
+        # Waveform widget (PySide6 — cree apres QApplication)
+        from src.gui.waveform_widget import WaveformWidget
+        self.waveform = WaveformWidget(
+            capture=self.capture,
+            on_start=self._on_start,
+            on_stop=self._on_stop,
+        )
+
+        # System tray (PySide6 QSystemTrayIcon)
         from src.gui.tray_icon import TrayIcon
         self.tray = TrayIcon(
             on_start=self._on_start,
@@ -142,15 +167,20 @@ class VoxTool:
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
         )
+        self.tray.setup()
 
-        # Précharge le modèle (local uniquement)
-        if hasattr(self.engine, '_load_model'):
-            logger.info("Préchargement du modèle Whisper...")
-            self.engine._load_model()
-        logger.info("VoxTool prêt !")
+        # Prechargement du modele (local uniquement)
+        if hasattr(self.engine, 'preload'):
+            try:
+                logger.info("Prechargement du modele Whisper...")
+                self.engine.preload()
+            except Exception as e:
+                logger.error(f"Echec prechargement modele: {e}")
+                logger.warning("Le modele sera charge au premier usage")
+        logger.info("VoxTool pret !")
 
     def _create_transcription_engine(self, provider: str) -> object:
-        """Crée le moteur de transcription selon le provider configuré.
+        """Cree le moteur de transcription selon le provider configure.
 
         Args:
             provider: hybrid, cloud, ou local.
@@ -159,6 +189,7 @@ class VoxTool:
             Instance du moteur de transcription.
         """
         language = self.config["whisper"]["language"]
+        sample_rate = self.config["audio"]["sample_rate"]
 
         if provider == "hybrid":
             from src.transcription.hybrid_engine import HybridTranscriptionEngine
@@ -167,84 +198,111 @@ class VoxTool:
                 groq_model=groq_model,
                 local_model=self.config["whisper"]["model"],
                 language=language,
+                sample_rate=sample_rate,
             )
         elif provider == "cloud":
             from src.transcription.groq_engine import GroqWhisperEngine
             groq_model = self.config.get("groq", {}).get("model", "whisper-large-v3")
-            return GroqWhisperEngine(model=groq_model, language=language)
+            return GroqWhisperEngine(
+                model=groq_model, language=language, sample_rate=sample_rate,
+            )
         else:
             from src.transcription.whisper_engine import WhisperEngine
             return WhisperEngine(
                 model=self.config["whisper"]["model"],
                 language=language,
+                sample_rate=sample_rate,
             )
 
     def _on_start(self) -> None:
-        """Callback: début enregistrement."""
-        logger.info("🔴 Enregistrement...")
+        """Callback: debut enregistrement."""
+        logger.info("Enregistrement...")
         self.feedback.play_start()
         if self.tray:
             self.tray.set_state("recording")
+        if self.waveform:
+            self.waveform.show_recording()
         self.capture.start()
 
     def _on_stop(self) -> None:
-        """Callback: fin enregistrement → lance le pipeline dans un thread."""
+        """Callback: fin enregistrement -> lance le pipeline dans un thread."""
         self.feedback.play_stop()
         if self.tray:
             self.tray.set_state("processing")
+        if self.waveform:
+            self.waveform.show_processing()
         self.capture.stop()
         audio = self.capture.get_buffer()
 
         if len(audio) == 0:
-            logger.warning("Aucun audio capturé")
+            logger.warning("Aucun audio capture")
+            if self.waveform:
+                self.waveform.show_idle()
             return
 
         # Lancer le pipeline dans un thread pour ne pas bloquer le listener
-        thread = threading.Thread(target=self._process_audio, args=(audio,), daemon=True)
-        thread.start()
-
-    # Durées min/max pour éviter les hallucinations Whisper/Groq
-    MIN_AUDIO_DURATION = 0.5  # secondes
-    MAX_AUDIO_DURATION = 120.0  # secondes
+        self._processing_thread = threading.Thread(
+            target=self._process_audio, args=(audio,), daemon=True,
+        )
+        self._processing_thread.start()
 
     def _process_audio(self, audio) -> None:
-        """Pipeline complet : transcription → nettoyage → injection (thread séparé)."""
+        """Pipeline complet : transcription -> nettoyage -> injection (thread separe)."""
+        if not self._processing_lock.acquire(blocking=False):
+            logger.warning("Pipeline deja en cours, appui ignore")
+            return
         self.listener.set_processing(True)
+        had_error = False
         try:
-            # Vérifier la licence / free tier
+            # Verifier la licence / free tier
             if self.license_validator and not self.license_validator.increment_usage():
-                msg = "Free tier épuisé. Activez une licence pour continuer."
+                msg = "Free tier epuise. Activez une licence pour continuer."
                 logger.warning(msg)
                 if self.tray:
                     self.tray.show_notification("VoxTool — Licence", msg)
                 return
 
-            duration = len(audio) / self.config["audio"]["sample_rate"]
-            logger.info(f"Audio capturé: {duration:.2f}s")
+            audio_config = self.config["audio"]
+            duration = len(audio) / audio_config["sample_rate"]
+            min_duration = audio_config.get("min_audio_duration", 0.5)
+            max_duration = audio_config.get("max_audio_duration", 120.0)
+            logger.info(f"Audio capture: {duration:.2f}s")
 
-            if duration < self.MIN_AUDIO_DURATION:
-                logger.warning(f"Audio trop court ({duration:.2f}s < {self.MIN_AUDIO_DURATION}s), ignoré")
+            if duration < min_duration:
+                logger.warning(f"Audio trop court ({duration:.2f}s < {min_duration}s), ignore")
                 return
 
-            if duration > self.MAX_AUDIO_DURATION:
-                logger.warning(f"Audio trop long ({duration:.2f}s), tronqué")
-                max_samples = int(self.MAX_AUDIO_DURATION * self.config["audio"]["sample_rate"])
+            if duration > max_duration:
+                logger.warning(f"Audio trop long ({duration:.2f}s), tronque a {max_duration}s")
+                max_samples = int(max_duration * audio_config["sample_rate"])
                 audio = audio[:max_samples]
 
-            # Préparer
+            # Preparer (apres troncature)
             audio = self.processor.prepare_for_whisper(audio)
+
+            # Verifier la taille apres preparation (limite Groq API : 25MB WAV)
+            audio_size_bytes = len(audio) * 2
+            if audio_size_bytes > 24_000_000:
+                max_safe_samples = 24_000_000 // 2
+                logger.warning(f"Audio trop volumineux ({audio_size_bytes/1e6:.1f}MB), tronque pour API")
+                audio = audio[:max_safe_samples]
 
             # Transcrire
             raw_text = self.engine.transcribe(audio)
             logger.info(f"Brut: {raw_text}")
+
+            # Adapter les filler words a la langue detectee
+            detected_lang = getattr(self.engine, "last_detected_language", None)
+            if detected_lang:
+                self.pipeline.regex_cleaner.set_language(detected_lang)
 
             if not raw_text.strip():
                 logger.warning("Transcription vide")
                 return
 
             # Filtrer les hallucinations connues de Whisper
-            if self._is_hallucination(raw_text):
-                logger.warning(f"Hallucination détectée, ignoré: {raw_text}")
+            if is_hallucination(raw_text):
+                logger.warning(f"Hallucination detectee, ignore: {raw_text}")
                 return
 
             # Nettoyer
@@ -252,18 +310,21 @@ class VoxTool:
             logger.info(f"Propre: {clean_text}")
 
             if not clean_text.strip():
-                logger.warning("Texte nettoyé vide, ignoré")
+                logger.warning("Texte nettoye vide, ignore")
                 return
 
             # Injecter
             self.injector.inject(clean_text)
             self.feedback.play_complete()
-            logger.info("Texte injecté !")
+            logger.info("Texte injecte !")
         except Exception as e:
+            had_error = True
             self.feedback.play_error()
             if self.tray:
                 self.tray.set_state("error")
                 self.tray.show_notification("VoxTool — Erreur", str(e))
+            if self.waveform:
+                self.waveform.show_error()  # revient a idle apres ERROR_DISPLAY_MS
             from src.utils.exceptions import TranscriptionError, CleaningError
             if isinstance(e, TranscriptionError):
                 logger.error(f"Erreur transcription: {e}")
@@ -272,113 +333,62 @@ class VoxTool:
             else:
                 logger.error(f"Erreur pipeline inattendue: {e}", exc_info=True)
         finally:
+            self._processing_lock.release()
             self.listener.set_processing(False)
-            # Revenir à idle après un délai si erreur, sinon immédiatement
-            if self.tray:
-                self.tray.set_state("idle")
-
-    @staticmethod
-    def _is_hallucination(text: str) -> bool:
-        """Détecte les hallucinations typiques de Whisper/Groq.
-
-        Args:
-            text: Texte transcrit.
-
-        Returns:
-            True si c'est probablement une hallucination.
-        """
-        text_lower = text.strip().lower()
-        # Phrases génériques que Whisper hallucine sur du silence/bruit
-        hallucinations = [
-            "merci.", "merci !", "merci",
-            "sous-titrage", "sous-titres",
-            "merci d'avoir regardé", "merci d'avoir regardé !",
-            "merci d'avoir regardé cette vidéo",
-            "merci d'avoir regardé cette vidéo !",
-            "merci de votre attention",
-            "merci de votre attention.",
-            "à bientôt", "à bientôt.",
-            "au revoir", "au revoir.",
-            "...", "…",
-            "bye", "bye.",
-            "thank you", "thanks",
-            "thank you for watching",
-            "thanks for watching",
-            "et oui.", "et oui",
-        ]
-        # Match exact ou le texte commence par une hallucination connue
-        if text_lower in hallucinations:
-            return True
-        # Texte trop court et générique = probable hallucination
-        if len(text_lower) < 15 and text_lower.count(" ") <= 2:
-            generic = ["oui", "non", "ok", "bon", "bien", "ah", "oh",
-                        "hmm", "hm", "ha", "et oui", "et non", "voilà"]
-            stripped = text_lower.rstrip(".!? ")
-            if stripped in generic:
-                return True
-        return False
+            if not had_error:
+                if self.waveform:
+                    self.waveform.show_idle()
+                if self.tray:
+                    self.tray.set_state("idle")
 
     def _activate_license_dialog(self) -> None:
-        """Ouvre un dialog tkinter pour saisir la clé de licence."""
+        """Ouvre un dialog pour saisir la cle de licence."""
         try:
-            import tkinter as tk
-            from tkinter import messagebox
-
-            root = tk.Tk()
-            root.title("VoxTool — Activer licence")
-            root.geometry("400x150")
-            root.resizable(False, False)
-
-            tk.Label(root, text="Entrez votre clé de licence :").pack(pady=(15, 5))
-            entry = tk.Entry(root, width=50)
-            entry.pack(pady=5)
-
-            def activate():
-                key = entry.get().strip()
-                if not key:
-                    messagebox.showwarning("Erreur", "Veuillez entrer une clé.")
-                    return
+            from PySide6.QtWidgets import QInputDialog
+            text, ok = QInputDialog.getText(
+                None, "VoxTool — Activer licence",
+                "Entrez votre cle de licence :"
+            )
+            if ok and text.strip():
                 try:
-                    self.license_validator.activate_license(key)
-                    messagebox.showinfo("Succès", "Licence activée avec succès !")
+                    self.license_validator.activate_license(text.strip())
                     if self.tray:
-                        self.tray.show_notification("VoxTool", "Licence activée !")
-                    root.destroy()
+                        self.tray.show_notification("VoxTool", "Licence activee avec succes !")
                 except Exception as e:
-                    messagebox.showerror("Erreur", f"Activation échouée : {e}")
-
-            tk.Button(root, text="Activer", command=activate).pack(pady=10)
-            root.mainloop()
+                    logger.error(f"Activation echouee: {e}")
+                    if self.tray:
+                        self.tray.show_notification("VoxTool — Erreur", f"Activation echouee : {e}")
         except Exception as e:
-            logger.error(f"Dialog licence échoué: {e}")
+            logger.error(f"Dialog licence echoue: {e}")
 
     def _shutdown(self) -> None:
-        """Arrête proprement tous les composants."""
-        logger.info("Arrêt VoxTool...")
+        """Arrete proprement tous les composants."""
+        logger.info("Arret VoxTool...")
         if self.listener:
             self.listener.stop()
-        if self.capture and self.capture.is_recording:
+        if self._processing_thread and self._processing_thread.is_alive():
+            logger.info("Attente fin du pipeline en cours...")
+            self._processing_thread.join(timeout=10)
+            if self._processing_thread.is_alive():
+                logger.warning("Pipeline toujours en cours apres 10s, arret force")
+        if self.capture:
             self.capture.stop()
+        if self.waveform:
+            self.waveform.show_idle()
+        # Quitter la boucle Qt
+        if self._qt_app:
+            self._qt_app.quit()
 
     def run(self) -> None:
-        """Lance l'application avec system tray."""
+        """Lance l'application avec boucle Qt."""
+        from PySide6.QtWidgets import QApplication
+
+        self._qt_app = QApplication.instance() or QApplication(sys.argv)
         self.initialize()
         self.listener.start()
-        logger.info(f"VoxTool actif ! Hotkey: {self.config['hotkey']}")
 
-        # Lancer le tray en mode non-bloquant (thread séparé)
-        # pour ne pas bloquer le hotkey listener pynput
-        self.tray.run_detached()
-
-        print(f"\n🎙️ VoxTool actif ! Appuyez sur {self.config['hotkey']} pour dicter.")
-        print("   Ctrl+C pour quitter.\n")
-        try:
-            while True:
-                time.sleep(0.1)
-        except KeyboardInterrupt:
-            self._shutdown()
-            if self.tray:
-                self.tray.stop()
+        logger.info(f"VoxTool actif ! Hotkey: {self.config['hotkey']} — Fermez le tray pour quitter.")
+        self._qt_app.exec()
 
 
 def test_microphone(config: dict) -> None:
@@ -386,7 +396,7 @@ def test_microphone(config: dict) -> None:
     from src.audio.capture import AudioCapture
     import numpy as np
 
-    print("🎤 Test du microphone (3 secondes)...")
+    print("Test du microphone (3 secondes)...")
     capture = AudioCapture(
         sample_rate=config["audio"]["sample_rate"],
         channels=config["audio"]["channels"],
@@ -397,26 +407,27 @@ def test_microphone(config: dict) -> None:
     audio = capture.get_buffer()
 
     if len(audio) == 0:
-        print("❌ Aucun audio capturé ! Vérifiez votre micro.")
+        print("Aucun audio capture ! Verifiez votre micro.")
     else:
         volume = np.abs(audio).mean()
         duration = len(audio) / config["audio"]["sample_rate"]
-        print(f"✅ Audio capturé: {duration:.1f}s, volume moyen: {volume:.4f}")
+        print(f"Audio capture: {duration:.1f}s, volume moyen: {volume:.4f}")
         if volume < 0.001:
-            print("⚠️ Volume très faible. Vérifiez votre micro.")
+            print("Volume tres faible. Verifiez votre micro.")
         else:
-            print("🎉 Micro OK !")
+            print("Micro OK !")
 
 
 @click.command()
-@click.option("--model", default=None, help="Modèle Whisper (tiny/base/small/medium/large-v3)")
+@click.option("--model", default=None, help="Modele Whisper (tiny/base/small/medium/large-v3)")
 @click.option("--test", is_flag=True, help="Test du microphone")
-@click.option("--list-devices", is_flag=True, help="Liste les périphériques audio")
+@click.option("--list-devices", is_flag=True, help="Liste les peripheriques audio")
 @click.option("--config", "config_path", default="config.yaml", help="Chemin config")
-@click.option("--log-level", default="INFO", help="Niveau de log")
+@click.option("--log-level", default=None, help="Niveau de log")
 def main(model, test, list_devices, config_path, log_level):
-    """VoxTool — Dictée vocale intelligente."""
-    setup_logging(log_level)
+    """VoxTool — Dictee vocale intelligente."""
+    effective_log_level = log_level or os.getenv("VOXTOOL_LOG_LEVEL", "INFO")
+    setup_logging(effective_log_level)
     config = load_config(config_path)
 
     if list_devices:

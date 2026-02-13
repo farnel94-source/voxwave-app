@@ -42,6 +42,7 @@ class AudioCapture:
         self.buffer: list[np.ndarray] = []
         self._is_recording = False
         self._stream = None
+        self._current_amplitude: float = 0.0
         logger.info(f"AudioCapture init: {sample_rate}Hz, {channels}ch, chunk={chunk_size}, device={device_id}")
 
     def _audio_callback(self, indata, frames, time_info, status):
@@ -49,7 +50,9 @@ class AudioCapture:
         if status:
             logger.warning(f"Audio status: {status}")
         if self._is_recording:
-            self.buffer.append(indata.copy().flatten())
+            flat = indata.copy().flatten()
+            self.buffer.append(flat)
+            self._current_amplitude = float(np.abs(flat).mean())
 
     def start(self) -> None:
         """Démarre la capture audio."""
@@ -67,12 +70,18 @@ class AudioCapture:
         logger.info("Capture audio démarrée")
 
     def stop(self) -> None:
-        """Arrête la capture audio."""
+        """Arrête la capture audio (idempotent)."""
+        if not self._is_recording and self._stream is None:
+            return
         self._is_recording = False
         if self._stream:
-            self._stream.stop()
-            self._stream.close()
-            self._stream = None
+            try:
+                self._stream.stop()
+                self._stream.close()
+            except Exception as e:
+                logger.warning(f"Erreur fermeture stream: {e}")
+            finally:
+                self._stream = None
         logger.info(f"Capture arrêtée: {len(self.buffer)} chunks")
 
     def get_buffer(self) -> np.ndarray:
@@ -84,6 +93,11 @@ class AudioCapture:
     def clear_buffer(self) -> None:
         """Vide le buffer audio."""
         self.buffer = []
+
+    @property
+    def current_amplitude(self) -> float:
+        """Amplitude moyenne du dernier chunk audio (0.0 à 1.0)."""
+        return self._current_amplitude
 
     @property
     def is_recording(self) -> bool:

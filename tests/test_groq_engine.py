@@ -68,12 +68,11 @@ class TestGroqWhisperEngine:
         with pytest.raises(TranscriptionError):
             engine.transcribe(audio)
 
-    @patch.dict("os.environ", {"GROQ_API_KEY": "test-key"})
-    def test_strip_hallucinations(self):
-        engine = self._create_engine()
-        assert engine._strip_hallucinations("Bonjour. Sous-titrage ST") == "Bonjour."
-        assert engine._strip_hallucinations("Merci d'avoir regardé") == "Merci d'avoir regardé"
-        assert engine._strip_hallucinations("Texte normal") == "Texte normal"
+    def test_strip_hallucination_tails(self):
+        from src.transcription.hallucinations import strip_hallucination_tails
+        assert strip_hallucination_tails("Bonjour. Sous-titrage ST") == "Bonjour."
+        assert strip_hallucination_tails("Merci d'avoir regard\u00e9") == "Merci d'avoir regard\u00e9"
+        assert strip_hallucination_tails("Texte normal") == "Texte normal"
 
     @patch.dict("os.environ", {"GROQ_API_KEY": "test-key"})
     def test_no_speech_detection(self):

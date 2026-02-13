@@ -21,6 +21,7 @@ class HybridTranscriptionEngine:
         groq_model: str = "whisper-large-v3",
         local_model: str = "base",
         language: str = "fr",
+        sample_rate: int = 16000,
     ) -> None:
         """Initialise les engines cloud et local.
 
@@ -28,12 +29,15 @@ class HybridTranscriptionEngine:
             groq_model: Modèle Whisper sur Groq.
             local_model: Modèle faster-whisper local.
             language: Langue de transcription.
+            sample_rate: Taux d'échantillonnage audio (depuis config.yaml).
         """
         self.language = language
+        self.sample_rate = sample_rate
         self._groq_engine: Optional[object] = None
         self._local_engine: Optional[object] = None
         self._groq_model = groq_model
         self._local_model = local_model
+        self._last_detected_language: Optional[str] = None
 
         self._init_groq()
         self._init_local()
@@ -45,6 +49,7 @@ class HybridTranscriptionEngine:
             self._groq_engine = GroqWhisperEngine(
                 model=self._groq_model,
                 language=self.language,
+                sample_rate=self.sample_rate,
             )
             logger.info("Groq engine initialisé")
         except Exception as e:
@@ -62,17 +67,19 @@ class HybridTranscriptionEngine:
                 self._local_engine = WhisperEngine(
                     model=self._local_model,
                     language=self.language,
+                    sample_rate=self.sample_rate,
                 )
-                self._local_engine._load_model()
+                self._local_engine.preload()
                 logger.info("Whisper local chargé (fallback)")
             except Exception as e:
                 logger.error(f"Whisper local indisponible: {e}")
                 return None
         return self._local_engine
 
-    def _load_model(self) -> None:
-        """No-op : le modèle local est chargé en lazy loading."""
-        pass
+    def preload(self) -> None:
+        """Precharge le moteur local si disponible."""
+        if self._local_engine is not None:
+            self._local_engine.preload()
 
     def transcribe(self, audio: np.ndarray) -> str:
         """Transcrit en essayant Groq puis fallback local.
@@ -86,6 +93,7 @@ class HybridTranscriptionEngine:
         if self._groq_engine is not None:
             try:
                 text = self._groq_engine.transcribe(audio)
+                self._last_detected_language = self._groq_engine.last_detected_language
                 logger.info("Transcription via Groq (cloud)")
                 return text
             except Exception as e:
@@ -94,6 +102,13 @@ class HybridTranscriptionEngine:
         local = self._get_local_engine()
         if local is not None:
             logger.info("Transcription via Whisper (local)")
-            return local.transcribe(audio)
+            text = local.transcribe(audio)
+            self._last_detected_language = local.last_detected_language
+            return text
 
         raise RuntimeError("Aucun moteur de transcription disponible")
+
+    @property
+    def last_detected_language(self) -> Optional[str]:
+        """Dernière langue détectée par le moteur utilisé."""
+        return self._last_detected_language

@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from src.app import VoxTool, load_config
+from src.transcription.hallucinations import is_hallucination
 
 
 class TestLoadConfig:
@@ -32,30 +33,30 @@ class TestLoadConfig:
 
 
 class TestVoxToolHallucination:
-    """Tests détection d'hallucinations."""
+    """Tests detection d'hallucinations (delegue a hallucinations.py)."""
 
     @pytest.mark.parametrize("text", [
         "merci.", "Merci !", "merci",
         "sous-titrage", "Sous-titres",
-        "...", "…",
+        "...", "\u2026",
         "bye", "thank you",
     ])
     def test_known_hallucinations(self, text):
-        assert VoxTool._is_hallucination(text) is True
+        assert is_hallucination(text) is True
 
     @pytest.mark.parametrize("text", [
-        "oui", "non", "ok", "bien", "voilà",
+        "oui", "non", "ok", "bien", "voil\u00e0",
     ])
     def test_generic_short_hallucinations(self, text):
-        assert VoxTool._is_hallucination(text) is True
+        assert is_hallucination(text) is True
 
     @pytest.mark.parametrize("text", [
         "Je vais faire un git push sur la branche main.",
-        "Bonjour, comment ça va aujourd'hui ?",
+        "Bonjour, comment \u00e7a va aujourd'hui ?",
         "Il faut que je finisse ce projet.",
     ])
     def test_valid_text_not_hallucination(self, text):
-        assert VoxTool._is_hallucination(text) is False
+        assert is_hallucination(text) is False
 
 
 class TestVoxToolPipeline:

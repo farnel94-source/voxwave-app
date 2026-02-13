@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoxTool Voice Input</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: transparent;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* === Main container === */
+.voice-input {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 9999px;
+    /* Idle: no background, no border — just the logo */
+    padding: 4px;
+    border: 1.5px solid transparent;
+    background: transparent;
+    transition: padding 0.3s ease, border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+}
+/* Active state: pill appears */
+.voice-input.active {
+    padding: 8px;
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(24, 24, 27, 0.95);
+}
+.voice-input.active:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.05);
+}
+
+/* === Logo === */
+.logo-icon {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    cursor: pointer;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    filter: drop-shadow(0 0 6px rgba(180, 200, 230, 0.4));
+}
+.logo-icon:hover {
+    transform: scale(1.08);
+}
+
+/* === Icon area === */
+.icon-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Rotating square (recording indicator) */
+.rotating-square {
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 3px;
+    animation: rotate-square 2s ease-in-out infinite;
+}
+
+@keyframes rotate-square {
+    0% { transform: rotate(0deg); }
+    50% { transform: rotate(180deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* === Expandable area (bars + timer) === */
+.expand-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    overflow: hidden;
+    max-width: 0;
+    opacity: 0;
+    margin-left: 0;
+    transition: max-width 0.4s ease, opacity 0.4s ease, margin-left 0.4s ease;
+}
+.expand-area.visible {
+    max-width: 200px;
+    opacity: 1;
+    margin-left: 8px;
+}
+
+/* === Frequency bars === */
+.bars {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+}
+.bar {
+    width: 2px;
+    height: 2px;
+    background: #fff;
+    border-radius: 9999px;
+    transition: height 0.15s ease;
+}
+
+/* === Timer === */
+.timer {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    width: 40px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+/* === Processing state === */
+.voice-input.processing {
+    pointer-events: none;
+}
+.processing-text {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    display: none;
+    margin-left: 8px;
+}
+.voice-input.processing .processing-text {
+    display: block;
+}
+
+/* === Error state === */
+.error-text {
+    font-size: 12px;
+    color: #ff4444;
+    display: none;
+    margin-left: 8px;
+    font-weight: 600;
+}
+.voice-input.error .error-text {
+    display: block;
+}
+.voice-input.error {
+    pointer-events: none;
+    animation: shake 0.4s ease-in-out;
+}
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+}
+</style>
+</head>
+<body>
+
+<div class="voice-input" id="voice-input">
+    <div class="icon-area" id="icon-area">
+        <img class="logo-icon" id="logo-icon" src="logo.png" alt="VoxTool" />
+        <div class="rotating-square" id="rotating-square" style="display:none;"></div>
+    </div>
+
+    <div class="expand-area" id="expand-area">
+        <div class="bars" id="bars"></div>
+        <div class="timer" id="timer">00:00</div>
+    </div>
+
+    <span class="processing-text" id="processing-text">Traitement...</span>
+    <span class="error-text" id="error-text">Erreur</span>
+</div>
+
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script>
+let currentState = 'idle';
+let bridge = null;
+let timerSeconds = 0;
+let timerInterval = null;
+let barAnimationId = null;
+let targetAmplitude = 0.0;
+let amplitude = 0.0;
+
+const NUM_BARS = 12;
+
+const voiceInput = document.getElementById('voice-input');
+const logoIcon = document.getElementById('logo-icon');
+const rotatingSquare = document.getElementById('rotating-square');
+const expandArea = document.getElementById('expand-area');
+const barsContainer = document.getElementById('bars');
+const timerEl = document.getElementById('timer');
+const processingText = document.getElementById('processing-text');
+
+// Create bars
+for (let i = 0; i < NUM_BARS; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.dataset.index = i;
+    barsContainer.appendChild(bar);
+}
+const bars = barsContainer.querySelectorAll('.bar');
+
+// === QWebChannel Bridge ===
+if (typeof QWebChannel !== 'undefined') {
+    new QWebChannel(qt.webChannelTransport, function(channel) {
+        bridge = channel.objects.bridge;
+    });
+}
+
+// === Called from Python to update amplitude ===
+function updateAmplitude(value) {
+    targetAmplitude = Math.min(1.0, Math.max(0.0, value));
+}
+
+// === State management ===
+function setState(state) {
+    currentState = state;
+
+    if (state === 'idle') {
+        // Just the logo, no pill
+        logoIcon.style.display = '';
+        rotatingSquare.style.display = 'none';
+        expandArea.classList.remove('visible');
+        voiceInput.classList.remove('active', 'processing');
+        stopTimer();
+        stopBarAnimation();
+        targetAmplitude = 0.0;
+
+    } else if (state === 'recording') {
+        // Pill appears: rotating square + bars + timer
+        logoIcon.style.display = 'none';
+        rotatingSquare.style.display = '';
+        expandArea.classList.add('visible');
+        voiceInput.classList.add('active');
+        voiceInput.classList.remove('processing');
+        startTimer();
+        startBarAnimation();
+
+    } else if (state === 'processing') {
+        // Pill stays: rotating square + "Traitement..."
+        logoIcon.style.display = 'none';
+        rotatingSquare.style.display = '';
+        expandArea.classList.remove('visible');
+        voiceInput.classList.add('active', 'processing');
+        voiceInput.classList.remove('error');
+        stopTimer();
+        stopBarAnimation();
+        targetAmplitude = 0.02;
+
+    } else if (state === 'error') {
+        // Pill stays: logo + "Erreur" en rouge + shake
+        logoIcon.style.display = '';
+        rotatingSquare.style.display = 'none';
+        expandArea.classList.remove('visible');
+        voiceInput.classList.add('active', 'error');
+        voiceInput.classList.remove('processing');
+        stopTimer();
+        stopBarAnimation();
+        targetAmplitude = 0.0;
+    }
+}
+
+// === Click + Drag handling ===
+const DRAG_THRESHOLD = 5;
+let dragStartX = 0, dragStartY = 0;
+let isDragging = false;
+let isMouseDown = false;
+
+voiceInput.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) return;
+    isMouseDown = true;
+    isDragging = false;
+    dragStartX = e.screenX;
+    dragStartY = e.screenY;
+    e.preventDefault();
+});
+
+document.addEventListener('mousemove', function(e) {
+    if (!isMouseDown) return;
+    const dx = e.screenX - dragStartX;
+    const dy = e.screenY - dragStartY;
+    if (!isDragging && (Math.abs(dx) >= DRAG_THRESHOLD || Math.abs(dy) >= DRAG_THRESHOLD)) {
+        isDragging = true;
+    }
+    if (isDragging && bridge && bridge.move_by) {
+        bridge.move_by(dx, dy);
+        dragStartX = e.screenX;
+        dragStartY = e.screenY;
+    }
+});
+
+document.addEventListener('mouseup', function(e) {
+    if (!isMouseDown) return;
+    isMouseDown = false;
+    if (!isDragging) {
+        if (currentState === 'idle') {
+            if (bridge && bridge.on_start_clicked) bridge.on_start_clicked();
+        } else if (currentState === 'recording') {
+            if (bridge && bridge.on_stop_clicked) bridge.on_stop_clicked();
+        }
+    }
+    isDragging = false;
+});
+
+// === Timer ===
+function startTimer() {
+    timerSeconds = 0;
+    timerEl.textContent = '00:00';
+    timerInterval = setInterval(() => {
+        timerSeconds++;
+        const mins = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
+        const secs = (timerSeconds % 60).toString().padStart(2, '0');
+        timerEl.textContent = `${mins}:${secs}`;
+    }, 1000);
+}
+
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+    timerSeconds = 0;
+    timerEl.textContent = '00:00';
+}
+
+// === Bar animation (driven by amplitude from Python) ===
+function startBarAnimation() {
+    if (barAnimationId) return;
+    animateBars();
+}
+
+function stopBarAnimation() {
+    if (barAnimationId) {
+        cancelAnimationFrame(barAnimationId);
+        barAnimationId = null;
+    }
+    bars.forEach(bar => bar.style.height = '2px');
+}
+
+function animateBars() {
+    amplitude += (targetAmplitude - amplitude) * 0.15;
+
+    const time = performance.now() / 1000;
+    bars.forEach((bar, i) => {
+        const phase = i * 0.5 + time * (2 + amplitude * 4);
+        const wave = Math.sin(phase) * 0.5 + 0.5;
+        const minH = 2;
+        const maxH = 3 + amplitude * 18;
+        const h = minH + wave * (maxH - minH);
+        bar.style.height = h.toFixed(1) + 'px';
+    });
+
+    barAnimationId = requestAnimationFrame(animateBars);
+}
+</script>
+</body>
+</html>

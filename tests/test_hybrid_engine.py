@@ -59,9 +59,9 @@ class TestHybridTranscriptionEngine:
 
     @patch("src.transcription.hybrid_engine.HybridTranscriptionEngine._init_groq")
     @patch("src.transcription.hybrid_engine.HybridTranscriptionEngine._init_local")
-    def test_load_model_is_noop(self, mock_init_local, mock_init_groq):
+    def test_preload_without_local_is_noop(self, mock_init_local, mock_init_groq):
         from src.transcription.hybrid_engine import HybridTranscriptionEngine
 
         engine = HybridTranscriptionEngine()
-        # Should not raise
-        engine._load_model()
+        # Should not raise (no local engine to preload)
+        engine.preload()

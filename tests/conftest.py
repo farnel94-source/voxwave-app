@@ -76,6 +76,7 @@ def sample_config():
         "licensing": {
             "provider": "lemonsqueezy",
             "free_limit": 1000,
+            "free_daily_limit": 50,
             "cache_duration": 86400,
         },
     }

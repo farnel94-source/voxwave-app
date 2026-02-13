@@ -59,26 +59,52 @@ class TestLicenseStorage:
             LicenseStorage.increment_usage()
             assert LicenseStorage.get_usage() == 2
 
+    def test_daily_usage_counter(self, tmp_path):
+        with patch("src.licensing.storage.VOXTOOL_DIR", tmp_path), \
+             patch("src.licensing.storage.USAGE_FILE", tmp_path / "usage.json"):
+            from src.licensing.storage import LicenseStorage
+
+            assert LicenseStorage.get_daily_usage() == 0
+            LicenseStorage.increment_usage()
+            assert LicenseStorage.get_daily_usage() == 1
+            LicenseStorage.increment_usage()
+            assert LicenseStorage.get_daily_usage() == 2
+
+    def test_daily_usage_resets_on_new_day(self, tmp_path):
+        with patch("src.licensing.storage.VOXTOOL_DIR", tmp_path), \
+             patch("src.licensing.storage.USAGE_FILE", tmp_path / "usage.json"):
+            from src.licensing.storage import LicenseStorage
+
+            # Simulate usage from a different day
+            data = {"count": 5, "daily_count": 5, "daily_date": "2024-01-01"}
+            (tmp_path / "usage.json").write_text(json.dumps(data))
+            # Daily usage should be 0 (different day)
+            assert LicenseStorage.get_daily_usage() == 0
+            # Total usage should still be 5
+            assert LicenseStorage.get_usage() == 5
+
 
 class TestLicenseValidator:
     """Tests LicenseValidator."""
 
-    def test_can_transcribe_under_limit(self):
+    @patch("src.licensing.validator._is_dev_mode", return_value=False)
+    def test_can_transcribe_under_daily_limit(self, _):
         from src.licensing.validator import LicenseValidator
 
-        validator = LicenseValidator(free_limit=10)
+        validator = LicenseValidator(free_daily_limit=10)
         validator.storage = MagicMock()
-        validator.storage.get_usage.return_value = 5
+        validator.storage.get_daily_usage.return_value = 5
         validator.storage.load_license.return_value = None
 
         assert validator.can_transcribe() is True
 
-    def test_cannot_transcribe_over_limit(self):
+    @patch("src.licensing.validator._is_dev_mode", return_value=False)
+    def test_cannot_transcribe_over_daily_limit(self, _):
         from src.licensing.validator import LicenseValidator
 
-        validator = LicenseValidator(free_limit=10)
+        validator = LicenseValidator(free_daily_limit=10)
         validator.storage = MagicMock()
-        validator.storage.get_usage.return_value = 10
+        validator.storage.get_daily_usage.return_value = 10
         validator.storage.load_license.return_value = None
 
         assert validator.can_transcribe() is False
@@ -86,26 +112,37 @@ class TestLicenseValidator:
     def test_licensed_user_always_can_transcribe(self):
         from src.licensing.validator import LicenseValidator
 
-        validator = LicenseValidator(free_limit=10)
+        validator = LicenseValidator(free_daily_limit=10)
         validator.storage = MagicMock()
-        validator.storage.get_usage.return_value = 99999
+        validator.storage.get_daily_usage.return_value = 99999
         validator.storage.load_license.return_value = {"license_key": "valid-key"}
         validator.client = MagicMock()
         validator.client.validate_license.return_value = {"valid": True}
 
         assert validator.can_transcribe() is True
 
-    def test_increment_usage_returns_false_at_limit(self):
+    @patch("src.licensing.validator._is_dev_mode", return_value=False)
+    def test_increment_usage_returns_false_at_daily_limit(self, _):
         from src.licensing.validator import LicenseValidator
 
-        validator = LicenseValidator(free_limit=5)
+        validator = LicenseValidator(free_daily_limit=5)
         validator.storage = MagicMock()
         validator.storage.load_license.return_value = None
-        validator.storage.increment_usage.return_value = 6
-        validator.storage.get_usage.return_value = 6
+        validator.storage.get_daily_usage.return_value = 5
 
-        # No license, count exceeds limit
         assert validator.increment_usage() is False
+
+    @patch("src.licensing.validator._is_dev_mode", return_value=False)
+    def test_increment_usage_returns_true_under_daily_limit(self, _):
+        from src.licensing.validator import LicenseValidator
+
+        validator = LicenseValidator(free_daily_limit=50)
+        validator.storage = MagicMock()
+        validator.storage.load_license.return_value = None
+        validator.storage.get_daily_usage.return_value = 3
+
+        assert validator.increment_usage() is True
+        validator.storage.increment_usage.assert_called_once()
 
     def test_activate_license(self):
         from src.licensing.validator import LicenseValidator
@@ -132,19 +169,22 @@ class TestLicenseValidator:
         with pytest.raises(LicenseError):
             validator.activate_license("bad-key")
 
-    def test_get_usage_info(self):
+    @patch("src.licensing.validator._is_dev_mode", return_value=False)
+    def test_get_usage_info(self, _):
         from src.licensing.validator import LicenseValidator
 
-        validator = LicenseValidator(free_limit=1000)
+        validator = LicenseValidator(free_daily_limit=50)
         validator.storage = MagicMock()
         validator.storage.load_license.return_value = None
         validator.storage.get_usage.return_value = 42
+        validator.storage.get_daily_usage.return_value = 7
 
         info = validator.get_usage_info()
         assert info["licensed"] is False
         assert info["usage"] == 42
-        assert info["limit"] == 1000
-        assert info["remaining"] == 958
+        assert info["daily_usage"] == 7
+        assert info["daily_limit"] == 50
+        assert info["remaining_today"] == 43
 
     def test_offline_validation_trusts_cache(self):
         from src.licensing.validator import LicenseValidator
@@ -155,5 +195,54 @@ class TestLicenseValidator:
         validator.client = MagicMock()
         validator.client.validate_license.side_effect = LicenseError("Network error")
 
-        # Should trust local cache when offline
         assert validator.is_licensed() is True
+
+    @patch("src.licensing.validator._is_dev_mode", return_value=False)
+    def test_get_transcription_provider_free(self, _):
+        from src.licensing.validator import LicenseValidator
+
+        validator = LicenseValidator()
+        validator.storage = MagicMock()
+        validator.storage.load_license.return_value = None
+        assert validator.get_transcription_provider() == "local"
+
+    def test_get_transcription_provider_paid(self):
+        from src.licensing.validator import LicenseValidator
+
+        validator = LicenseValidator()
+        validator._cached_valid = True
+        validator._cache_time = __import__("time").time()
+        assert validator.get_transcription_provider() == "hybrid"
+
+    @patch("src.licensing.validator._is_dev_mode", return_value=False)
+    def test_get_cleaning_provider_free(self, _):
+        from src.licensing.validator import LicenseValidator
+
+        validator = LicenseValidator()
+        validator.storage = MagicMock()
+        validator.storage.load_license.return_value = None
+        assert validator.get_cleaning_provider() == "local"
+
+    def test_get_cleaning_provider_paid(self):
+        from src.licensing.validator import LicenseValidator
+
+        validator = LicenseValidator()
+        validator._cached_valid = True
+        validator._cache_time = __import__("time").time()
+        assert validator.get_cleaning_provider() == "hybrid"
+
+    def test_days_remaining_no_license(self):
+        from src.licensing.validator import LicenseValidator
+
+        validator = LicenseValidator()
+        validator.storage = MagicMock()
+        validator.storage.load_license.return_value = None
+        assert validator.days_remaining() is None
+
+    def test_days_remaining_lifetime(self):
+        from src.licensing.validator import LicenseValidator
+
+        validator = LicenseValidator()
+        validator.storage = MagicMock()
+        validator.storage.load_license.return_value = {"license_key": "k"}
+        assert validator.days_remaining() is None

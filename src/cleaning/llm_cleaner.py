@@ -35,7 +35,7 @@ class CloudLLMCleaner:
             api_key: Clé API OpenAI (ou variable d'env OPENAI_API_KEY).
         """
         self.model = model
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = (api_key or os.getenv("OPENAI_API_KEY") or "").strip()
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY non configurée")
         self._client = None
@@ -96,9 +96,9 @@ class CloudLLMCleaner:
 class LLMCleaner:
     """Nettoyeur via Ollama."""
 
-    def __init__(self, model: str = "gemma3:4b", host: str = "http://localhost:11434", timeout: int = 5) -> None:
+    def __init__(self, model: str = "gemma3:4b", host: Optional[str] = None, timeout: int = 5) -> None:
         self.model = model
-        self.host = host
+        self.host = host or os.getenv("OLLAMA_HOST", "http://localhost:11434")
         self.timeout = timeout
 
     def is_available(self) -> bool:
@@ -117,9 +117,14 @@ class LLMCleaner:
         response = requests.post(
             f"{self.host}/api/generate",
             json={"model": self.model, "prompt": CLEANING_PROMPT.format(text=text), "stream": False},
-            timeout=self.timeout,
+            timeout=(5, self.timeout),  # (connect_timeout, read_timeout)
         )
-        return response.json()["response"].strip()
+        response.raise_for_status()
+        data = response.json()
+        result = data.get("response")
+        if not result:
+            raise CleaningError(f"Réponse Ollama invalide: clé 'response' manquante dans {data}")
+        return result.strip()
 
 
 class CleaningPipeline:
@@ -131,6 +136,8 @@ class CleaningPipeline:
         llm_model: str = "gemma3:4b",
         cloud_model: Optional[str] = None,
         cleaning_provider: str = "hybrid",
+        language: str = "fr",
+        filler_words: Optional[list] = None,
     ) -> None:
         """Initialise le pipeline de nettoyage.
 
@@ -139,12 +146,14 @@ class CleaningPipeline:
             llm_model: Modèle Ollama local.
             cloud_model: Modèle OpenAI cloud.
             cleaning_provider: Provider (hybrid, cloud, local).
+            language: Code langue ISO 639-1 (depuis config.yaml).
+            filler_words: Liste de mots de remplissage (override config).
         """
         from src.cleaning.regex_cleaner import RegexCleaner
 
         self.mode = mode
         self.cleaning_provider = cleaning_provider
-        self.regex_cleaner = RegexCleaner()
+        self.regex_cleaner = RegexCleaner(language=language, filler_words=filler_words)
         self._cloud_cleaner: Optional[CloudLLMCleaner] = None
         self._local_cleaner: Optional[LLMCleaner] = None
 

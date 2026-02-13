@@ -11,90 +11,107 @@ from src.hotkey.listener import HotkeyListener
 class TestHotkeyListener:
     """Tests HotkeyListener."""
 
-    def test_init_defaults(self):
+    @patch.object(HotkeyListener, "_detect_backend", return_value="pynput")
+    def test_init_defaults(self, mock_backend):
         listener = HotkeyListener()
         assert listener.hotkey == "F8"
         assert listener.is_recording is False
 
-    def test_init_custom_hotkey(self):
+    @patch.object(HotkeyListener, "_detect_backend", return_value="pynput")
+    def test_init_custom_hotkey(self, mock_backend):
         listener = HotkeyListener(hotkey="F9")
         assert listener.hotkey == "F9"
 
-    def test_set_processing(self):
+    @patch.object(HotkeyListener, "_detect_backend", return_value="pynput")
+    def test_set_processing(self, mock_backend):
         listener = HotkeyListener()
         listener.set_processing(True)
         assert listener._is_processing is True
         listener.set_processing(False)
         assert listener._is_processing is False
 
-    def test_on_press_triggers_start(self):
+    @patch.object(HotkeyListener, "_detect_backend", return_value="pynput")
+    def test_handle_hotkey_triggers_start(self, mock_backend):
         on_start = MagicMock()
         on_stop = MagicMock()
         listener = HotkeyListener(on_start=on_start, on_stop=on_stop)
-
-        from pynput.keyboard import Key
-
         listener._last_press_time = 0
-        # Call the real _on_press (not mocked)
-        HotkeyListener._on_press(listener, Key.f8)
+        listener._handle_hotkey()
         on_start.assert_called_once()
         assert listener.is_recording is True
 
-    def test_on_press_triggers_stop(self):
+    @patch.object(HotkeyListener, "_detect_backend", return_value="pynput")
+    def test_handle_hotkey_triggers_stop(self, mock_backend):
         on_start = MagicMock()
         on_stop = MagicMock()
         listener = HotkeyListener(on_start=on_start, on_stop=on_stop)
-
-        from pynput.keyboard import Key
-
         listener._last_press_time = 0
-        HotkeyListener._on_press(listener, Key.f8)  # Start
+        listener._handle_hotkey()  # Start
         listener._last_press_time = 0  # Reset debounce
-        HotkeyListener._on_press(listener, Key.f8)  # Stop
+        listener._handle_hotkey()  # Stop
         on_stop.assert_called_once()
 
-    def test_debounce_ignores_rapid_presses(self):
+    @patch.object(HotkeyListener, "_detect_backend", return_value="pynput")
+    def test_on_press_pynput_triggers_start(self, mock_backend):
         on_start = MagicMock()
         listener = HotkeyListener(on_start=on_start)
-
         from pynput.keyboard import Key
-
-        listener._on_press(Key.f8)
-        listener._on_press(Key.f8)  # Should be debounced
-        # Only one call
+        listener._last_press_time = 0
+        listener._on_press_pynput(Key.f8)
         on_start.assert_called_once()
 
-    def test_ignores_when_processing(self):
+    @patch.object(HotkeyListener, "_detect_backend", return_value="pynput")
+    def test_debounce_ignores_rapid_presses(self, mock_backend):
+        on_start = MagicMock()
+        listener = HotkeyListener(on_start=on_start)
+        from pynput.keyboard import Key
+        listener._on_press_pynput(Key.f8)
+        listener._on_press_pynput(Key.f8)  # Should be debounced
+        on_start.assert_called_once()
+
+    @patch.object(HotkeyListener, "_detect_backend", return_value="pynput")
+    def test_ignores_when_processing(self, mock_backend):
         on_start = MagicMock()
         listener = HotkeyListener(on_start=on_start)
         listener.set_processing(True)
-
         from pynput.keyboard import Key
-
         listener._last_press_time = 0
-        listener._on_press(Key.f8)
+        listener._on_press_pynput(Key.f8)
         on_start.assert_not_called()
 
-    def test_ignores_other_keys(self):
+    @patch.object(HotkeyListener, "_detect_backend", return_value="pynput")
+    def test_ignores_other_keys(self, mock_backend):
         on_start = MagicMock()
         listener = HotkeyListener(on_start=on_start)
-
         from pynput.keyboard import Key
-
-        listener._on_press(Key.f9)
+        listener._on_press_pynput(Key.f9)
         on_start.assert_not_called()
 
+    @patch.object(HotkeyListener, "_detect_backend", return_value="pynput")
     @patch("pynput.keyboard.Listener")
-    def test_start_creates_listener(self, mock_listener_class):
+    def test_start_creates_listener(self, mock_listener_class, mock_backend):
         listener = HotkeyListener()
         listener.start()
         mock_listener_class.assert_called_once()
 
+    @patch.object(HotkeyListener, "_detect_backend", return_value="pynput")
     @patch("pynput.keyboard.Listener")
-    def test_stop(self, mock_listener_class):
+    def test_stop(self, mock_listener_class, mock_backend):
         listener = HotkeyListener()
         mock_instance = MagicMock()
         mock_listener_class.return_value = mock_instance
         listener.start()
         listener.stop()
         mock_instance.stop.assert_called_once()
+
+
+class TestHotkeyListenerBackendDetection:
+    """Tests de la detection du backend."""
+
+    @patch("sys.platform", "win32")
+    def test_windows_uses_pynput(self):
+        assert HotkeyListener._detect_backend() == "pynput"
+
+    @patch("sys.platform", "darwin")
+    def test_darwin_uses_pynput(self):
+        assert HotkeyListener._detect_backend() == "pynput"

@@ -1,13 +1,29 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec pour VoxTool."""
+"""PyInstaller spec pour VoxTool (multi-plateforme)."""
 
 import os
 import sys
 
 block_cipher = None
 
-# Répertoire racine du projet
+# Repertoire racine du projet
 ROOT = os.path.dirname(os.path.abspath(SPEC))
+
+# Detection plateforme
+is_linux = sys.platform == "linux"
+is_windows = sys.platform == "win32"
+is_darwin = sys.platform == "darwin"
+
+# Icone : .ico pour Windows, .png pour Linux, .icns pour macOS
+icon_file = None
+if is_windows:
+    ico_path = os.path.join(ROOT, 'assets', 'icon.ico')
+    if os.path.exists(ico_path):
+        icon_file = ico_path
+elif is_darwin:
+    icns_path = os.path.join(ROOT, 'assets', 'icon.icns')
+    if os.path.exists(icns_path):
+        icon_file = icns_path
 
 a = Analysis(
     [os.path.join(ROOT, 'src', '__main__.py')],
@@ -16,6 +32,7 @@ a = Analysis(
     datas=[
         (os.path.join(ROOT, 'config.yaml'), '.'),
         (os.path.join(ROOT, '.env.example'), '.'),
+        (os.path.join(ROOT, 'src', 'gui', 'orb'), 'src/gui/orb'),
     ],
     hiddenimports=[
         'faster_whisper',
@@ -23,7 +40,15 @@ a = Analysis(
         'numpy',
         'groq',
         'openai',
-        'pystray',
+        # PySide6
+        'PySide6',
+        'PySide6.QtCore',
+        'PySide6.QtGui',
+        'PySide6.QtWidgets',
+        'PySide6.QtWebEngineWidgets',
+        'PySide6.QtWebChannel',
+        'PySide6.QtWebEngineCore',
+        'shiboken6',
         'PIL',
         'PIL.Image',
         'PIL.ImageDraw',
@@ -31,7 +56,9 @@ a = Analysis(
         'cryptography.fernet',
         'pynput',
         'pynput.keyboard',
+        'evdev',
         'pyperclip',
+        'keyboard',
         'yaml',
         'click',
         'requests',
@@ -57,12 +84,14 @@ a = Analysis(
         'src.gui',
         'src.gui.icons',
         'src.gui.tray_icon',
+        'src.gui.waveform_widget',
         'src.config',
         'src.config.defaults',
         'src.config.validator',
         'src.utils',
         'src.utils.retry',
         'src.utils.exceptions',
+        'src.utils.platform',
         'src.licensing',
         'src.licensing.lemonsqueezy',
         'src.licensing.storage',
@@ -78,6 +107,7 @@ a = Analysis(
         'pytest',
         'black',
         'flake8',
+        'pystray',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -97,7 +127,7 @@ exe = EXE(
     name='VoxTool',
     debug=False,
     bootloader_ignore_signals=False,
-    strip=False,
+    strip=is_linux,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
@@ -107,5 +137,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,
+    icon=icon_file,
 )
