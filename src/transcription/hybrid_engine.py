@@ -6,9 +6,11 @@ Usage:
 """
 
 import logging
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
+
+from src.utils.circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,7 @@ class HybridTranscriptionEngine:
         local_model: str = "base",
         language: str = "fr",
         sample_rate: int = 16000,
+        on_fallback: Optional[Callable[[str], None]] = None,
     ) -> None:
         """Initialise les engines cloud et local.
 
@@ -30,14 +33,17 @@ class HybridTranscriptionEngine:
             local_model: Modèle faster-whisper local.
             language: Langue de transcription.
             sample_rate: Taux d'échantillonnage audio (depuis config.yaml).
+            on_fallback: Callback appele lors d'un fallback (message str).
         """
         self.language = language
         self.sample_rate = sample_rate
+        self.on_fallback = on_fallback
         self._groq_engine: Optional[object] = None
         self._local_engine: Optional[object] = None
         self._groq_model = groq_model
         self._local_model = local_model
         self._last_detected_language: Optional[str] = None
+        self._circuit = CircuitBreaker(name="groq", failure_threshold=3, cooldown_seconds=30.0)
 
         self._init_groq()
         self._init_local()
@@ -51,6 +57,7 @@ class HybridTranscriptionEngine:
                 language=self.language,
                 sample_rate=self.sample_rate,
             )
+            self._groq_engine.set_circuit_breaker(self._circuit)
             logger.info("Groq engine initialisé")
         except Exception as e:
             logger.warning(f"Groq indisponible: {e}")
@@ -98,6 +105,8 @@ class HybridTranscriptionEngine:
                 return text
             except Exception as e:
                 logger.warning(f"Groq echec, fallback local: {e}")
+                if self.on_fallback:
+                    self.on_fallback("Transcription : mode local (cloud indisponible)")
 
         local = self._get_local_engine()
         if local is not None:

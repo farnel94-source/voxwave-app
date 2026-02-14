@@ -9,9 +9,40 @@ import platform
 import shutil
 import subprocess
 import time
-from typing import Literal, Optional
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from typing import Any, Callable, Literal, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+def _with_timeout(func: Callable[..., T], timeout: float, default: T, *args: Any, **kwargs: Any) -> T:
+    """Execute une fonction avec timeout via ThreadPoolExecutor.
+
+    Args:
+        func: Fonction a executer.
+        timeout: Timeout en secondes.
+        default: Valeur retournee si timeout.
+        *args: Arguments positionnels pour func.
+        **kwargs: Arguments nommes pour func.
+
+    Returns:
+        Resultat de func ou default si timeout.
+    """
+    func_name = getattr(func, "__name__", repr(func))
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(func, *args, **kwargs)
+    try:
+        return future.result(timeout=timeout)
+    except FutureTimeoutError:
+        logger.warning(f"Timeout ({timeout}s) sur {func_name}, valeur par defaut utilisee")
+        return default
+    except Exception as e:
+        logger.warning(f"Erreur sur {func_name}: {e}")
+        return default
+    finally:
+        executor.shutdown(wait=False)
 
 
 class TextInjector:
@@ -20,10 +51,14 @@ class TextInjector:
     def __init__(self, mode: Literal["paste", "type"] = "paste") -> None:
         self.mode = mode
         self.os_name = platform.system().lower()
+        self._wayland_paste_tool: Optional[str] = None
+        self._wayland_type_tool: Optional[str] = None
         if self.os_name == "linux":
             from src.utils.platform import get_display_server
             self._display_server = get_display_server()
             self._check_clipboard_tools()
+            if self._display_server == "wayland":
+                self._detect_wayland_tools()
         else:
             self._display_server = self.os_name
 
@@ -52,24 +87,78 @@ class TextInjector:
                     "sudo apt install xclip"
                 )
 
+    def _detect_wayland_tools(self) -> None:
+        """Detecte les outils disponibles pour Wayland et etablit la cascade.
+
+        Paste: wtype → ydotool → pynput (XWayland apps)
+        Type:  wtype → ydotool → None (erreur explicite)
+        """
+        # Cascade paste
+        if shutil.which("wtype"):
+            self._wayland_paste_tool = "wtype"
+        elif shutil.which("ydotool"):
+            self._wayland_paste_tool = "ydotool"
+            logger.info("wtype non trouve, utilisation de ydotool pour le paste Wayland")
+        else:
+            self._wayland_paste_tool = "pynput"
+            logger.warning(
+                "wtype et ydotool non trouves. Fallback pynput (XWayland uniquement). "
+                "Installez wtype: sudo apt install wtype"
+            )
+
+        # Cascade type
+        if shutil.which("wtype"):
+            self._wayland_type_tool = "wtype"
+        elif shutil.which("ydotool"):
+            self._wayland_type_tool = "ydotool"
+            logger.info("wtype non trouve, utilisation de ydotool pour la frappe Wayland")
+        else:
+            self._wayland_type_tool = None
+            logger.warning(
+                "Aucun outil de frappe Wayland disponible. "
+                "Installez wtype (sudo apt install wtype) ou ydotool (sudo apt install ydotool)"
+            )
+
+        logger.info(f"Wayland tools: paste={self._wayland_paste_tool}, type={self._wayland_type_tool}")
+
     @staticmethod
     def _save_clipboard() -> Optional[str]:
-        """Sauvegarde le contenu actuel du clipboard."""
+        """Sauvegarde le contenu actuel du clipboard (avec timeout 2s)."""
         try:
             import pyperclip
-            return pyperclip.paste()
+            return _with_timeout(pyperclip.paste, 2.0, None)
         except Exception:
             logger.debug("Impossible de lire le clipboard")
             return None
 
     @staticmethod
+    def _copy_to_clipboard(text: str) -> None:
+        """Copie du texte dans le clipboard (avec timeout 2s).
+
+        Args:
+            text: Texte a copier.
+        """
+        import pyperclip
+        _with_timeout(pyperclip.copy, 2.0, None, text)
+
+    @staticmethod
+    def _paste_from_clipboard() -> Optional[str]:
+        """Lit le clipboard (avec timeout 2s).
+
+        Returns:
+            Contenu du clipboard ou None si timeout.
+        """
+        import pyperclip
+        return _with_timeout(pyperclip.paste, 2.0, None)
+
+    @staticmethod
     def _restore_clipboard(content: Optional[str]) -> None:
-        """Restaure le clipboard a son contenu original."""
+        """Restaure le clipboard a son contenu original (avec timeout 2s)."""
         if content is not None:
             try:
                 import pyperclip
                 time.sleep(0.3)
-                pyperclip.copy(content)
+                _with_timeout(pyperclip.copy, 2.0, None, content)
                 logger.debug("Clipboard restaure")
             except Exception:
                 logger.warning("Impossible de restaurer le clipboard")
@@ -105,17 +194,16 @@ class TextInjector:
     def _inject_paste_win32(self, text: str) -> None:
         """Injection Windows : pyperclip + keyboard.send('ctrl+v')."""
         import keyboard as kb
-        import pyperclip
 
         original = self._save_clipboard()
         try:
-            pyperclip.copy(text)
+            self._copy_to_clipboard(text)
             time.sleep(0.05)
 
-            actual = pyperclip.paste()
+            actual = self._paste_from_clipboard()
             if actual != text:
-                logger.warning(f"Clipboard mismatch: attendu {len(text)}, obtenu {len(actual)} chars")
-                pyperclip.copy(text)
+                logger.warning(f"Clipboard mismatch: attendu {len(text)}, obtenu {len(actual) if actual else 0} chars")
+                self._copy_to_clipboard(text)
                 time.sleep(0.05)
             else:
                 logger.debug(f"Clipboard OK ({len(text)} chars)")
@@ -127,31 +215,38 @@ class TextInjector:
             self._restore_clipboard(original)
 
     def _inject_paste_wayland(self, text: str) -> None:
-        """Injection Wayland : wl-copy + wtype Ctrl+V."""
-        import pyperclip
-
+        """Injection Wayland : wl-copy + wtype/ydotool/pynput Ctrl+V."""
         original = self._save_clipboard()
         try:
-            pyperclip.copy(text)
+            self._copy_to_clipboard(text)
             time.sleep(0.05)
 
-            if shutil.which("wtype"):
+            if self._wayland_paste_tool == "wtype":
                 subprocess.run(
                     ["wtype", "-M", "ctrl", "v", "-m", "ctrl"],
                     timeout=5, check=False,
                 )
+            elif self._wayland_paste_tool == "ydotool":
+                # ydotool keycodes: ctrl=29, v=47
+                subprocess.run(
+                    ["ydotool", "key", "29:1", "47:1", "47:0", "29:0"],
+                    timeout=5, check=False,
+                )
+            elif self._wayland_paste_tool == "pynput":
+                self._do_pynput_paste()
             else:
-                logger.error("wtype non disponible, injection impossible sur Wayland")
+                logger.error(
+                    "Aucun outil d'injection disponible sur Wayland. "
+                    "Installez wtype (sudo apt install wtype) ou ydotool (sudo apt install ydotool)"
+                )
         finally:
             self._restore_clipboard(original)
 
     def _inject_paste_x11(self, text: str) -> None:
         """Injection X11 : pyperclip + xdotool key ctrl+v."""
-        import pyperclip
-
         original = self._save_clipboard()
         try:
-            pyperclip.copy(text)
+            self._copy_to_clipboard(text)
             time.sleep(0.05)
 
             if shutil.which("xdotool"):
@@ -167,16 +262,14 @@ class TextInjector:
 
     def _inject_paste_pynput(self, text: str) -> None:
         """Injection macOS/fallback via pyperclip + pynput."""
-        import pyperclip
-
         original = self._save_clipboard()
         try:
-            pyperclip.copy(text)
+            self._copy_to_clipboard(text)
             time.sleep(0.05)
 
-            actual = pyperclip.paste()
+            actual = self._paste_from_clipboard()
             if actual != text:
-                logger.warning(f"Clipboard mismatch: attendu {len(text)}, obtenu {len(actual)} chars")
+                logger.warning(f"Clipboard mismatch: attendu {len(text)}, obtenu {len(actual) if actual else 0} chars")
 
             time.sleep(0.05)
             self._do_pynput_paste()
@@ -184,23 +277,30 @@ class TextInjector:
             self._restore_clipboard(original)
 
     def _do_pynput_paste(self) -> None:
-        """Execute le Ctrl+V / Cmd+V via pynput."""
-        from pynput.keyboard import Controller, Key
-        ctrl = Controller()
-        mod = Key.cmd if self.os_name == "darwin" else Key.ctrl
-        ctrl.press(mod)
-        ctrl.press('v')
-        time.sleep(0.02)
-        ctrl.release('v')
-        ctrl.release(mod)
+        """Execute le Ctrl+V / Cmd+V via pynput (avec timeout 3s)."""
+        def _paste_action() -> None:
+            from pynput.keyboard import Controller, Key
+            ctrl = Controller()
+            mod = Key.cmd if self.os_name == "darwin" else Key.ctrl
+            ctrl.press(mod)
+            ctrl.press('v')
+            time.sleep(0.02)
+            ctrl.release('v')
+            ctrl.release(mod)
+        _with_timeout(_paste_action, 3.0, None)
 
     def _inject_type(self, text: str) -> None:
         """Injection par frappe clavier."""
         if self.os_name == "linux" and self._display_server == "wayland":
-            if shutil.which("wtype"):
+            if self._wayland_type_tool == "wtype":
                 subprocess.run(["wtype", text], timeout=10, check=False)
+            elif self._wayland_type_tool == "ydotool":
+                subprocess.run(["ydotool", "type", text], timeout=10, check=False)
             else:
-                logger.error("wtype non disponible pour la frappe Wayland")
+                logger.error(
+                    "Aucun outil de frappe Wayland disponible. "
+                    "Installez wtype (sudo apt install wtype) ou ydotool (sudo apt install ydotool)"
+                )
         else:
             import keyboard as kb
             kb.write(text, delay=0.01)

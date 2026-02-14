@@ -27,12 +27,28 @@ def deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
+def _validate_hotkey(hotkey_str: str) -> bool:
+    """Valide un format hotkey (combo ou touche simple).
+
+    Args:
+        hotkey_str: Chaine hotkey (ex: "F8", "Ctrl+Shift+V").
+
+    Returns:
+        True si le format est valide.
+    """
+    try:
+        from src.hotkey.listener import parse_hotkey
+        parse_hotkey(hotkey_str)
+        return True
+    except (ValueError, Exception):
+        return False
+
+
 class ConfigValidator:
     """Valide et complète la configuration utilisateur."""
 
     VALID_PROVIDERS = ("hybrid", "cloud", "local")
     VALID_CLEANING_MODES = ("verbatim", "quality")
-    VALID_HOTKEYS = ("F8", "F9", "F10", "F11", "F12")
     VALID_INJECTION_MODES = ("paste", "type")
 
     @classmethod
@@ -60,7 +76,7 @@ class ConfigValidator:
             ValueError: Si une valeur est invalide.
         """
         # Hotkey
-        if config.get("hotkey") not in cls.VALID_HOTKEYS:
+        if not _validate_hotkey(config.get("hotkey", "F8")):
             logger.warning(
                 f"Hotkey '{config.get('hotkey')}' invalide, utilisation de F8"
             )

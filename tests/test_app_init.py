@@ -60,15 +60,23 @@ class TestVoxToolInit:
         app.license_validator = MagicMock()
         app.license_validator.increment_usage.return_value = True
 
-        # 130s audio (over max)
+        # 130s audio (over max) — gets truncated to 120s
         long_audio = np.zeros(int(16000 * 130), dtype=np.float32)
-        app.processor.prepare_for_whisper.return_value = long_audio[:int(16000 * 120)]
+        prepared = long_audio[:int(16000 * 120)]
+        app.processor.prepare_for_whisper.return_value = prepared
+        # Chunked: 120s > 30s threshold, split into chunks
+        app.processor.split_at_silence.return_value = [
+            prepared[:int(16000 * 30)],
+            prepared[int(16000 * 30):int(16000 * 60)],
+            prepared[int(16000 * 60):int(16000 * 90)],
+            prepared[int(16000 * 90):],
+        ]
         app.engine.transcribe.return_value = "Texte long"
         app.pipeline.clean.return_value = "Texte long."
 
         app._process_audio(long_audio)
-        # Should have been processed (not rejected)
-        app.engine.transcribe.assert_called_once()
+        # Should have been processed (not rejected) — called once per chunk
+        assert app.engine.transcribe.call_count == 4
         # Widget returns to idle after processing
         app.waveform.show_idle.assert_called()
 

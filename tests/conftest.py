@@ -48,6 +48,10 @@ def sample_config():
             "chunk_size": 512,
             "silence_threshold": 0.01,
             "min_speech_duration": 0.5,
+            "min_audio_duration": 0.5,
+            "max_audio_duration": 120.0,
+            "vad_aggressiveness": 2,
+            "chunking_threshold": 30.0,
             "device_id": None,
             "feedback": {
                 "enabled": True,
@@ -72,6 +76,9 @@ def sample_config():
             "cloud_model": "gpt-4o-mini",
             "llm_model": "gemma3:4b",
             "llm_timeout": 5,
+        },
+        "gui": {
+            "show_transcription_preview": True,
         },
         "licensing": {
             "provider": "lemonsqueezy",

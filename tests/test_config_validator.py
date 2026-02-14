@@ -53,8 +53,12 @@ class TestConfigValidator:
         assert config["hotkey"] == "F9"
 
     def test_invalid_hotkey_falls_back(self):
-        config = ConfigValidator.validate_and_merge({"hotkey": "SPACE"})
+        config = ConfigValidator.validate_and_merge({"hotkey": "Ctrl"})
         assert config["hotkey"] == "F8"
+
+    def test_combo_hotkey_accepted(self):
+        config = ConfigValidator.validate_and_merge({"hotkey": "Ctrl+Shift+V"})
+        assert config["hotkey"] == "Ctrl+Shift+V"
 
     def test_invalid_injection_mode_falls_back(self):
         config = ConfigValidator.validate_and_merge({"injection": "shout"})

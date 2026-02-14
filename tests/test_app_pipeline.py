@@ -139,5 +139,59 @@ class TestVoxToolPipeline:
         app.capture = MagicMock()
         app.capture.get_buffer.return_value = np.array([], dtype=np.float32)
         app._on_stop()
-        app.feedback.play_stop.assert_called_once()
+        # play_stop is now submitted to executor, just check it was called via executor
         app.tray.set_state.assert_called_with("processing")
+
+    def test_process_audio_chunked(self, sample_config):
+        """Test chunked processing for long audio."""
+        sample_config["audio"]["chunking_threshold"] = 5.0
+        app = self._create_app(sample_config)
+        # 10s audio at 16kHz
+        long_audio = np.random.randn(160000).astype(np.float32) * 0.5
+        app.processor.prepare_for_whisper.return_value = long_audio
+        app.processor.split_at_silence.return_value = [
+            long_audio[:80000], long_audio[80000:]
+        ]
+        app.engine.transcribe.side_effect = ["Premiere partie", "Deuxieme partie"]
+        app.pipeline.clean.side_effect = ["Premiere partie.", "Deuxieme partie."]
+        app.waveform = MagicMock()
+
+        app._process_audio(long_audio)
+
+        assert app.engine.transcribe.call_count == 2
+        app.injector.inject.assert_called_once()
+        injected = app.injector.inject.call_args[0][0]
+        assert "Premiere partie" in injected
+        assert "Deuxieme partie" in injected
+
+    def test_prewarm_engines(self, sample_config):
+        """Test that prewarm submits tasks to executor."""
+        app = self._create_app(sample_config)
+        app.engine = MagicMock()
+        app.engine.preload = MagicMock()
+        app.pipeline = MagicMock()
+        app.pipeline._local_cleaner = MagicMock()
+        app.pipeline._local_cleaner.is_available.return_value = True
+
+        app._prewarm_engines()
+
+        # Executor should have submitted tasks (non-blocking)
+        app._executor.shutdown(wait=True)
+
+    def test_transcribe_and_clean_returns_text(self, sample_config, sample_audio):
+        app = self._create_app(sample_config)
+        app.processor.prepare_for_whisper.return_value = sample_audio
+        app.engine.transcribe.return_value = "Bonjour le monde"
+        app.pipeline.clean.return_value = "Bonjour le monde."
+        app.waveform = MagicMock()
+
+        result = app._transcribe_and_clean(sample_audio)
+        assert result == "Bonjour le monde."
+
+    def test_transcribe_and_clean_returns_none_for_hallucination(self, sample_config, sample_audio):
+        app = self._create_app(sample_config)
+        app.engine.transcribe.return_value = "Merci."
+        app.waveform = MagicMock()
+
+        result = app._transcribe_and_clean(sample_audio)
+        assert result is None

@@ -98,6 +98,66 @@ class TestTextInjectorWayland:
         mock_copy.assert_any_call("test")
         mock_run.assert_called_once()
 
+    @patch("platform.system", return_value="Linux")
+    @patch("src.utils.platform.get_display_server", return_value="wayland")
+    @patch("shutil.which", return_value="/usr/bin/wtype")
+    def test_wayland_detect_wtype(self, mock_which, mock_display, mock_sys):
+        from src.injection.keyboard import TextInjector
+        injector = TextInjector(mode="paste")
+        assert injector._wayland_paste_tool == "wtype"
+        assert injector._wayland_type_tool == "wtype"
+
+    @patch("platform.system", return_value="Linux")
+    @patch("src.utils.platform.get_display_server", return_value="wayland")
+    def test_wayland_detect_ydotool_fallback(self, mock_display, mock_sys):
+        def which_side_effect(tool):
+            if tool == "ydotool":
+                return "/usr/bin/ydotool"
+            return None
+
+        with patch("shutil.which", side_effect=which_side_effect):
+            from src.injection.keyboard import TextInjector
+            injector = TextInjector(mode="paste")
+            assert injector._wayland_paste_tool == "ydotool"
+            assert injector._wayland_type_tool == "ydotool"
+
+    @patch("platform.system", return_value="Linux")
+    @patch("src.utils.platform.get_display_server", return_value="wayland")
+    @patch("shutil.which", return_value=None)
+    def test_wayland_detect_pynput_last_resort(self, mock_which, mock_display, mock_sys):
+        from src.injection.keyboard import TextInjector
+        injector = TextInjector(mode="paste")
+        assert injector._wayland_paste_tool == "pynput"
+        assert injector._wayland_type_tool is None
+
+    @patch("platform.system", return_value="Linux")
+    @patch("src.utils.platform.get_display_server", return_value="wayland")
+    @patch("shutil.which", return_value=None)
+    @patch("subprocess.run")
+    @patch("pyperclip.paste", return_value="original")
+    @patch("pyperclip.copy")
+    def test_wayland_paste_ydotool(self, mock_copy, mock_paste, mock_run, mock_which, mock_display, mock_sys):
+        from src.injection.keyboard import TextInjector
+        injector = TextInjector(mode="paste")
+        injector._wayland_paste_tool = "ydotool"
+        injector._inject_paste_wayland("test")
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        assert args[0] == "ydotool"
+
+    @patch("platform.system", return_value="Linux")
+    @patch("src.utils.platform.get_display_server", return_value="wayland")
+    @patch("shutil.which", return_value=None)
+    @patch("subprocess.run")
+    def test_wayland_type_ydotool(self, mock_run, mock_which, mock_display, mock_sys):
+        from src.injection.keyboard import TextInjector
+        injector = TextInjector(mode="type")
+        injector._wayland_type_tool = "ydotool"
+        injector._inject_type("hello")
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        assert args == ["ydotool", "type", "hello"]
+
 
 class TestTextInjectorX11:
     """Tests injection X11."""

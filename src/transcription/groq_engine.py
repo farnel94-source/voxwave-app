@@ -44,11 +44,13 @@ class GroqWhisperEngine:
         self.language = language
         self.sample_rate = sample_rate
         self.api_key = (api_key or os.getenv("GROQ_API_KEY") or "").strip()
-        if not self.api_key:
-            raise ValueError("GROQ_API_KEY non configurée")
+        self._available = bool(self.api_key)
+        if not self._available:
+            logger.warning("GROQ_API_KEY non configuree, Groq indisponible")
         self._client = None
+        self._circuit: Optional[object] = None
         self._last_detected_language: Optional[str] = None
-        logger.info(f"GroqWhisperEngine: model={model}, lang={language}")
+        logger.info(f"GroqWhisperEngine: model={model}, lang={language}, available={self._available}")
 
     def preload(self) -> None:
         """No-op : Groq n'a pas de modele local a precharger."""
@@ -63,7 +65,7 @@ class GroqWhisperEngine:
         """Retourne le client Groq (singleton)."""
         if self._client is None:
             from groq import Groq
-            self._client = Groq(api_key=self.api_key)
+            self._client = Groq(api_key=self.api_key, timeout=10.0)
         return self._client
 
     def _audio_to_wav_bytes(self, audio: np.ndarray, sample_rate: int = 16000) -> io.BytesIO:
@@ -90,10 +92,11 @@ class GroqWhisperEngine:
         return buf
 
     @retry_with_backoff(
-        max_retries=3,
-        initial_delay=1.0,
+        max_retries=2,
+        initial_delay=0.5,
         backoff_factor=2.0,
         exceptions=(Exception,),
+        network_retries=0,
     )
     def _call_groq_api(self, wav_buf: io.BytesIO):
         """Appel API Groq avec retry automatique.
@@ -115,6 +118,14 @@ class GroqWhisperEngine:
             prompt="Transcription fidèle et exacte, mot à mot, d'une dictée vocale en français. Pas de sous-titres, pas de remerciements.",
         )
 
+    def set_circuit_breaker(self, circuit: "CircuitBreaker") -> None:
+        """Attache un circuit breaker a ce moteur.
+
+        Args:
+            circuit: Instance de CircuitBreaker.
+        """
+        self._circuit = circuit
+
     def transcribe(self, audio: np.ndarray) -> str:
         """Transcrit un buffer audio via Groq API.
 
@@ -127,12 +138,24 @@ class GroqWhisperEngine:
         Raises:
             TranscriptionError: Si la transcription échoue après retries.
         """
+        if not self._available:
+            raise TranscriptionError("Groq indisponible (API key manquante)")
+
+        if self._circuit and not self._circuit.should_allow_request():
+            raise TranscriptionError("Groq indisponible (circuit breaker ouvert)")
+
         start = time.time()
         wav_buf = self._audio_to_wav_bytes(audio, sample_rate=self.sample_rate)
 
         try:
             transcription = self._call_groq_api(wav_buf)
         except Exception as e:
+            if self._circuit:
+                from src.utils.retry import _is_network_error
+                if _is_network_error(e):
+                    self._circuit.record_network_failure()
+                else:
+                    self._circuit.record_failure()
             raise TranscriptionError(f"Groq API échouée: {e}") from e
 
         # Extraire le texte et vérifier la qualité
@@ -176,6 +199,8 @@ class GroqWhisperEngine:
                 logger.info(f"Langue détectée: {detected_lang} (config: {self.language})")
 
         text = strip_hallucination_tails(text)
+        if self._circuit:
+            self._circuit.record_success()
         elapsed = time.time() - start
         duration = len(audio) / self.sample_rate
         logger.info(f"Groq transcription: {elapsed:.2f}s pour {duration:.2f}s audio")

@@ -54,6 +54,7 @@ class Bridge(QObject):
         self,
         on_start: Optional[Callable] = None,
         on_stop: Optional[Callable] = None,
+        on_settings: Optional[Callable] = None,
         widget: Optional["WaveformWidget"] = None,
     ) -> None:
         """Initialise le bridge.
@@ -61,10 +62,12 @@ class Bridge(QObject):
         Args:
             on_start: Callback appelee quand l'icone micro est cliquee.
             on_stop: Callback appelee quand le stop est clique.
+            on_settings: Callback appelee quand les parametres sont demandes.
         """
         super().__init__()
         self._on_start = on_start
         self._on_stop = on_stop
+        self._on_settings = on_settings
         self._widget = widget
         self._saved_restore: Optional[Callable] = None
 
@@ -98,6 +101,13 @@ class Bridge(QObject):
             QTimer.singleShot(100, self._saved_restore)
             self._saved_restore = None
 
+    @Slot()
+    def on_settings_clicked(self) -> None:
+        """Appelee depuis JS quand le clic droit sur le logo demande les parametres."""
+        logger.debug("Bridge: settings clicked")
+        if self._on_settings:
+            self._on_settings()
+
     @Slot(int, int)
     def move_by(self, dx: int, dy: int) -> None:
         """Deplace le widget parent de (dx, dy) pixels.
@@ -117,12 +127,15 @@ class WaveformWidget(QWidget):
     sig_show_processing = Signal()
     sig_show_idle = Signal()
     sig_show_error = Signal()
+    sig_update_step = Signal(str)
+    sig_show_preview = Signal(str)
 
     def __init__(
         self,
         capture: Optional[object] = None,
         on_start: Optional[Callable] = None,
         on_stop: Optional[Callable] = None,
+        on_settings: Optional[Callable] = None,
     ) -> None:
         """Initialise le widget Voice Input.
 
@@ -130,12 +143,14 @@ class WaveformWidget(QWidget):
             capture: Instance AudioCapture pour lire l'amplitude en temps reel.
             on_start: Callback quand l'icone micro est cliquee.
             on_stop: Callback quand le stop est clique.
+            on_settings: Callback quand les parametres sont demandes (clic droit logo).
         """
         super().__init__()
         self._capture = capture
         self._state: str = "idle"
         self._on_start = on_start
         self._on_stop = on_stop
+        self._on_settings = on_settings
         self._setup_window()
         self._setup_webview()
         self._setup_timers()
@@ -169,6 +184,7 @@ class WaveformWidget(QWidget):
         self._bridge = Bridge(
             on_start=self._on_start,
             on_stop=self._on_stop,
+            on_settings=self._on_settings,
             widget=self,
         )
 
@@ -203,6 +219,8 @@ class WaveformWidget(QWidget):
         self.sig_show_processing.connect(self._do_show_processing)
         self.sig_show_idle.connect(self._do_show_idle)
         self.sig_show_error.connect(self._do_show_error)
+        self.sig_update_step.connect(self._do_update_step)
+        self.sig_show_preview.connect(self._do_show_preview)
 
     # === Public API (thread-safe) ===
 
@@ -221,6 +239,23 @@ class WaveformWidget(QWidget):
     def show_error(self) -> None:
         """Affiche l'etat erreur pendant 3s puis revient a idle (thread-safe)."""
         self.sig_show_error.emit()
+
+    def update_step(self, step_text: str) -> None:
+        """Met a jour l'indicateur d'etape (thread-safe).
+
+        Args:
+            step_text: Texte de l'etape (ex: "Transcription...", "Nettoyage...").
+        """
+        self.sig_update_step.emit(step_text)
+
+    def show_preview(self, text: str) -> None:
+        """Affiche un apercu de la transcription (thread-safe, auto-hide 3s).
+
+        Args:
+            text: Texte a afficher (tronque a 50 chars).
+        """
+        preview = text[:50] + "..." if len(text) > 50 else text
+        self.sig_show_preview.emit(preview)
 
     def hide_widget(self) -> None:
         """Retourne a l'etat idle (retrocompatibilite)."""
@@ -257,6 +292,18 @@ class WaveformWidget(QWidget):
         self._amplitude_timer.stop()
         self._run_js("setState('error')")
         QTimer.singleShot(ERROR_DISPLAY_MS, self._do_show_idle)
+
+    @Slot(str)
+    def _do_update_step(self, step_text: str) -> None:
+        """Met a jour l'indicateur d'etape (main thread)."""
+        escaped = step_text.replace("'", "\\'")
+        self._run_js(f"updateStep('{escaped}')")
+
+    @Slot(str)
+    def _do_show_preview(self, text: str) -> None:
+        """Affiche un apercu de la transcription (main thread, auto-hide 3s)."""
+        escaped = text.replace("'", "\\'").replace("\n", " ")
+        self._run_js(f"showPreview('{escaped}')")
 
     def _send_amplitude(self) -> None:
         """Envoie l'amplitude audio courante au JS."""

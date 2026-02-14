@@ -103,10 +103,10 @@ body {
     gap: 2px;
     align-items: center;
     justify-content: center;
-    height: 24px;
+    height: 80px;
 }
 .bar {
-    width: 2px;
+    width: 3px;
     height: 2px;
     background: #fff;
     border-radius: 9999px;
@@ -233,9 +233,9 @@ function setState(state) {
         targetAmplitude = 0.0;
 
     } else if (state === 'recording') {
-        // Pill appears: rotating square + bars + timer
-        logoIcon.style.display = 'none';
-        rotatingSquare.style.display = '';
+        // Pill appears: logo stays + bars + timer
+        logoIcon.style.display = '';
+        rotatingSquare.style.display = 'none';
         expandArea.classList.add('visible');
         voiceInput.classList.add('active');
         voiceInput.classList.remove('processing');
@@ -243,9 +243,9 @@ function setState(state) {
         startBarAnimation();
 
     } else if (state === 'processing') {
-        // Pill stays: rotating square + "Traitement..."
-        logoIcon.style.display = 'none';
-        rotatingSquare.style.display = '';
+        // Pill stays: logo + "Traitement..."
+        logoIcon.style.display = '';
+        rotatingSquare.style.display = 'none';
         expandArea.classList.remove('visible');
         voiceInput.classList.add('active', 'processing');
         voiceInput.classList.remove('error');
@@ -265,6 +265,14 @@ function setState(state) {
         targetAmplitude = 0.0;
     }
 }
+
+// === Right-click on logo → Settings ===
+logoIcon.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    if (bridge && bridge.on_settings_clicked) {
+        bridge.on_settings_clicked();
+    }
+});
 
 // === Click + Drag handling ===
 const DRAG_THRESHOLD = 5;
@@ -351,7 +359,7 @@ function animateBars() {
         const phase = i * 0.5 + time * (2 + amplitude * 4);
         const wave = Math.sin(phase) * 0.5 + 0.5;
         const minH = 2;
-        const maxH = 3 + amplitude * 18;
+        const maxH = 6 + amplitude * 90;
         const h = minH + wave * (maxH - minH);
         bar.style.height = h.toFixed(1) + 'px';
     });

@@ -1,6 +1,7 @@
 """Valeurs par défaut de la configuration VoxTool."""
 
 DEFAULT_CONFIG: dict = {
+    "first_launch": True,
     "hotkey": "F8",
     "language": "fr",
     "model": "base",
@@ -14,6 +15,8 @@ DEFAULT_CONFIG: dict = {
         "min_speech_duration": 0.5,
         "min_audio_duration": 0.5,
         "max_audio_duration": 120.0,
+        "vad_aggressiveness": 2,
+        "chunking_threshold": 30.0,
         "device_id": None,
         "feedback": {
             "enabled": True,
@@ -43,6 +46,9 @@ DEFAULT_CONFIG: dict = {
             "du coup", "en fait", "tu vois", "quoi", "voilà",
             "comment dire",
         ],
+    },
+    "gui": {
+        "show_transcription_preview": True,
     },
     "licensing": {
         "provider": "lemonsqueezy",

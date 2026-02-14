@@ -14,11 +14,19 @@ class TestCloudLLMCleaner:
         cleaner = CloudLLMCleaner(api_key="test-key")
         assert cleaner.model == "gpt-4o-mini"
 
-    def test_init_without_key_raises(self):
+    def test_init_without_key_not_available(self):
         from src.cleaning.llm_cleaner import CloudLLMCleaner
         with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(ValueError, match="OPENAI_API_KEY"):
-                CloudLLMCleaner(api_key=None)
+            cleaner = CloudLLMCleaner(api_key=None)
+            assert cleaner._available is False
+
+    def test_clean_without_key_raises_cleaning_error(self):
+        from src.cleaning.llm_cleaner import CloudLLMCleaner
+        from src.utils.exceptions import CleaningError
+        with patch.dict("os.environ", {}, clear=True):
+            cleaner = CloudLLMCleaner(api_key=None)
+            with pytest.raises(CleaningError, match="API key manquante"):
+                cleaner.clean("test text")
 
     @patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"})
     def test_clean_empty_text(self):

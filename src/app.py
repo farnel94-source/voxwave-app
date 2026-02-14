@@ -8,9 +8,11 @@ Usage:
 
 import logging
 import os
+import signal
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 # Fix encodage Unicode sur Windows (emojis dans le terminal)
@@ -81,8 +83,10 @@ class VoxTool:
         self.waveform = None
         self.license_validator = None
         self._qt_app = None
+        self._shutting_down = False
         self._processing_thread: Optional[threading.Thread] = None
         self._processing_lock = threading.Lock()
+        self._executor = ThreadPoolExecutor(max_workers=2)
 
     def initialize(self) -> None:
         """Initialise tous les composants."""
@@ -114,7 +118,11 @@ class VoxTool:
             silence_threshold=self.config["audio"]["silence_threshold"],
             device_id=device_id,
         )
-        self.processor = AudioProcessor(sample_rate=self.config["audio"]["sample_rate"])
+        vad_aggressiveness = self.config.get("audio", {}).get("vad_aggressiveness", 2)
+        self.processor = AudioProcessor(
+            sample_rate=self.config["audio"]["sample_rate"],
+            vad_aggressiveness=vad_aggressiveness,
+        )
 
         # Choix du moteur de transcription
         transcription_provider = self.config.get("transcription", {}).get("provider", "local")
@@ -132,6 +140,7 @@ class VoxTool:
             cleaning_provider=cleaning_provider,
             language=self.config["whisper"]["language"],
             filler_words=filler_words,
+            on_fallback=self._on_fallback,
         )
 
         self.injector = TextInjector(mode=self.config["injection"])
@@ -157,6 +166,7 @@ class VoxTool:
             capture=self.capture,
             on_start=self._on_start,
             on_stop=self._on_stop,
+            on_settings=self._on_settings,
         )
 
         # System tray (PySide6 QSystemTrayIcon)
@@ -166,18 +176,62 @@ class VoxTool:
             on_stop=self._on_stop,
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
+            on_settings=self._on_settings,
         )
         self.tray.setup()
 
-        # Prechargement du modele (local uniquement)
-        if hasattr(self.engine, 'preload'):
-            try:
-                logger.info("Prechargement du modele Whisper...")
-                self.engine.preload()
-            except Exception as e:
-                logger.error(f"Echec prechargement modele: {e}")
-                logger.warning("Le modele sera charge au premier usage")
+        # Pre-warm en background : charger Whisper + verifier Ollama
+        self._prewarm_engines()
         logger.info("VoxTool pret !")
+
+    def _prewarm_engines(self) -> None:
+        """Pre-charge les moteurs en background pour reduire la latence du premier appel."""
+        def _prewarm_whisper() -> None:
+            if hasattr(self.engine, 'preload'):
+                try:
+                    logger.info("Pre-warm: chargement modele Whisper...")
+                    self.engine.preload()
+                    logger.info("Pre-warm: modele Whisper charge")
+                except Exception as e:
+                    logger.warning(f"Pre-warm Whisper echec: {e}")
+
+        def _prewarm_ollama() -> None:
+            if self.pipeline and self.pipeline._local_cleaner:
+                try:
+                    available = self.pipeline._local_cleaner.is_available()
+                    logger.info(f"Pre-warm: Ollama {'disponible' if available else 'indisponible'}")
+                except Exception as e:
+                    logger.warning(f"Pre-warm Ollama echec: {e}")
+
+        def _check_cloud_connectivity() -> None:
+            """Ping les APIs cloud et pre-ouvre les circuit breakers si injoignables."""
+            import urllib.error
+            import urllib.request
+            # Check Groq
+            if hasattr(self.engine, '_circuit'):
+                try:
+                    urllib.request.urlopen("https://api.groq.com", timeout=3)
+                    logger.info("Pre-warm: Groq API joignable")
+                except urllib.error.HTTPError:
+                    # HTTP error = serveur joignable, juste pas de endpoint valide
+                    logger.info("Pre-warm: Groq API joignable")
+                except (urllib.error.URLError, OSError, TimeoutError):
+                    logger.warning("Pre-warm: Groq API injoignable, circuit breaker pre-ouvert")
+                    self.engine._circuit.force_open()
+            # Check OpenAI
+            if self.pipeline and self.pipeline._cloud_cleaner is not None:
+                try:
+                    urllib.request.urlopen("https://api.openai.com", timeout=3)
+                    logger.info("Pre-warm: OpenAI API joignable")
+                except urllib.error.HTTPError:
+                    logger.info("Pre-warm: OpenAI API joignable")
+                except (urllib.error.URLError, OSError, TimeoutError):
+                    logger.warning("Pre-warm: OpenAI API injoignable, circuit breaker pre-ouvert")
+                    self.pipeline._cloud_circuit.force_open()
+
+        self._executor.submit(_prewarm_whisper)
+        self._executor.submit(_prewarm_ollama)
+        self._executor.submit(_check_cloud_connectivity)
 
     def _create_transcription_engine(self, provider: str) -> object:
         """Cree le moteur de transcription selon le provider configure.
@@ -199,6 +253,7 @@ class VoxTool:
                 local_model=self.config["whisper"]["model"],
                 language=language,
                 sample_rate=sample_rate,
+                on_fallback=self._on_fallback,
             )
         elif provider == "cloud":
             from src.transcription.groq_engine import GroqWhisperEngine
@@ -226,7 +281,6 @@ class VoxTool:
 
     def _on_stop(self) -> None:
         """Callback: fin enregistrement -> lance le pipeline dans un thread."""
-        self.feedback.play_stop()
         if self.tray:
             self.tray.set_state("processing")
         if self.waveform:
@@ -239,6 +293,9 @@ class VoxTool:
             if self.waveform:
                 self.waveform.show_idle()
             return
+
+        # Jouer le son stop en background (overlap avec debut du pipeline)
+        self._executor.submit(self.feedback.play_stop)
 
         # Lancer le pipeline dans un thread pour ne pas bloquer le listener
         self._processing_thread = threading.Thread(
@@ -287,33 +344,31 @@ class VoxTool:
                 logger.warning(f"Audio trop volumineux ({audio_size_bytes/1e6:.1f}MB), tronque pour API")
                 audio = audio[:max_safe_samples]
 
-            # Transcrire
-            raw_text = self.engine.transcribe(audio)
-            logger.info(f"Brut: {raw_text}")
+            # Chunking si audio long
+            chunking_threshold = self.config.get("audio", {}).get("chunking_threshold", 30.0)
+            audio_duration = len(audio) / self.config["audio"]["sample_rate"]
 
-            # Adapter les filler words a la langue detectee
-            detected_lang = getattr(self.engine, "last_detected_language", None)
-            if detected_lang:
-                self.pipeline.regex_cleaner.set_language(detected_lang)
+            # Indicateur d'etape
+            if self.waveform:
+                self.waveform.update_step("Transcription...")
 
-            if not raw_text.strip():
-                logger.warning("Transcription vide")
+            if audio_duration > chunking_threshold:
+                clean_text = self._process_chunked(audio)
+            else:
+                clean_text = self._transcribe_and_clean(audio)
+
+            if not clean_text or not clean_text.strip():
+                logger.warning("Texte final vide, ignore")
                 return
 
-            # Filtrer les hallucinations connues de Whisper
-            if is_hallucination(raw_text):
-                logger.warning(f"Hallucination detectee, ignore: {raw_text}")
-                return
-
-            # Nettoyer
-            clean_text = self.pipeline.clean(raw_text)
-            logger.info(f"Propre: {clean_text}")
-
-            if not clean_text.strip():
-                logger.warning("Texte nettoye vide, ignore")
-                return
+            # Apercu transcription
+            show_preview = self.config.get("gui", {}).get("show_transcription_preview", True)
+            if self.waveform and show_preview:
+                self.waveform.show_preview(clean_text)
 
             # Injecter
+            if self.waveform:
+                self.waveform.update_step("Injection...")
             self.injector.inject(clean_text)
             self.feedback.play_complete()
             logger.info("Texte injecte !")
@@ -341,6 +396,71 @@ class VoxTool:
                 if self.tray:
                     self.tray.set_state("idle")
 
+    def _transcribe_and_clean(self, audio) -> Optional[str]:
+        """Transcrit et nettoie un segment audio.
+
+        Args:
+            audio: Buffer audio float32.
+
+        Returns:
+            Texte nettoye ou None.
+        """
+        # Transcrire
+        raw_text = self.engine.transcribe(audio)
+        logger.info(f"Brut: {raw_text}")
+
+        # Adapter les filler words a la langue detectee
+        detected_lang = getattr(self.engine, "last_detected_language", None)
+        if detected_lang:
+            self.pipeline.regex_cleaner.set_language(detected_lang)
+
+        if not raw_text.strip():
+            logger.warning("Transcription vide")
+            return None
+
+        # Filtrer les hallucinations connues de Whisper
+        if is_hallucination(raw_text):
+            logger.warning(f"Hallucination detectee, ignore: {raw_text}")
+            return None
+
+        # Nettoyer
+        if self.waveform:
+            self.waveform.update_step("Nettoyage...")
+        clean_text = self.pipeline.clean(raw_text)
+        logger.info(f"Propre: {clean_text}")
+
+        if not clean_text.strip():
+            logger.warning("Texte nettoye vide, ignore")
+            return None
+
+        return clean_text
+
+    def _process_chunked(self, audio) -> Optional[str]:
+        """Traite un audio long par chunks avec progress.
+
+        Args:
+            audio: Buffer audio float32.
+
+        Returns:
+            Texte complet nettoye ou None.
+        """
+        chunks = self.processor.split_at_silence(audio)
+        total = len(chunks)
+        logger.info(f"Traitement chunke: {total} chunks")
+
+        results = []
+        for i, chunk in enumerate(chunks):
+            if self.waveform:
+                self.waveform.update_step(f"Transcription {i+1}/{total}...")
+            result = self._transcribe_and_clean(chunk)
+            if result:
+                results.append(result)
+
+        if not results:
+            return None
+
+        return " ".join(results)
+
     def _activate_license_dialog(self) -> None:
         """Ouvre un dialog pour saisir la cle de licence."""
         try:
@@ -361,8 +481,149 @@ class VoxTool:
         except Exception as e:
             logger.error(f"Dialog licence echoue: {e}")
 
+    def _on_settings(self) -> None:
+        """Ouvre le dialogue des parametres et applique les changements."""
+        from src.gui.settings_dialog import SettingsDialog
+
+        cleaning_config = self.config.get("cleaning", {})
+        dialog = SettingsDialog(
+            current_hotkey=self.config["hotkey"],
+            current_cleaning_mode=cleaning_config.get("mode", "verbatim"),
+            current_language=self.config.get("whisper", {}).get("language", "fr"),
+            current_device_id=self.config.get("audio", {}).get("device_id"),
+            current_transcription_provider=self.config.get("transcription", {}).get("provider", "hybrid"),
+            current_cleaning_provider=cleaning_config.get("provider", "hybrid"),
+        )
+        if dialog.exec():
+            changes = []
+
+            # Hotkey
+            new_hotkey = dialog.hotkey
+            if new_hotkey != self.config["hotkey"]:
+                self.config["hotkey"] = new_hotkey
+                if self.listener:
+                    self.listener.update_hotkey(new_hotkey)
+                self._save_config("hotkey", new_hotkey)
+                changes.append(f"Raccourci : {new_hotkey}")
+
+            # Cleaning mode
+            new_mode = dialog.cleaning_mode
+            if new_mode != cleaning_config.get("mode"):
+                self.config.setdefault("cleaning", {})["mode"] = new_mode
+                if self.pipeline:
+                    self.pipeline.mode = new_mode
+                self._save_config_nested("cleaning", "mode", new_mode)
+                changes.append(f"Mode : {'Naturel' if new_mode == 'verbatim' else 'Professionnel'}")
+
+            # Language
+            new_lang = dialog.language
+            if new_lang != self.config.get("whisper", {}).get("language"):
+                self.config.setdefault("whisper", {})["language"] = new_lang
+                self._save_config_nested("whisper", "language", new_lang)
+                changes.append(f"Langue : {new_lang}")
+
+            # Device ID
+            new_device = dialog.device_id
+            if new_device != self.config.get("audio", {}).get("device_id"):
+                self.config.setdefault("audio", {})["device_id"] = new_device
+                self._save_config_nested("audio", "device_id", new_device)
+                changes.append("Micro change")
+
+            # Transcription provider
+            new_trans = dialog.transcription_provider
+            if new_trans != self.config.get("transcription", {}).get("provider"):
+                self.config.setdefault("transcription", {})["provider"] = new_trans
+                self._save_config_nested("transcription", "provider", new_trans)
+                changes.append(f"Transcription : {new_trans}")
+
+            # Cleaning provider
+            new_clean = dialog.cleaning_provider
+            if new_clean != cleaning_config.get("provider"):
+                self.config.setdefault("cleaning", {})["provider"] = new_clean
+                self._save_config_nested("cleaning", "provider", new_clean)
+                changes.append(f"Nettoyage : {new_clean}")
+
+            if changes and self.tray:
+                self.tray.show_notification("VoxTool", "Parametres mis a jour")
+            logger.info(f"Settings: {', '.join(changes) if changes else 'aucun changement'}")
+
+    def _save_config(self, key: str, value: object) -> None:
+        """Sauvegarde un champ dans config.yaml en preservant le reste.
+
+        Args:
+            key: Cle de premier niveau a mettre a jour.
+            value: Nouvelle valeur.
+        """
+        from src.utils.platform import resource_path
+
+        config_path = resource_path("config.yaml")
+        try:
+            with open(config_path, "r") as f:
+                lines = f.readlines()
+
+            # Chercher et remplacer la ligne correspondante
+            new_lines = []
+            found = False
+            for line in lines:
+                if line.startswith(f"{key}:"):
+                    new_lines.append(f"{key}: {value}\n")
+                    found = True
+                else:
+                    new_lines.append(line)
+
+            if not found:
+                new_lines.append(f"{key}: {value}\n")
+
+            with open(config_path, "w") as f:
+                f.writelines(new_lines)
+
+            logger.info(f"Config sauvegardee: {key}={value}")
+        except Exception as e:
+            logger.error(f"Erreur sauvegarde config: {e}")
+
+    def _save_config_nested(self, section: str, key: str, value: object) -> None:
+        """Sauvegarde une cle nested dans config.yaml (ex: cleaning.mode).
+
+        Charge le YAML complet, modifie la cle, et re-ecrit le fichier.
+
+        Args:
+            section: Section de premier niveau (ex: "cleaning").
+            key: Cle dans la section (ex: "mode").
+            value: Nouvelle valeur.
+        """
+        from src.utils.platform import resource_path
+
+        config_path = resource_path("config.yaml")
+        try:
+            with open(config_path, "r") as f:
+                data = yaml.safe_load(f) or {}
+
+            if section not in data:
+                data[section] = {}
+            data[section][key] = value
+
+            with open(config_path, "w") as f:
+                yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+            logger.info(f"Config sauvegardee: {section}.{key}={value}")
+        except Exception as e:
+            logger.error(f"Erreur sauvegarde config nested: {e}")
+
+    def _on_fallback(self, message: str) -> None:
+        """Affiche une notification de fallback via le tray.
+
+        Args:
+            message: Message de fallback a afficher.
+        """
+        logger.info(f"Fallback: {message}")
+        if self.tray:
+            self.tray.show_notification("VoxTool", message)
+
     def _shutdown(self) -> None:
-        """Arrete proprement tous les composants."""
+        """Arrete proprement tous les composants (idempotent)."""
+        if self._shutting_down:
+            return
+        self._shutting_down = True
         logger.info("Arret VoxTool...")
         if self.listener:
             self.listener.stop()
@@ -375,17 +636,65 @@ class VoxTool:
             self.capture.stop()
         if self.waveform:
             self.waveform.show_idle()
+        # Shutdown executor
+        self._executor.shutdown(wait=False)
         # Quitter la boucle Qt
         if self._qt_app:
             self._qt_app.quit()
 
     def run(self) -> None:
         """Lance l'application avec boucle Qt."""
+        from PySide6.QtCore import QTimer
         from PySide6.QtWidgets import QApplication
 
         self._qt_app = QApplication.instance() or QApplication(sys.argv)
+        self._qt_app.setQuitOnLastWindowClosed(False)
         self.initialize()
+
+        # Welcome screen au premier lancement
+        if self.config.get("first_launch", True):
+            from src.gui.welcome_dialog import WelcomeDialog
+            dialog = WelcomeDialog(
+                current_hotkey=self.config["hotkey"],
+                engine=self.engine,
+                processor=self.processor,
+                parent=None,
+            )
+            if dialog.exec():
+                # Appliquer le hotkey choisi
+                new_hotkey = dialog.hotkey
+                if new_hotkey != self.config["hotkey"]:
+                    self.config["hotkey"] = new_hotkey
+                    if self.listener:
+                        self.listener.update_hotkey(new_hotkey)
+                    self._save_config("hotkey", new_hotkey)
+                # Appliquer le mode de nettoyage choisi
+                new_mode = dialog.cleaning_mode
+                if new_mode != self.config.get("cleaning", {}).get("mode"):
+                    self.config.setdefault("cleaning", {})["mode"] = new_mode
+                    if self.pipeline:
+                        self.pipeline.mode = new_mode
+                    self._save_config_nested("cleaning", "mode", new_mode)
+                # Marquer le premier lancement comme termine
+                self.config["first_launch"] = False
+                self._save_config("first_launch", "false")
+
         self.listener.start()
+
+        # Signal handlers pour shutdown propre (Ctrl+C, SIGTERM)
+        def _signal_handler(signum: int, frame: object) -> None:
+            sig_name = signal.Signals(signum).name
+            logger.info(f"Signal {sig_name} recu, arret en cours...")
+            self._shutdown()
+
+        signal.signal(signal.SIGINT, _signal_handler)
+        signal.signal(signal.SIGTERM, _signal_handler)
+
+        # QTimer no-op pour que Python puisse traiter les signaux
+        # pendant la boucle Qt (sinon exec() bloque les handlers)
+        self._signal_timer = QTimer()
+        self._signal_timer.timeout.connect(lambda: None)
+        self._signal_timer.start(500)
 
         logger.info(f"VoxTool actif ! Hotkey: {self.config['hotkey']} — Fermez le tray pour quitter.")
         self._qt_app.exec()

@@ -23,11 +23,20 @@ class TestGroqWhisperEngine:
         assert engine.model == "whisper-large-v3-turbo"
         assert engine.language == "fr"
 
-    def test_init_without_api_key_raises(self):
+    def test_init_without_api_key_not_available(self):
         from src.transcription.groq_engine import GroqWhisperEngine
         with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(ValueError, match="GROQ_API_KEY"):
-                GroqWhisperEngine(api_key=None)
+            engine = GroqWhisperEngine(api_key=None)
+            assert engine._available is False
+
+    def test_transcribe_without_api_key_raises_transcription_error(self):
+        from src.transcription.groq_engine import GroqWhisperEngine
+        from src.utils.exceptions import TranscriptionError
+        with patch.dict("os.environ", {}, clear=True):
+            engine = GroqWhisperEngine(api_key=None)
+            audio = np.zeros(16000, dtype=np.float32)
+            with pytest.raises(TranscriptionError, match="API key manquante"):
+                engine.transcribe(audio)
 
     @patch.dict("os.environ", {"GROQ_API_KEY": "test-key"})
     def test_audio_to_wav_bytes(self):

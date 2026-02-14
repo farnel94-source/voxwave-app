@@ -21,6 +21,7 @@ class TrayIcon:
         on_stop: Optional[Callable] = None,
         on_quit: Optional[Callable] = None,
         on_activate_license: Optional[Callable] = None,
+        on_settings: Optional[Callable] = None,
     ) -> None:
         """Initialise le tray icon.
 
@@ -29,11 +30,13 @@ class TrayIcon:
             on_stop: Callback pour arreter l'enregistrement.
             on_quit: Callback pour quitter l'application.
             on_activate_license: Callback pour activer la licence.
+            on_settings: Callback pour ouvrir les parametres.
         """
         self.on_start = on_start
         self.on_stop = on_stop
         self.on_quit = on_quit
         self.on_activate_license = on_activate_license
+        self.on_settings = on_settings
         self._state: IconState = "idle"
         self._is_recording = False
         self._tray: Optional[QSystemTrayIcon] = None
@@ -55,6 +58,10 @@ class TrayIcon:
         menu.addAction(self._stop_action)
 
         menu.addSeparator()
+
+        settings_action = QAction("Parametres...", menu)
+        settings_action.triggered.connect(self._on_settings_click)
+        menu.addAction(settings_action)
 
         license_action = QAction("Activer licence...", menu)
         license_action.triggered.connect(self._on_activate_license_click)
@@ -92,6 +99,11 @@ class TrayIcon:
             self._start_action.setVisible(not self._is_recording)
         if self._stop_action:
             self._stop_action.setVisible(self._is_recording)
+
+    def _on_settings_click(self) -> None:
+        """Ouvre le dialogue des parametres."""
+        if self.on_settings:
+            self.on_settings()
 
     def _on_activate_license_click(self) -> None:
         """Ouvre le dialog de licence."""
