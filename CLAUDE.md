@@ -1,7 +1,7 @@
 # CLAUDE.md — Instructions pour Claude Code
 
 ## Projet
-**VoxTool** : Outil de dictee vocale desktop.
+**The Wave** (anciennement VoxTool) : Outil de dictee vocale desktop (Windows + Linux).
 Parle → Transcrit (Whisper) → Nettoie (regex + LLM) → Colle le texte propre.
 
 ## Stack
@@ -24,7 +24,7 @@ Parle → Transcrit (Whisper) → Nettoie (regex + LLM) → Colle le texte propr
 voxtool/
 ├── src/
 │   ├── __init__.py
-│   ├── app.py                  # Point d'entree, shutdown gracieux, signal handlers, sauvegarde config
+│   ├── app.py                  # Point d'entree (classe TheWave), shutdown gracieux, check macOS, sauvegarde config
 │   ├── audio/
 │   │   ├── capture.py          # Capture micro + VAD
 │   │   ├── device_manager.py   # Liste et validation des peripheriques audio
@@ -37,21 +37,21 @@ voxtool/
 │   │   └── hallucinations.py   # Detection hallucinations Whisper
 │   ├── cleaning/
 │   │   ├── regex_cleaner.py    # Nettoyage rapide regex (15 langues de filler words)
-│   │   └── llm_cleaner.py     # Nettoyage: OpenAI cloud + Ollama local — circuit breaker
+│   │   └── llm_cleaner.py     # Nettoyage: mode raw/verbatim/quality — OpenAI cloud + Ollama local — circuit breaker
 │   ├── injection/
-│   │   └── keyboard.py         # Injection texte (paste/type) avec timeouts, fallback cascade
+│   │   └── keyboard.py         # Injection texte (paste/type) Windows+Linux, warning macOS
 │   ├── hotkey/
 │   │   └── listener.py         # Ecoute raccourci clavier — combos (Ctrl+Shift+V, etc.)
 │   ├── licensing/
 │   │   └── validator.py        # Validation licence LemonSqueezy (free tier + pro)
 │   ├── gui/
 │   │   ├── orb/
-│   │   │   ├── orb.html        # Widget Voice Input HTML/CSS/JS (barres de frequences animees)
-│   │   │   └── logo.png        # Logo VoxTool
-│   │   ├── waveform_widget.py  # QWebEngineView frameless, always-on-top, draggable
-│   │   ├── tray_icon.py        # Icone system tray PySide6 (QSystemTrayIcon)
-│   │   ├── settings_dialog.py  # Parametres modernes (sidebar navigation, 4 sections)
-│   │   ├── welcome_dialog.py   # Onboarding v2 (7 pages, inspire Wispr Flow)
+│   │   │   ├── orb.html        # Widget Voice Input HTML/CSS/JS (barres animees + hover icons settings/quit)
+│   │   │   └── logo.png        # Logo The Wave
+│   │   ├── waveform_widget.py  # QWebEngineView frameless, always-on-top, draggable + hover icons
+│   │   ├── tray_icon.py        # Icone system tray PySide6 (QSystemTrayIcon) + icones unicode
+│   │   ├── settings_dialog.py  # Parametres modernes (sidebar navigation, 5 sections dont Aide)
+│   │   ├── welcome_dialog.py   # Onboarding v2.1 (8 pages, inspire Wispr Flow, page langue)
 │   │   └── icons.py            # Generation icones dynamiques
 │   ├── config/
 │   │   ├── defaults.py         # Valeurs par defaut de la configuration
@@ -78,7 +78,7 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 - **Transcription** : Groq API (whisper-large-v3-turbo) en priorite, fallback faster-whisper local
 - **Nettoyage** : OpenAI GPT-4o-mini en priorite, fallback Ollama local, fallback regex
 - Config `transcription.provider` et `cleaning.provider` : `hybrid` | `cloud` | `local`
-- Config `cleaning.mode` : `verbatim` (naturel) | `quality` (professionnel)
+- Config `cleaning.mode` : `raw` (brut, zero traitement) | `verbatim` (naturel) | `quality` (professionnel)
 - Cles API dans `.env` : `GROQ_API_KEY`, `OPENAI_API_KEY`
 
 ## Resilience hors-ligne
@@ -91,37 +91,46 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 
 ## GUI (PySide6 + QWebEngineView)
 - **Widget flottant** (`waveform_widget.py`) : fenetre frameless, always-on-top, draggable, 300x116px
-- **orb.html** : logo VoxTool + pill expandable avec barres de frequences animees + timer
+- **orb.html** : logo The Wave + pill expandable avec barres de frequences animees + timer + hover icons (settings/quit)
   - **Idle** : logo seul (transparent, pas de pill)
   - **Recording** : logo reste visible + pill s'ouvre a droite (barres + timer)
   - **Processing** : logo + pill avec "Traitement..."
   - **Error** : logo + pill avec "Erreur" en rouge + animation shake
 - **Barres de frequences** : 12 barres, 3px large, hauteur max 80px, animees par l'amplitude audio
-- **Bridge Python ↔ JS** : QWebChannel (setState, updateAmplitude, updateStep, showPreview)
-- **Tray icon** : menu contextuel (Start/Stop, Parametres, Licence, A propos, Quitter)
+- **Hover icons** : au survol du logo (idle uniquement), 2 boutons ronds apparaissent (settings + quit)
+- **Bridge Python ↔ JS** : QWebChannel (setState, updateAmplitude, updateStep, showPreview, on_quit_clicked)
+- **Tray icon** : menu avec icones unicode et separateurs (▶ Dictee / ⚙ Parametres / ❓ Aide / ✧ Licence / ⓘ A propos / ✕ Quitter). Clic gauche tray → ouvre directement les Parametres (via `_on_settings`)
+- **Barre des taches Windows** : `_TaskbarWindow` (dans `app.py`) — fenetre fantome minimisee qui donne a l'app une presence permanente dans la barre des taches avec le logo The Wave. Clic sur l'icone → ouvre les Parametres. Necessite `SetCurrentProcessExplicitAppUserModelID("com.thewave.app")` (via `ctypes`) pour que Windows traite l'app independamment de Python.
 - **`setQuitOnLastWindowClosed(False)`** : l'app ne quitte plus quand on ferme un dialog
 
-## Onboarding v2 (welcome_dialog.py) — Inspire Wispr Flow
-7 pages avec indicateur de progression (dots + messages encourageants) :
+## Plateforme
+- **Windows + Linux uniquement** — macOS non supporte (check au demarrage dans `app.py`, `sys.exit(1)`)
+- Warning dans `keyboard.py` et `waveform_widget.py` si `sys.platform == "darwin"`
+- Raison : Wispr Flow et Aqua Voice dominent sur Mac, aucun concurrent serieux sur Windows/Linux
+
+## Onboarding v2.1 (welcome_dialog.py) — Inspire Wispr Flow
+8 pages avec indicateur de progression (dots + messages encourageants) :
 1. **Bienvenue** : logo + bullets + bouton Commencer
-2. **Pourquoi VoxTool ?** : 4 cartes multi-select (motivations), Suivant bloque sans selection
+2. **Pourquoi The Wave ?** : 4 cartes multi-select (motivations), Suivant bloque sans selection
 3. **Raccourci clavier** : HotkeyCapture, no-skip 3s (Suivant desactive temporairement)
-4. **Test micro** : test 3s avec barre de volume
-5. **Demo interactive** : bouton Dicter toggle, QTextEdit resultat, transcription dans un thread, bouton Passer apres 10s
-6. **Ton d'ecriture** : 2 cartes radio (Naturel/Professionnel) avec exemples avant/apres
-7. **Pret !** : rappel hotkey + mode d'ecriture + indication tray
+4. **Langue** : QComboBox (15 langues), sauvegardee dans config
+5. **Test micro** : test 3s avec barre de volume + bip audio (play_start/play_stop via AudioFeedback)
+6. **Demo interactive** : bouton Dicter toggle, QTextEdit resultat, transcription dans un thread, bouton Passer apres 10s
+7. **Ton d'ecriture** : 3 cartes radio (Brut/Naturel/Professionnel) avec exemples
+8. **Pret !** : rappel hotkey + mode d'ecriture + indication tray
 
 ### Widgets custom onboarding
-- `_ProgressDots` : 7 cercles peints via QPainter + "Etape X sur 7"
+- `_ProgressDots` : 8 cercles peints via QPainter + "Etape X sur 8"
 - `_ClickableCard` : carte avec paintEvent (3 etats visuels: normal/hover/selected) + checkmark
 - `_TranscriptionWorker` : QObject avec signals finished/error, tourne dans un thread
 
-## Settings Dialog v2 (settings_dialog.py) — Inspire Wispr/Aqua
-Fenetre moderne dark theme avec **sidebar navigation a gauche** :
+## Settings Dialog v2.1 (settings_dialog.py) — Inspire Wispr/Aqua
+Fenetre moderne dark theme 620x580 avec **sidebar navigation a gauche** (7 onglets), pages scrollables (QScrollArea) :
 - **General** : raccourci clavier (HotkeyCapture) + langue (15 langues, QComboBox)
-- **Ecriture** : mode Naturel/Professionnel (cartes cliquables `_ToneCard` avec checkmark)
+- **Ecriture** : mode Brut/Naturel/Professionnel (3 cartes cliquables `_ToneCard` avec checkmark)
 - **Audio** : selection micro (liste des peripheriques via AudioDeviceManager)
 - **Avance** : provider transcription + provider nettoyage (hybrid/cloud/local)
+- **Aide** : raccourci actuel, comment ca marche, signaler probleme, a propos, bouton Quitter rouge
 
 ### Widgets custom settings
 - `_NavItem` : QLabel cliquable avec etat actif/inactif pour la sidebar
@@ -129,8 +138,12 @@ Fenetre moderne dark theme avec **sidebar navigation a gauche** :
 - `HotkeyCapture` : QLineEdit read-only qui capture les combos de touches
 
 ### Integration app.py
+- Classe principale `TheWave` (anciennement `VoxTool`)
 - `_on_settings()` gere 6 parametres : hotkey, cleaning mode, langue, micro, transcription provider, cleaning provider
+- `_on_help()` ouvre les settings directement sur l'onglet Aide via `navigate_to_help()`
+- `on_quit` callback passe a `SettingsDialog`, `WaveformWidget` et `TrayIcon`
 - `_save_config_nested()` : charge YAML complet, modifie la cle nested, re-ecrit (supporte cleaning.mode, whisper.language, etc.)
+- Onboarding sauvegarde aussi la langue choisie via `_save_config_nested("whisper", "language", ...)`
 - Notification tray "Parametres mis a jour" apres sauvegarde
 
 ## Hotkey personnalisable
@@ -152,7 +165,7 @@ Fenetre moderne dark theme avec **sidebar navigation a gauche** :
 3. logging (jamais print)
 4. Tests pytest pour chaque module
 5. Gestion erreurs gracieuse, jamais de crash silencieux
-6. Multiplateforme : macOS, Windows, Linux
+6. Plateformes supportees : Windows, Linux (macOS non supporte)
 7. Config via config.yaml, pas de valeurs hardcodees
 
 ## Commandes

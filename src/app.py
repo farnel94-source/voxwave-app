@@ -1,4 +1,4 @@
-"""VoxTool — Point d'entree principal.
+"""The Wave — Point d'entree principal.
 
 Usage:
     python -m voxtool
@@ -68,8 +68,34 @@ def load_config(config_path: str = "config.yaml") -> dict:
     return ConfigValidator.validate_and_merge(user_config)
 
 
-class VoxTool:
-    """Application principale VoxTool."""
+class _TaskbarWindow:
+    """Fenetre fantome pour donner a l'app une presence dans la barre des taches Windows.
+
+    Affichee comme minimisee (invisible) mais visible dans la barre des taches avec
+    le logo The Wave. Clic sur l'icone -> ouvre les Parametres.
+    """
+
+    def __init__(self, on_activate, app_icon) -> None:
+        from PySide6.QtCore import QEvent
+        from PySide6.QtWidgets import QWidget
+
+        class _Anchor(QWidget):
+            def changeEvent(self_, event) -> None:  # noqa: N805
+                from PySide6.QtCore import Qt
+                if event.type() == QEvent.Type.WindowStateChange:
+                    if not (self_.windowState() & Qt.WindowState.WindowMinimized):
+                        self_.showMinimized()
+                        on_activate()
+                super(_Anchor, self_).changeEvent(event)
+
+        self._win = _Anchor()
+        self._win.setWindowTitle("The Wave")
+        self._win.setWindowIcon(app_icon)
+        self._win.showMinimized()
+
+
+class TheWave:
+    """Application principale The Wave."""
 
     def __init__(self, config: dict) -> None:
         self.config = config
@@ -97,7 +123,7 @@ class VoxTool:
         from src.injection.keyboard import TextInjector
         from src.hotkey.listener import HotkeyListener
 
-        logger.info("Initialisation VoxTool...")
+        logger.info("Initialisation The Wave...")
 
         # Audio feedback
         feedback_config = self.config.get("audio", {}).get("feedback", {})
@@ -167,6 +193,7 @@ class VoxTool:
             on_start=self._on_start,
             on_stop=self._on_stop,
             on_settings=self._on_settings,
+            on_quit=self._shutdown,
         )
 
         # System tray (PySide6 QSystemTrayIcon)
@@ -177,12 +204,14 @@ class VoxTool:
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
             on_settings=self._on_settings,
+            on_help=self._on_help,
+            on_tray_clicked=self._on_settings,
         )
         self.tray.setup()
 
         # Pre-warm en background : charger Whisper + verifier Ollama
         self._prewarm_engines()
-        logger.info("VoxTool pret !")
+        logger.info("The Wave pret !")
 
     def _prewarm_engines(self) -> None:
         """Pre-charge les moteurs en background pour reduire la latence du premier appel."""
@@ -269,6 +298,15 @@ class VoxTool:
                 sample_rate=sample_rate,
             )
 
+    def _toggle_waveform(self) -> None:
+        """Affiche ou cache le widget orb quand on clique sur l'icone tray."""
+        if self.waveform:
+            if self.waveform.isVisible():
+                self.waveform.hide()
+            else:
+                self.waveform.show()
+                self.waveform.raise_()
+
     def _on_start(self) -> None:
         """Callback: debut enregistrement."""
         logger.info("Enregistrement...")
@@ -316,7 +354,7 @@ class VoxTool:
                 msg = "Free tier epuise. Activez une licence pour continuer."
                 logger.warning(msg)
                 if self.tray:
-                    self.tray.show_notification("VoxTool — Licence", msg)
+                    self.tray.show_notification("The Wave — Licence", msg)
                 return
 
             audio_config = self.config["audio"]
@@ -377,7 +415,7 @@ class VoxTool:
             self.feedback.play_error()
             if self.tray:
                 self.tray.set_state("error")
-                self.tray.show_notification("VoxTool — Erreur", str(e))
+                self.tray.show_notification("The Wave — Erreur", str(e))
             if self.waveform:
                 self.waveform.show_error()  # revient a idle apres ERROR_DISPLAY_MS
             from src.utils.exceptions import TranscriptionError, CleaningError
@@ -466,18 +504,18 @@ class VoxTool:
         try:
             from PySide6.QtWidgets import QInputDialog
             text, ok = QInputDialog.getText(
-                None, "VoxTool — Activer licence",
+                None, "The Wave — Activer licence",
                 "Entrez votre cle de licence :"
             )
             if ok and text.strip():
                 try:
                     self.license_validator.activate_license(text.strip())
                     if self.tray:
-                        self.tray.show_notification("VoxTool", "Licence activee avec succes !")
+                        self.tray.show_notification("The Wave", "Licence activee avec succes !")
                 except Exception as e:
                     logger.error(f"Activation echouee: {e}")
                     if self.tray:
-                        self.tray.show_notification("VoxTool — Erreur", f"Activation echouee : {e}")
+                        self.tray.show_notification("The Wave — Erreur", f"Activation echouee : {e}")
         except Exception as e:
             logger.error(f"Dialog licence echoue: {e}")
 
@@ -489,63 +527,113 @@ class VoxTool:
         dialog = SettingsDialog(
             current_hotkey=self.config["hotkey"],
             current_cleaning_mode=cleaning_config.get("mode", "verbatim"),
-            current_language=self.config.get("whisper", {}).get("language", "fr"),
+            current_language=self.config.get("whisper", {}).get("language", "en"),
+            current_system_language=self.config.get("language", "en"),
             current_device_id=self.config.get("audio", {}).get("device_id"),
             current_transcription_provider=self.config.get("transcription", {}).get("provider", "hybrid"),
             current_cleaning_provider=cleaning_config.get("provider", "hybrid"),
+            current_activation_method=self.config.get("activation_method", "both"),
+            on_quit=self._shutdown,
+            on_activate_license=self._activate_license_dialog,
         )
-        if dialog.exec():
-            changes = []
+        dialog.exec()  # on lance toujours (fermeture avec X ou Save sauvegarde quand meme)
+        changes = []
 
-            # Hotkey
-            new_hotkey = dialog.hotkey
-            if new_hotkey != self.config["hotkey"]:
-                self.config["hotkey"] = new_hotkey
+        # Hotkey
+        new_hotkey = dialog.hotkey
+        if new_hotkey != self.config["hotkey"]:
+            self.config["hotkey"] = new_hotkey
+            if self.listener:
+                self.listener.update_hotkey(new_hotkey)
+            self._save_config("hotkey", new_hotkey)
+            changes.append(f"Raccourci : {new_hotkey}")
+
+        # Cleaning mode
+        new_mode = dialog.cleaning_mode
+        if new_mode != cleaning_config.get("mode"):
+            self.config.setdefault("cleaning", {})["mode"] = new_mode
+            if self.pipeline:
+                self.pipeline.mode = new_mode
+            self._save_config_nested("cleaning", "mode", new_mode)
+            mode_names = {"raw": "Brut", "verbatim": "Naturel", "quality": "Professionnel"}
+            changes.append(f"Mode : {mode_names.get(new_mode, new_mode)}")
+
+        # System language (interface)
+        new_sys_lang = dialog.system_language
+        if new_sys_lang != self.config.get("language"):
+            self.config["language"] = new_sys_lang
+            self._save_config("language", new_sys_lang)
+            changes.append(f"Interface : {new_sys_lang}")
+
+        # Dictation language
+        new_lang = dialog.language
+        if new_lang != self.config.get("whisper", {}).get("language"):
+            self.config.setdefault("whisper", {})["language"] = new_lang
+            self._save_config_nested("whisper", "language", new_lang)
+            # Mettre a jour le moteur a runtime (sans redemarrer)
+            if hasattr(self.engine, "language"):
+                self.engine.language = new_lang
+            if self.pipeline and hasattr(self.pipeline, "language"):
+                self.pipeline.language = new_lang
+            changes.append(f"Dictee : {new_lang}")
+
+        # Device ID
+        new_device = dialog.device_id
+        if new_device != self.config.get("audio", {}).get("device_id"):
+            self.config.setdefault("audio", {})["device_id"] = new_device
+            self._save_config_nested("audio", "device_id", new_device)
+            changes.append("Micro change")
+
+        # Transcription provider
+        new_trans = dialog.transcription_provider
+        if new_trans != self.config.get("transcription", {}).get("provider"):
+            self.config.setdefault("transcription", {})["provider"] = new_trans
+            self._save_config_nested("transcription", "provider", new_trans)
+            changes.append(f"Transcription : {new_trans}")
+
+        # Cleaning provider
+        new_clean = dialog.cleaning_provider
+        if new_clean != cleaning_config.get("provider"):
+            self.config.setdefault("cleaning", {})["provider"] = new_clean
+            self._save_config_nested("cleaning", "provider", new_clean)
+            changes.append(f"Nettoyage : {new_clean}")
+
+        # Activation method (hotkey / icon / both)
+        new_activation = dialog.activation_method
+        if new_activation != self.config.get("activation_method", "both"):
+            self.config["activation_method"] = new_activation
+            self._save_config("activation_method", new_activation)
+            if new_activation == "icon":
                 if self.listener:
-                    self.listener.update_hotkey(new_hotkey)
-                self._save_config("hotkey", new_hotkey)
-                changes.append(f"Raccourci : {new_hotkey}")
+                    self.listener.stop()
+            else:
+                if self.listener:
+                    self.listener.start()
+            changes.append(f"Activation : {new_activation}")
 
-            # Cleaning mode
-            new_mode = dialog.cleaning_mode
-            if new_mode != cleaning_config.get("mode"):
-                self.config.setdefault("cleaning", {})["mode"] = new_mode
-                if self.pipeline:
-                    self.pipeline.mode = new_mode
-                self._save_config_nested("cleaning", "mode", new_mode)
-                changes.append(f"Mode : {'Naturel' if new_mode == 'verbatim' else 'Professionnel'}")
+        if changes and self.tray:
+            self.tray.show_notification("The Wave", "Parametres mis a jour")
+        logger.info(f"Settings: {', '.join(changes) if changes else 'aucun changement'}")
 
-            # Language
-            new_lang = dialog.language
-            if new_lang != self.config.get("whisper", {}).get("language"):
-                self.config.setdefault("whisper", {})["language"] = new_lang
-                self._save_config_nested("whisper", "language", new_lang)
-                changes.append(f"Langue : {new_lang}")
+    def _on_help(self) -> None:
+        """Ouvre les parametres sur l'onglet Aide."""
+        from src.gui.settings_dialog import SettingsDialog
 
-            # Device ID
-            new_device = dialog.device_id
-            if new_device != self.config.get("audio", {}).get("device_id"):
-                self.config.setdefault("audio", {})["device_id"] = new_device
-                self._save_config_nested("audio", "device_id", new_device)
-                changes.append("Micro change")
-
-            # Transcription provider
-            new_trans = dialog.transcription_provider
-            if new_trans != self.config.get("transcription", {}).get("provider"):
-                self.config.setdefault("transcription", {})["provider"] = new_trans
-                self._save_config_nested("transcription", "provider", new_trans)
-                changes.append(f"Transcription : {new_trans}")
-
-            # Cleaning provider
-            new_clean = dialog.cleaning_provider
-            if new_clean != cleaning_config.get("provider"):
-                self.config.setdefault("cleaning", {})["provider"] = new_clean
-                self._save_config_nested("cleaning", "provider", new_clean)
-                changes.append(f"Nettoyage : {new_clean}")
-
-            if changes and self.tray:
-                self.tray.show_notification("VoxTool", "Parametres mis a jour")
-            logger.info(f"Settings: {', '.join(changes) if changes else 'aucun changement'}")
+        cleaning_config = self.config.get("cleaning", {})
+        dialog = SettingsDialog(
+            current_hotkey=self.config["hotkey"],
+            current_cleaning_mode=cleaning_config.get("mode", "verbatim"),
+            current_language=self.config.get("whisper", {}).get("language", "en"),
+            current_system_language=self.config.get("language", "en"),
+            current_device_id=self.config.get("audio", {}).get("device_id"),
+            current_transcription_provider=self.config.get("transcription", {}).get("provider", "hybrid"),
+            current_cleaning_provider=cleaning_config.get("provider", "hybrid"),
+            current_activation_method=self.config.get("activation_method", "both"),
+            on_quit=self._shutdown,
+            on_activate_license=self._activate_license_dialog,
+        )
+        dialog.navigate_to_help()
+        dialog.exec()
 
     def _save_config(self, key: str, value: object) -> None:
         """Sauvegarde un champ dans config.yaml en preservant le reste.
@@ -617,14 +705,14 @@ class VoxTool:
         """
         logger.info(f"Fallback: {message}")
         if self.tray:
-            self.tray.show_notification("VoxTool", message)
+            self.tray.show_notification("The Wave", message)
 
     def _shutdown(self) -> None:
         """Arrete proprement tous les composants (idempotent)."""
         if self._shutting_down:
             return
         self._shutting_down = True
-        logger.info("Arret VoxTool...")
+        logger.info("Arret The Wave...")
         if self.listener:
             self.listener.stop()
         if self._processing_thread and self._processing_thread.is_alive():
@@ -644,11 +732,25 @@ class VoxTool:
 
     def run(self) -> None:
         """Lance l'application avec boucle Qt."""
+        # The Wave cible Windows et Linux uniquement
+        if sys.platform == "darwin":
+            logger.error("The Wave n'est pas supporte sur macOS. Utilisez Windows ou Linux.")
+            print("The Wave n'est pas supporte sur macOS.")
+            print("Plateformes supportees : Windows, Linux.")
+            sys.exit(1)
+
         from PySide6.QtCore import QTimer
         from PySide6.QtWidgets import QApplication
 
         self._qt_app = QApplication.instance() or QApplication(sys.argv)
         self._qt_app.setQuitOnLastWindowClosed(False)
+        from src.gui.icons import create_qicon
+        _app_icon = create_qicon("idle")
+        self._qt_app.setWindowIcon(_app_icon)
+        if sys.platform == "win32":
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("com.thewave.app")
+        self._taskbar = _TaskbarWindow(on_activate=self._on_settings, app_icon=_app_icon)
         self.initialize()
 
         # Welcome screen au premier lancement
@@ -658,6 +760,7 @@ class VoxTool:
                 current_hotkey=self.config["hotkey"],
                 engine=self.engine,
                 processor=self.processor,
+                feedback=self.feedback,
                 parent=None,
             )
             if dialog.exec():
@@ -675,6 +778,14 @@ class VoxTool:
                     if self.pipeline:
                         self.pipeline.mode = new_mode
                     self._save_config_nested("cleaning", "mode", new_mode)
+                # Appliquer la langue choisie (interface + dictee)
+                new_lang = dialog.language
+                if new_lang != self.config.get("language"):
+                    self.config["language"] = new_lang
+                    self._save_config("language", new_lang)
+                if new_lang != self.config.get("whisper", {}).get("language"):
+                    self.config.setdefault("whisper", {})["language"] = new_lang
+                    self._save_config_nested("whisper", "language", new_lang)
                 # Marquer le premier lancement comme termine
                 self.config["first_launch"] = False
                 self._save_config("first_launch", "false")
@@ -696,7 +807,7 @@ class VoxTool:
         self._signal_timer.timeout.connect(lambda: None)
         self._signal_timer.start(500)
 
-        logger.info(f"VoxTool actif ! Hotkey: {self.config['hotkey']} — Fermez le tray pour quitter.")
+        logger.info(f"The Wave actif ! Hotkey: {self.config['hotkey']} — Fermez le tray pour quitter.")
         self._qt_app.exec()
 
 
@@ -734,7 +845,7 @@ def test_microphone(config: dict) -> None:
 @click.option("--config", "config_path", default="config.yaml", help="Chemin config")
 @click.option("--log-level", default=None, help="Niveau de log")
 def main(model, test, list_devices, config_path, log_level):
-    """VoxTool — Dictee vocale intelligente."""
+    """The Wave — Dictee vocale intelligente."""
     effective_log_level = log_level or os.getenv("VOXTOOL_LOG_LEVEL", "INFO")
     setup_logging(effective_log_level)
     config = load_config(config_path)
@@ -751,7 +862,7 @@ def main(model, test, list_devices, config_path, log_level):
         test_microphone(config)
         return
 
-    app = VoxTool(config)
+    app = TheWave(config)
     app.run()
 
 
