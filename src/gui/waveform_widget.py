@@ -30,6 +30,9 @@ def _restore_foreground_window() -> Optional[Callable]:
     Returns:
         Callable qui restaure le focus, ou None si non-Windows.
     """
+    if sys.platform == "darwin":
+        logger.warning("restore_foreground: macOS non supporte par The Wave")
+        return None
     if sys.platform != "win32":
         return None
     try:
@@ -55,6 +58,7 @@ class Bridge(QObject):
         on_start: Optional[Callable] = None,
         on_stop: Optional[Callable] = None,
         on_settings: Optional[Callable] = None,
+        on_quit: Optional[Callable] = None,
         widget: Optional["WaveformWidget"] = None,
     ) -> None:
         """Initialise le bridge.
@@ -63,17 +67,19 @@ class Bridge(QObject):
             on_start: Callback appelee quand l'icone micro est cliquee.
             on_stop: Callback appelee quand le stop est clique.
             on_settings: Callback appelee quand les parametres sont demandes.
+            on_quit: Callback appelee quand le quit est demande.
         """
         super().__init__()
         self._on_start = on_start
         self._on_stop = on_stop
         self._on_settings = on_settings
+        self._on_quit = on_quit
         self._widget = widget
         self._saved_restore: Optional[Callable] = None
 
     @Slot()
     def on_start_clicked(self) -> None:
-        """Appelee depuis JS quand l'icone micro est cliquee.
+        """Appelee depuis JS quand le logo est clique (idle -> recording).
 
         Sauvegarde la fenetre active pour pouvoir restaurer le focus
         au moment du stop (injection de texte).
@@ -88,7 +94,7 @@ class Bridge(QObject):
 
     @Slot()
     def on_stop_clicked(self) -> None:
-        """Appelee depuis JS quand le stop est clique.
+        """Appelee depuis JS quand le logo est clique (recording -> stop).
 
         Restaure la fenetre active sauvegardee au start pour que l'injection
         de texte se fasse dans la bonne fenetre.
@@ -103,10 +109,17 @@ class Bridge(QObject):
 
     @Slot()
     def on_settings_clicked(self) -> None:
-        """Appelee depuis JS quand le clic droit sur le logo demande les parametres."""
+        """Appelee depuis JS quand clic droit sur le logo."""
         logger.debug("Bridge: settings clicked")
         if self._on_settings:
             self._on_settings()
+
+    @Slot()
+    def on_quit_clicked(self) -> None:
+        """Appelee depuis JS pour quitter (reserve pour usage futur)."""
+        logger.debug("Bridge: quit clicked")
+        if self._on_quit:
+            self._on_quit()
 
     @Slot(int, int)
     def move_by(self, dx: int, dy: int) -> None:
@@ -136,6 +149,7 @@ class WaveformWidget(QWidget):
         on_start: Optional[Callable] = None,
         on_stop: Optional[Callable] = None,
         on_settings: Optional[Callable] = None,
+        on_quit: Optional[Callable] = None,
     ) -> None:
         """Initialise le widget Voice Input.
 
@@ -144,6 +158,7 @@ class WaveformWidget(QWidget):
             on_start: Callback quand l'icone micro est cliquee.
             on_stop: Callback quand le stop est clique.
             on_settings: Callback quand les parametres sont demandes (clic droit logo).
+            on_quit: Callback quand le quit est demande (via tray icon).
         """
         super().__init__()
         self._capture = capture
@@ -151,6 +166,7 @@ class WaveformWidget(QWidget):
         self._on_start = on_start
         self._on_stop = on_stop
         self._on_settings = on_settings
+        self._on_quit = on_quit
         self._setup_window()
         self._setup_webview()
         self._setup_timers()
@@ -185,6 +201,7 @@ class WaveformWidget(QWidget):
             on_start=self._on_start,
             on_stop=self._on_stop,
             on_settings=self._on_settings,
+            on_quit=self._on_quit,
             widget=self,
         )
 

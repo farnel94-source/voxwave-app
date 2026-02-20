@@ -1,9 +1,10 @@
-"""Valeurs par défaut de la configuration VoxTool."""
+"""Valeurs par défaut de la configuration The Wave."""
 
 DEFAULT_CONFIG: dict = {
     "first_launch": True,
     "hotkey": "F8",
-    "language": "fr",
+    "language": "en",
+    "activation_method": "both",
     "model": "base",
     "injection": "paste",
     "hotkey_debounce": 0.5,
@@ -30,11 +31,12 @@ DEFAULT_CONFIG: dict = {
         "model": "base",
         "beam_size": 5,
         "vad_filter": True,
-        "language": "fr",
+        "language": "en",
     },
     "groq": {
         "model": "whisper-large-v3-turbo",
     },
+    # cleaning.mode: "raw" (brut, zero traitement) | "verbatim" (naturel) | "quality" (professionnel)
     "cleaning": {
         "mode": "verbatim",
         "provider": "hybrid",

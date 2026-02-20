@@ -76,22 +76,63 @@ class _TaskbarWindow:
     """
 
     def __init__(self, on_activate, app_icon) -> None:
-        from PySide6.QtCore import QEvent
+        from PySide6.QtCore import QEvent, Qt, QTimer
         from PySide6.QtWidgets import QWidget
 
         class _Anchor(QWidget):
+            def nativeEvent(self_, event_type, message):  # noqa: N805
+                """Windows: intercepte WM_SYSCOMMAND SC_RESTORE (clic barre des taches).
+
+                Consume le message pour empecher la fenetre de se restaurer (pas de flash).
+                Appele exactement une fois par clic utilisateur.
+                """
+                if event_type == b"windows_generic_MSG":
+                    import ctypes
+
+                    class _MSG(ctypes.Structure):
+                        _fields_ = [
+                            ("hWnd", ctypes.c_size_t),
+                            ("message", ctypes.c_uint),
+                            ("wParam", ctypes.c_size_t),
+                            ("lParam", ctypes.c_ssize_t),
+                        ]
+
+                    msg = _MSG.from_address(int(message))
+                    WM_SYSCOMMAND = 0x0112
+                    SC_RESTORE = 0xF120
+                    if msg.message == WM_SYSCOMMAND and (msg.wParam & 0xFFF0) == SC_RESTORE:
+                        print("[TaskbarWindow] SC_RESTORE intercepte -> ouverture Settings", flush=True)
+                        on_activate()
+                        return True, 0  # Consomme le message : fenetre reste minimisee
+                return super(_Anchor, self_).nativeEvent(event_type, message)
+
             def changeEvent(self_, event) -> None:  # noqa: N805
-                from PySide6.QtCore import Qt
+                """Securite : re-minimise si la fenetre se retrouve visible (Linux ou cas edge)."""
                 if event.type() == QEvent.Type.WindowStateChange:
                     if not (self_.windowState() & Qt.WindowState.WindowMinimized):
                         self_.showMinimized()
-                        on_activate()
+                        if sys.platform != "win32":
+                            on_activate()
                 super(_Anchor, self_).changeEvent(event)
+
+            def closeEvent(self_, event) -> None:  # noqa: N805
+                event.ignore()
+                self_.showMinimized()
 
         self._win = _Anchor()
         self._win.setWindowTitle("The Wave")
         self._win.setWindowIcon(app_icon)
+        self._win.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self._win.setWindowOpacity(0.0)
         self._win.showMinimized()
+
+        if sys.platform == "win32":
+            from src.gui.icons import force_taskbar_icon_win32
+            hwnd = int(self._win.winId())
+            print(f"[TaskbarWindow] HWND = {hwnd}", flush=True)
+            # Differement 300ms : l'Explorateur Windows cree le bouton barre des taches
+            # de maniere asynchrone. On attend qu'il soit pret avant d'envoyer WM_SETICON.
+            QTimer.singleShot(300, lambda: force_taskbar_icon_win32(hwnd))
 
 
 class TheWave:
@@ -113,6 +154,7 @@ class TheWave:
         self._processing_thread: Optional[threading.Thread] = None
         self._processing_lock = threading.Lock()
         self._executor = ThreadPoolExecutor(max_workers=2)
+        self._settings_dialog = None
 
     def initialize(self) -> None:
         """Initialise tous les composants."""
@@ -521,7 +563,15 @@ class TheWave:
 
     def _on_settings(self) -> None:
         """Ouvre le dialogue des parametres et applique les changements."""
+        if self._shutting_down:
+            return
         from src.gui.settings_dialog import SettingsDialog
+
+        # Guard singleton : si un dialog est deja ouvert, le mettre au premier plan
+        if self._settings_dialog is not None:
+            self._settings_dialog.raise_()
+            self._settings_dialog.activateWindow()
+            return
 
         cleaning_config = self.config.get("cleaning", {})
         dialog = SettingsDialog(
@@ -536,7 +586,9 @@ class TheWave:
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
         )
+        self._settings_dialog = dialog
         dialog.exec()  # on lance toujours (fermeture avec X ou Save sauvegarde quand meme)
+        self._settings_dialog = None
         changes = []
 
         # Hotkey
@@ -617,7 +669,15 @@ class TheWave:
 
     def _on_help(self) -> None:
         """Ouvre les parametres sur l'onglet Aide."""
+        if self._shutting_down:
+            return
         from src.gui.settings_dialog import SettingsDialog
+
+        # Guard singleton : si un dialog est deja ouvert, le mettre au premier plan
+        if self._settings_dialog is not None:
+            self._settings_dialog.raise_()
+            self._settings_dialog.activateWindow()
+            return
 
         cleaning_config = self.config.get("cleaning", {})
         dialog = SettingsDialog(
@@ -632,8 +692,10 @@ class TheWave:
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
         )
+        self._settings_dialog = dialog
         dialog.navigate_to_help()
         dialog.exec()
+        self._settings_dialog = None
 
     def _save_config(self, key: str, value: object) -> None:
         """Sauvegarde un champ dans config.yaml en preservant le reste.
@@ -726,6 +788,9 @@ class TheWave:
             self.waveform.show_idle()
         # Shutdown executor
         self._executor.shutdown(wait=False)
+        # Cacher la fenetre taskbar pour stopper les SC_RESTORE apres shutdown
+        if hasattr(self, '_taskbar'):
+            self._taskbar._win.hide()
         # Quitter la boucle Qt
         if self._qt_app:
             self._qt_app.quit()

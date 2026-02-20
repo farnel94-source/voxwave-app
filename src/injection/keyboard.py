@@ -1,18 +1,23 @@
 """Injection de texte dans l'app active via clipboard + raccourci.
 
-Supporte Windows, macOS, Linux X11 (xdotool) et Linux Wayland (wtype).
+Supporte Windows et Linux (X11 xdotool + Wayland wtype).
 Le clipboard original est sauvegarde et restaure apres injection.
+Note: macOS n'est pas supporte — The Wave cible Windows et Linux.
 """
 
 import logging
 import platform
 import shutil
 import subprocess
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from typing import Any, Callable, Literal, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
+
+if sys.platform == "darwin":
+    logger.warning("The Wave ne supporte pas macOS. L'injection clavier peut ne pas fonctionner.")
 
 T = TypeVar("T")
 

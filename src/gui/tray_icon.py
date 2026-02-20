@@ -1,4 +1,4 @@
-"""System tray icon pour VoxTool avec QSystemTrayIcon (PySide6)."""
+"""System tray icon pour The Wave avec QSystemTrayIcon (PySide6)."""
 
 import logging
 import threading
@@ -22,6 +22,8 @@ class TrayIcon:
         on_quit: Optional[Callable] = None,
         on_activate_license: Optional[Callable] = None,
         on_settings: Optional[Callable] = None,
+        on_help: Optional[Callable] = None,
+        on_tray_clicked: Optional[Callable] = None,
     ) -> None:
         """Initialise le tray icon.
 
@@ -31,12 +33,16 @@ class TrayIcon:
             on_quit: Callback pour quitter l'application.
             on_activate_license: Callback pour activer la licence.
             on_settings: Callback pour ouvrir les parametres.
+            on_help: Callback pour ouvrir l'aide (settings onglet Aide).
+            on_tray_clicked: Callback quand l'icone tray est cliquee (clic simple).
         """
         self.on_start = on_start
         self.on_stop = on_stop
         self.on_quit = on_quit
         self.on_activate_license = on_activate_license
         self.on_settings = on_settings
+        self.on_help = on_help
+        self.on_tray_clicked = on_tray_clicked
         self._state: IconState = "idle"
         self._is_recording = False
         self._tray: Optional[QSystemTrayIcon] = None
@@ -48,32 +54,42 @@ class TrayIcon:
         """Cree le menu contextuel du tray."""
         menu = QMenu()
 
-        self._start_action = QAction("Demarrer l'enregistrement", menu)
+        # --- Groupe enregistrement ---
+        self._start_action = QAction("\u25b6  Demarrer la dictee", menu)
         self._start_action.triggered.connect(self._toggle_start)
         menu.addAction(self._start_action)
 
-        self._stop_action = QAction("Arreter l'enregistrement", menu)
+        self._stop_action = QAction("\u25a0  Arreter la dictee", menu)
         self._stop_action.triggered.connect(self._toggle_stop)
         self._stop_action.setVisible(False)
         menu.addAction(self._stop_action)
 
         menu.addSeparator()
 
-        settings_action = QAction("Parametres...", menu)
+        # --- Groupe parametres ---
+        settings_action = QAction("\u2699  Parametres", menu)
         settings_action.triggered.connect(self._on_settings_click)
         menu.addAction(settings_action)
 
-        license_action = QAction("Activer licence...", menu)
+        help_action = QAction("\u2753  Aide", menu)
+        help_action.triggered.connect(self._on_help_click)
+        menu.addAction(help_action)
+
+        menu.addSeparator()
+
+        # --- Groupe licence / about ---
+        license_action = QAction("\u2727  Activer licence", menu)
         license_action.triggered.connect(self._on_activate_license_click)
         menu.addAction(license_action)
 
-        about_action = QAction("A propos", menu)
+        about_action = QAction("\u24d8  A propos", menu)
         about_action.triggered.connect(self._on_about)
         menu.addAction(about_action)
 
         menu.addSeparator()
 
-        quit_action = QAction("Quitter", menu)
+        # --- Quitter ---
+        quit_action = QAction("\u2715  Quitter", menu)
         quit_action.triggered.connect(self._on_quit_click)
         menu.addAction(quit_action)
 
@@ -111,9 +127,14 @@ class TrayIcon:
             thread = threading.Thread(target=self.on_activate_license, daemon=True)
             thread.start()
 
+    def _on_help_click(self) -> None:
+        """Ouvre l'aide (settings sur l'onglet Aide)."""
+        if self.on_help:
+            self.on_help()
+
     def _on_about(self) -> None:
-        """Affiche les infos sur VoxTool."""
-        self.show_notification("VoxTool", "VoxTool v2.0 — Dictee vocale intelligente")
+        """Affiche les infos sur The Wave."""
+        self.show_notification("The Wave", "The Wave v2.1 — Dictee vocale intelligente")
 
     def _on_quit_click(self) -> None:
         """Quitte l'application."""
@@ -121,6 +142,17 @@ class TrayIcon:
         if self.on_quit:
             self.on_quit()
         self.stop()
+
+    def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
+        """Gere le clic sur l'icone tray.
+
+        Args:
+            reason: Raison de l'activation (clic simple, double-clic, etc.).
+        """
+        # Trigger = clic simple (gauche)
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            if self.on_tray_clicked:
+                self.on_tray_clicked()
 
     def set_state(self, state: IconState) -> None:
         """Change l'etat visuel de l'icone.
@@ -153,8 +185,9 @@ class TrayIcon:
         self._menu = self._create_menu()
         self._tray = QSystemTrayIcon()
         self._tray.setIcon(create_qicon("idle"))
-        self._tray.setToolTip("VoxTool — Dictee vocale")
+        self._tray.setToolTip("The Wave — Dictee vocale")
         self._tray.setContextMenu(self._menu)
+        self._tray.activated.connect(self._on_tray_activated)
         self._tray.show()
         logger.info("System tray demarre (QSystemTrayIcon)")
 

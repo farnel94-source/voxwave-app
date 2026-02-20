@@ -52,7 +52,7 @@ voxtool/
 │   │   ├── tray_icon.py        # Icone system tray PySide6 (QSystemTrayIcon) + icones unicode
 │   │   ├── settings_dialog.py  # Parametres modernes (sidebar navigation, 5 sections dont Aide)
 │   │   ├── welcome_dialog.py   # Onboarding v2.1 (8 pages, inspire Wispr Flow, page langue)
-│   │   └── icons.py            # Generation icones dynamiques
+│   │   └── icons.py            # Generation icones dynamiques + force_taskbar_icon_win32 (WM_SETICON Win32)
 │   ├── config/
 │   │   ├── defaults.py         # Valeurs par defaut de la configuration
 │   │   └── validator.py        # Validation et merge de la config
@@ -100,7 +100,11 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 - **Hover icons** : au survol du logo (idle uniquement), 2 boutons ronds apparaissent (settings + quit)
 - **Bridge Python ↔ JS** : QWebChannel (setState, updateAmplitude, updateStep, showPreview, on_quit_clicked)
 - **Tray icon** : menu avec icones unicode et separateurs (▶ Dictee / ⚙ Parametres / ❓ Aide / ✧ Licence / ⓘ A propos / ✕ Quitter). Clic gauche tray → ouvre directement les Parametres (via `_on_settings`)
-- **Barre des taches Windows** : `_TaskbarWindow` (dans `app.py`) — fenetre fantome minimisee qui donne a l'app une presence permanente dans la barre des taches avec le logo The Wave. Clic sur l'icone → ouvre les Parametres. Necessite `SetCurrentProcessExplicitAppUserModelID("com.thewave.app")` (via `ctypes`) pour que Windows traite l'app independamment de Python.
+- **Barre des taches Windows** : `_TaskbarWindow` (dans `app.py`) — fenetre fantome minimisee (opacity=0, WA_ShowWithoutActivating) qui donne a l'app une presence permanente dans la barre des taches avec le logo The Wave.
+  - Necessite `SetCurrentProcessExplicitAppUserModelID("com.thewave.app")` (via `ctypes`) appele avant la creation de la fenetre
+  - **Clic sur l'icone** : intercepte via `nativeEvent` + `WM_SYSCOMMAND SC_RESTORE` (0x0112 / 0xF120). Message consomme (`return True, 0`) pour empecher le flash. Appele EXACTEMENT une fois par clic. Sur Linux : fallback via `changeEvent`.
+  - **Logo** : `force_taskbar_icon_win32(hwnd)` dans `icons.py` — sauvegarde logo en ICO temporaire, envoie `WM_SETICON` via `LoadImageW` + `SendMessageW`. Appele avec `QTimer.singleShot(300ms)` apres demarrage event loop (l'Explorateur Windows cree le bouton taskbar de maniere asynchrone).
+  - **PIEGE** : ne jamais appeler `force_taskbar_icon_win32` immediatement dans `__init__` — l'Explorateur n'a pas encore cree le bouton, l'icone est ignoree.
 - **`setQuitOnLastWindowClosed(False)`** : l'app ne quitte plus quand on ferme un dialog
 
 ## Plateforme

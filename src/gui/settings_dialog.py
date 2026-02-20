@@ -1,4 +1,4 @@
-"""Dialogue de parametres VoxTool — UI moderne inspiree Wispr/Aqua."""
+"""Dialogue de parametres The Wave — UI moderne inspiree Wispr/Aqua."""
 
 import logging
 from typing import Optional
@@ -11,12 +11,281 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
     QPushButton,
 )
 
 logger = logging.getLogger(__name__)
+
+# ====================================================================
+# Traductions Settings Dialog (en + fr)
+# ====================================================================
+
+_SETTINGS_T = {
+    "en": {
+        "title": "Settings",
+        "nav_general": "General",
+        "nav_writing": "Writing",
+        "nav_audio": "Audio",
+        "nav_advanced": "Advanced",
+        "nav_license": "License",
+        "nav_about": "About",
+        "nav_help": "Help",
+        "label_hotkey": "Keyboard shortcut",
+        "hint_hotkey": "Click then press your combo (e.g. F8, Ctrl+Shift+V)",
+        "label_interface_lang": "Interface language",
+        "hint_interface_lang": "Changes menus and interface language",
+        "label_dictation_lang": "Dictation language",
+        "hint_dictation_lang": "Language used for voice recognition",
+        "label_activation": "Activation method",
+        "hint_activation": "How to start/stop dictation",
+        "activation_hotkey": "Keyboard shortcut only",
+        "activation_icon": "The Wave icon only",
+        "activation_both": "Both (keyboard + icon)",
+        "section_writing": "WRITING MODE",
+        "desc_writing": "How should The Wave clean your dictations?",
+        "tone_raw": "Raw",
+        "tone_raw_desc": "No processing, exact transcription",
+        "tone_natural": "Natural",
+        "tone_natural_desc": "Keeps your style, minimal corrections",
+        "tone_pro": "Professional",
+        "tone_pro_desc": "Reformulates cleanly, formal tone",
+        "section_audio": "AUDIO DEVICE",
+        "label_mic": "Microphone",
+        "hint_mic": "Select the microphone to use for dictation",
+        "btn_close": "Save",
+        "section_advanced": "ADVANCED",
+        "label_trans_provider": "Transcription",
+        "label_clean_provider": "Cleaning",
+        "section_help": "HELP",
+        "help_shortcut_label": "Current shortcut:",
+        "help_how_title": "How it works",
+        "help_how_text": (
+            "1. Press shortcut to start dictating\n"
+            "2. Speak into your mic\n"
+            "3. Press again to stop\n"
+            "4. Clean text is pasted automatically"
+        ),
+        "help_report_title": "Report an issue",
+        "help_report_hint": "Contact us: support@thewave.app",
+    },
+    "fr": {
+        "title": "Parametres",
+        "nav_general": "General",
+        "nav_writing": "Ecriture",
+        "nav_audio": "Audio",
+        "nav_advanced": "Avance",
+        "nav_license": "Licence",
+        "nav_about": "A propos",
+        "nav_help": "Aide",
+        "label_hotkey": "Raccourci clavier",
+        "hint_hotkey": "Cliquez puis appuyez sur la combinaison souhaitee (ex: F8, Ctrl+Shift+V)",
+        "label_interface_lang": "Langue de l'interface",
+        "hint_interface_lang": "Change la langue des menus et de l'interface",
+        "label_dictation_lang": "Langue de dictee",
+        "hint_dictation_lang": "Langue utilisee pour la reconnaissance vocale",
+        "label_activation": "Methode d'activation",
+        "hint_activation": "Comment demarrer/arreter la dictee",
+        "activation_hotkey": "Raccourci clavier uniquement",
+        "activation_icon": "Icone The Wave uniquement",
+        "activation_both": "Les deux (clavier + icone)",
+        "section_writing": "MODE D'ECRITURE",
+        "desc_writing": "Comment The Wave doit nettoyer vos dictees ?",
+        "tone_raw": "Brut",
+        "tone_raw_desc": "Aucun traitement, texte exact de la transcription",
+        "tone_natural": "Naturel",
+        "tone_natural_desc": "Garde votre style oral, corrections minimales",
+        "tone_pro": "Professionnel",
+        "tone_pro_desc": "Reformule proprement, ton formel",
+        "section_audio": "PERIPHERIQUE AUDIO",
+        "label_mic": "Microphone",
+        "hint_mic": "Selectionnez le micro a utiliser pour la dictee",
+        "btn_close": "Sauvegarder",
+        "section_advanced": "AVANCE",
+        "label_trans_provider": "Transcription",
+        "label_clean_provider": "Nettoyage",
+        "section_help": "AIDE",
+        "help_shortcut_label": "Raccourci actuel :",
+        "help_how_title": "Comment ca marche",
+        "help_how_text": (
+            "1. Appuyez sur le raccourci pour commencer a dicter\n"
+            "2. Parlez normalement dans votre micro\n"
+            "3. Appuyez a nouveau pour arreter\n"
+            "4. Le texte nettoye est colle automatiquement"
+        ),
+        "help_report_title": "Signaler un probleme",
+        "help_report_hint": "Contactez-nous : support@thewave.app",
+    },
+    "es": {
+        "title": "Configuracion",
+        "nav_general": "General", "nav_writing": "Escritura",
+        "nav_audio": "Audio", "nav_advanced": "Avanzado",
+        "nav_license": "Licencia", "nav_about": "Acerca de", "nav_help": "Ayuda",
+        "label_hotkey": "Atajo de teclado",
+        "hint_hotkey": "Haga clic y presione la combinacion (ej: F8, Ctrl+Shift+V)",
+        "label_interface_lang": "Idioma de la interfaz",
+        "hint_interface_lang": "Cambia el idioma de los menus",
+        "label_dictation_lang": "Idioma de dictado",
+        "hint_dictation_lang": "Idioma usado para el reconocimiento de voz",
+        "label_activation": "Metodo de activacion",
+        "hint_activation": "Como iniciar/detener el dictado",
+        "activation_hotkey": "Solo atajo de teclado",
+        "activation_icon": "Solo icono The Wave",
+        "activation_both": "Ambos (teclado + icono)",
+        "section_writing": "MODO DE ESCRITURA",
+        "desc_writing": "Como debe limpiar The Wave sus dictados?",
+        "tone_raw": "Bruto", "tone_raw_desc": "Sin procesamiento, transcripcion exacta",
+        "tone_natural": "Natural", "tone_natural_desc": "Conserva tu estilo, correcciones minimas",
+        "tone_pro": "Profesional", "tone_pro_desc": "Reformulado correctamente, tono formal",
+        "section_audio": "DISPOSITIVO DE AUDIO",
+        "label_mic": "Microfono",
+        "hint_mic": "Seleccione el microfono para el dictado",
+        "btn_close": "Guardar",
+        "section_advanced": "AVANZADO",
+        "label_trans_provider": "Transcripcion",
+        "label_clean_provider": "Limpieza",
+        "section_help": "AYUDA",
+        "help_shortcut_label": "Atajo actual:",
+        "help_how_title": "Como funciona",
+        "help_how_text": (
+            "1. Presiona el atajo para dictar\n"
+            "2. Habla al microfono\n"
+            "3. Presiona de nuevo para parar\n"
+            "4. El texto limpio se pega automaticamente"
+        ),
+        "help_report_title": "Reportar un problema",
+        "help_report_hint": "Contactenos: support@thewave.app",
+    },
+    "de": {
+        "title": "Einstellungen",
+        "nav_general": "Allgemein", "nav_writing": "Schreiben",
+        "nav_audio": "Audio", "nav_advanced": "Erweitert",
+        "nav_license": "Lizenz", "nav_about": "Uber", "nav_help": "Hilfe",
+        "label_hotkey": "Tastenkurzel",
+        "hint_hotkey": "Klicken und Kombination drucken (z.B. F8, Strg+Umschalt+V)",
+        "label_interface_lang": "Oberflachensprache",
+        "hint_interface_lang": "Andert die Sprache der Menus",
+        "label_dictation_lang": "Diktiersprache",
+        "hint_dictation_lang": "Sprache fur die Spracherkennung",
+        "label_activation": "Aktivierungsmethode",
+        "hint_activation": "Wie Diktat starten/stoppen",
+        "activation_hotkey": "Nur Tastenkurzel",
+        "activation_icon": "Nur The Wave Symbol",
+        "activation_both": "Beides (Tastatur + Symbol)",
+        "section_writing": "SCHREIBMODUS",
+        "desc_writing": "Wie soll The Wave Ihre Diktate bereinigen?",
+        "tone_raw": "Roh", "tone_raw_desc": "Keine Verarbeitung, genaue Transkription",
+        "tone_natural": "Naturlich", "tone_natural_desc": "Behalt Ihren Stil, minimale Korrekturen",
+        "tone_pro": "Professionell", "tone_pro_desc": "Sauber umformuliert, formeller Ton",
+        "section_audio": "AUDIOGERAET",
+        "label_mic": "Mikrofon",
+        "hint_mic": "Wahlen Sie das Mikrofon fur das Diktat",
+        "btn_close": "Speichern",
+        "section_advanced": "ERWEITERT",
+        "label_trans_provider": "Transkription",
+        "label_clean_provider": "Bereinigung",
+        "section_help": "HILFE",
+        "help_shortcut_label": "Aktuelles Kurzel:",
+        "help_how_title": "So funktioniert es",
+        "help_how_text": (
+            "1. Kurzel drucken um zu diktieren\n"
+            "2. In Mikrofon sprechen\n"
+            "3. Erneut drucken um zu stoppen\n"
+            "4. Bereinigter Text wird eingefugt"
+        ),
+        "help_report_title": "Problem melden",
+        "help_report_hint": "Kontakt: support@thewave.app",
+    },
+    "it": {
+        "title": "Impostazioni",
+        "nav_general": "Generale", "nav_writing": "Scrittura",
+        "nav_audio": "Audio", "nav_advanced": "Avanzate",
+        "nav_license": "Licenza", "nav_about": "Informazioni", "nav_help": "Aiuto",
+        "label_hotkey": "Scorciatoia tastiera",
+        "hint_hotkey": "Clicca e premi la combinazione (es: F8, Ctrl+Shift+V)",
+        "label_interface_lang": "Lingua interfaccia",
+        "hint_interface_lang": "Cambia la lingua dei menu",
+        "label_dictation_lang": "Lingua di dettatura",
+        "hint_dictation_lang": "Lingua per il riconoscimento vocale",
+        "label_activation": "Metodo di attivazione",
+        "hint_activation": "Come avviare/fermare la dettatura",
+        "activation_hotkey": "Solo scorciatoia tastiera",
+        "activation_icon": "Solo icona The Wave",
+        "activation_both": "Entrambi (tastiera + icona)",
+        "section_writing": "MODALITA DI SCRITTURA",
+        "desc_writing": "Come deve pulire The Wave i tuoi dettati?",
+        "tone_raw": "Grezzo", "tone_raw_desc": "Nessuna elaborazione, trascrizione esatta",
+        "tone_natural": "Naturale", "tone_natural_desc": "Mantiene il tuo stile, correzioni minime",
+        "tone_pro": "Professionale", "tone_pro_desc": "Riformulato correttamente, tono formale",
+        "section_audio": "DISPOSITIVO AUDIO",
+        "label_mic": "Microfono",
+        "hint_mic": "Seleziona il microfono per la dettatura",
+        "btn_close": "Salva",
+        "section_advanced": "AVANZATE",
+        "label_trans_provider": "Trascrizione",
+        "label_clean_provider": "Pulizia",
+        "section_help": "AIUTO",
+        "help_shortcut_label": "Scorciatoia attuale:",
+        "help_how_title": "Come funziona",
+        "help_how_text": (
+            "1. Premi la scorciatoia per dettare\n"
+            "2. Parla al microfono\n"
+            "3. Premi di nuovo per fermare\n"
+            "4. Il testo pulito viene incollato"
+        ),
+        "help_report_title": "Segnala un problema",
+        "help_report_hint": "Contattaci: support@thewave.app",
+    },
+    "pt": {
+        "title": "Configuracoes",
+        "nav_general": "Geral", "nav_writing": "Escrita",
+        "nav_audio": "Audio", "nav_advanced": "Avancado",
+        "nav_license": "Licenca", "nav_about": "Sobre", "nav_help": "Ajuda",
+        "label_hotkey": "Atalho de teclado",
+        "hint_hotkey": "Clique e pressione a combinacao (ex: F8, Ctrl+Shift+V)",
+        "label_interface_lang": "Idioma da interface",
+        "hint_interface_lang": "Altera o idioma dos menus",
+        "label_dictation_lang": "Idioma de ditado",
+        "hint_dictation_lang": "Idioma usado para reconhecimento de voz",
+        "label_activation": "Metodo de ativacao",
+        "hint_activation": "Como iniciar/parar o ditado",
+        "activation_hotkey": "Somente atalho de teclado",
+        "activation_icon": "Somente icone The Wave",
+        "activation_both": "Ambos (teclado + icone)",
+        "section_writing": "MODO DE ESCRITA",
+        "desc_writing": "Como o The Wave deve limpar seus ditados?",
+        "tone_raw": "Bruto", "tone_raw_desc": "Sem processamento, transcricao exata",
+        "tone_natural": "Natural", "tone_natural_desc": "Mantem seu estilo, correcoes minimas",
+        "tone_pro": "Profissional", "tone_pro_desc": "Reformulado corretamente, tom formal",
+        "section_audio": "DISPOSITIVO DE AUDIO",
+        "label_mic": "Microfone",
+        "hint_mic": "Selecione o microfone para o ditado",
+        "btn_close": "Salvar",
+        "section_advanced": "AVANCADO",
+        "label_trans_provider": "Transcricao",
+        "label_clean_provider": "Limpeza",
+        "section_help": "AJUDA",
+        "help_shortcut_label": "Atalho atual:",
+        "help_how_title": "Como funciona",
+        "help_how_text": (
+            "1. Pressione o atalho para ditar\n"
+            "2. Fale no microfone\n"
+            "3. Pressione novamente para parar\n"
+            "4. O texto limpo e colado automaticamente"
+        ),
+        "help_report_title": "Reportar um problema",
+        "help_report_hint": "Contato: support@thewave.app",
+    },
+}
+
+
+def _st(lang: str, key: str) -> str:
+    """Retourne la traduction settings pour une cle dans la langue donnee."""
+    d = _SETTINGS_T.get(lang, _SETTINGS_T["en"])
+    return d.get(key, _SETTINGS_T["en"].get(key, key))
+
 
 # Mapping Qt modifier flags -> noms
 _QT_MODIFIER_NAMES = {
@@ -143,6 +412,19 @@ QPushButton#close-btn {
 QPushButton#close-btn:hover {
     background-color: rgba(255, 255, 255, 0.12);
     color: #ffffff;
+}
+QPushButton#quit-btn {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+QPushButton#quit-btn:hover {
+    background-color: rgba(239, 68, 68, 0.25);
+    border-color: rgba(239, 68, 68, 0.5);
 }
 """
 
@@ -317,35 +599,44 @@ class _ToneCard(QWidget):
 # ====================================================================
 
 class SettingsDialog(QDialog):
-    """Dialogue de parametres VoxTool — design moderne avec navigation laterale."""
+    """Dialogue de parametres The Wave — design moderne avec navigation laterale."""
 
     def __init__(
         self,
         current_hotkey: str = "F8",
         current_cleaning_mode: str = "verbatim",
-        current_language: str = "fr",
+        current_language: str = "en",
+        current_system_language: str = "en",
         current_device_id: Optional[int] = None,
         current_transcription_provider: str = "hybrid",
         current_cleaning_provider: str = "hybrid",
+        current_activation_method: str = "both",
+        on_quit: Optional[object] = None,
+        on_activate_license: Optional[object] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self._hotkey = current_hotkey
         self._cleaning_mode = current_cleaning_mode
         self._language = current_language
+        self._system_language = current_system_language
+        self._sys_lang = current_system_language  # alias utilisé pour les traductions
         self._device_id = current_device_id
         self._transcription_provider = current_transcription_provider
         self._cleaning_provider = current_cleaning_provider
+        self._activation_method = current_activation_method
+        self._on_quit = on_quit
+        self._on_activate_license = on_activate_license
 
         self._setup_window()
         self._build_ui()
 
     def _setup_window(self) -> None:
-        self.setWindowTitle("VoxTool — Parametres")
-        self.setFixedSize(580, 420)
+        self.setWindowTitle(f"The Wave — {_st(self._sys_lang, 'title')}")
+        self.setFixedSize(620, 580)
         self.setStyleSheet(_STYLESHEET)
         self.setWindowFlags(
-            Qt.WindowType.Dialog | Qt.WindowType.WindowCloseButtonHint
+            Qt.WindowType.Dialog | Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.Tool
         )
 
     def _build_ui(self) -> None:
@@ -362,7 +653,7 @@ class SettingsDialog(QDialog):
         sidebar_layout.setSpacing(4)
 
         # Titre sidebar
-        title = QLabel("Parametres")
+        title = QLabel(_st(self._sys_lang, "title"))
         title_font = QFont()
         title_font.setPointSize(14)
         title_font.setBold(True)
@@ -373,10 +664,13 @@ class SettingsDialog(QDialog):
         # Nav items
         self._nav_items: list[_NavItem] = []
         nav_labels = [
-            ("General", "\u2699"),
-            ("Ecriture", "\u270e"),
-            ("Audio", "\u266b"),
-            ("Avance", "\u2699"),
+            (_st(self._sys_lang, "nav_general"), "\u2699"),
+            (_st(self._sys_lang, "nav_writing"), "\u270e"),
+            (_st(self._sys_lang, "nav_audio"), "\u266b"),
+            (_st(self._sys_lang, "nav_advanced"), "\u2699"),
+            (_st(self._sys_lang, "nav_license"), "\u2727"),
+            (_st(self._sys_lang, "nav_about"), "\u24d8"),
+            (_st(self._sys_lang, "nav_help"), "\u2753"),
         ]
         for i, (label, icon) in enumerate(nav_labels):
             nav = _NavItem(label, icon)
@@ -387,7 +681,7 @@ class SettingsDialog(QDialog):
         sidebar_layout.addStretch()
 
         # Version
-        version = QLabel("VoxTool v2.0")
+        version = QLabel("The Wave v2.1")
         version.setStyleSheet("color: rgba(255,255,255,0.25); font-size: 10px; padding: 0 16px;")
         sidebar_layout.addWidget(version)
 
@@ -403,18 +697,26 @@ class SettingsDialog(QDialog):
         self._pages.append(self._build_page_writing())
         self._pages.append(self._build_page_audio())
         self._pages.append(self._build_page_advanced())
+        self._pages.append(self._build_page_license())
+        self._pages.append(self._build_page_about())
+        self._pages.append(self._build_page_help())
 
-        # On utilise un stacked widget simple
+        # On utilise un stacked widget avec scroll pour chaque page
         from PySide6.QtWidgets import QStackedWidget
         self._stack = QStackedWidget()
         for page in self._pages:
-            self._stack.addWidget(page)
+            scroll = QScrollArea()
+            scroll.setWidget(page)
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+            scroll.setStyleSheet("QScrollArea { background: transparent; }")
+            self._stack.addWidget(scroll)
         self._content_stack.addWidget(self._stack)
 
         # Bouton Fermer en bas
         close_row = QHBoxLayout()
         close_row.addStretch()
-        close_btn = QPushButton("Fermer")
+        close_btn = QPushButton(_st(self._sys_lang, "btn_close"))
         close_btn.setObjectName("close-btn")
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.clicked.connect(self.accept)
@@ -439,32 +741,66 @@ class SettingsDialog(QDialog):
     # ================================================================
 
     def _build_page_general(self) -> QWidget:
+        t = _SETTINGS_T.get(self._sys_lang, _SETTINGS_T["en"])
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(16)
+        layout.setSpacing(8)
 
         # Section title
         layout.addWidget(self._section_title("GENERAL"))
 
         # Raccourci clavier
-        layout.addWidget(self._field_label("Raccourci clavier"))
+        layout.addWidget(self._field_label(t["label_hotkey"]))
         self._hotkey_capture = HotkeyCapture(self._hotkey)
         self._hotkey_capture.setMinimumHeight(40)
         layout.addWidget(self._hotkey_capture)
-        hint = QLabel("Cliquez puis appuyez sur la combinaison souhaitee (ex: F8, Ctrl+Shift+V)")
+        hint = QLabel(t["hint_hotkey"])
         hint.setObjectName("hint")
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
-        layout.addSpacing(8)
+        layout.addSpacing(6)
 
-        # Langue
-        layout.addWidget(self._field_label("Langue de dictee"))
+        # Langue de l'interface
+        layout.addWidget(self._field_label(t["label_interface_lang"]))
+        self._sys_lang_combo = QComboBox()
+        sys_languages = [
+            ("en", "English"),
+            ("fr", "Francais"),
+            ("es", "Espanol"),
+            ("de", "Deutsch"),
+            ("it", "Italiano"),
+            ("pt", "Portugues"),
+            ("nl", "Nederlands"),
+            ("ja", "Japanese"),
+            ("ko", "Korean"),
+            ("zh", "Chinese"),
+            ("ru", "Russian"),
+            ("ar", "Arabic"),
+            ("tr", "Turkish"),
+            ("pl", "Polish"),
+            ("sv", "Swedish"),
+        ]
+        current_sys_lang_idx = 0
+        for i, (code, name) in enumerate(sys_languages):
+            self._sys_lang_combo.addItem(f"{name} ({code})", code)
+            if code == self._system_language:
+                current_sys_lang_idx = i
+        self._sys_lang_combo.setCurrentIndex(current_sys_lang_idx)
+        layout.addWidget(self._sys_lang_combo)
+        sys_hint = QLabel(t["hint_interface_lang"])
+        sys_hint.setObjectName("hint")
+        layout.addWidget(sys_hint)
+
+        layout.addSpacing(6)
+
+        # Langue de dictee
+        layout.addWidget(self._field_label(t["label_dictation_lang"]))
         self._lang_combo = QComboBox()
         languages = [
-            ("fr", "Francais"),
             ("en", "English"),
+            ("fr", "Francais"),
             ("es", "Espanol"),
             ("de", "Deutsch"),
             ("it", "Italiano"),
@@ -486,51 +822,85 @@ class SettingsDialog(QDialog):
                 current_lang_idx = i
         self._lang_combo.setCurrentIndex(current_lang_idx)
         layout.addWidget(self._lang_combo)
+        lang_hint = QLabel(t["hint_dictation_lang"])
+        lang_hint.setObjectName("hint")
+        layout.addWidget(lang_hint)
+
+        layout.addSpacing(6)
+
+        # Methode d'activation
+        layout.addWidget(self._field_label(t["label_activation"]))
+        activation_hint = QLabel(t["hint_activation"])
+        activation_hint.setObjectName("hint")
+        layout.addWidget(activation_hint)
+
+        self._act_hotkey_card = _ToneCard(t["activation_hotkey"], "")
+        self._act_hotkey_card.clicked.connect(lambda: self._select_activation("hotkey"))
+        layout.addWidget(self._act_hotkey_card)
+
+        self._act_icon_card = _ToneCard(t["activation_icon"], "")
+        self._act_icon_card.clicked.connect(lambda: self._select_activation("icon"))
+        layout.addWidget(self._act_icon_card)
+
+        self._act_both_card = _ToneCard(t["activation_both"], "")
+        self._act_both_card.clicked.connect(lambda: self._select_activation("both"))
+        layout.addWidget(self._act_both_card)
+
+        # Pre-select
+        self._select_activation(self._activation_method)
 
         layout.addStretch()
         return page
+
+    def _select_activation(self, method: str) -> None:
+        self._activation_method = method
+        self._act_hotkey_card.selected = (method == "hotkey")
+        self._act_icon_card.selected = (method == "icon")
+        self._act_both_card.selected = (method == "both")
 
     # ================================================================
     # Page Ecriture
     # ================================================================
 
     def _build_page_writing(self) -> QWidget:
+        t = _SETTINGS_T.get(self._sys_lang, _SETTINGS_T["en"])
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
-        layout.addWidget(self._section_title("MODE D'ECRITURE"))
+        layout.addWidget(self._section_title(t["section_writing"]))
 
-        desc = QLabel("Comment VoxTool doit nettoyer vos dictees ?")
+        desc = QLabel(t["desc_writing"])
         desc.setStyleSheet("color: rgba(255,255,255,0.6); font-size: 13px;")
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
         layout.addSpacing(4)
 
+        # Carte Brut
+        self._tone_raw = _ToneCard(t["tone_raw"], t["tone_raw_desc"])
+        self._tone_raw.clicked.connect(lambda: self._select_mode("raw"))
+        layout.addWidget(self._tone_raw)
+
+        layout.addSpacing(4)
+
         # Carte Naturel
-        self._tone_natural = _ToneCard("Naturel", "Garde votre style oral, corrections minimales")
+        self._tone_natural = _ToneCard(t["tone_natural"], t["tone_natural_desc"])
         self._tone_natural.clicked.connect(lambda: self._select_mode("verbatim"))
         layout.addWidget(self._tone_natural)
-
-        ex1 = QLabel('  "je pense qu\'on devrait se voir demain"')
-        ex1.setObjectName("hint")
-        layout.addWidget(ex1)
 
         layout.addSpacing(4)
 
         # Carte Pro
-        self._tone_pro = _ToneCard("Professionnel", "Reformule proprement, ton formel")
+        self._tone_pro = _ToneCard(t["tone_pro"], t["tone_pro_desc"])
         self._tone_pro.clicked.connect(lambda: self._select_mode("quality"))
         layout.addWidget(self._tone_pro)
 
-        ex2 = QLabel('  "Je pense que nous devrions nous voir demain."')
-        ex2.setObjectName("hint")
-        layout.addWidget(ex2)
-
         # Pre-select
-        if self._cleaning_mode == "quality":
+        if self._cleaning_mode == "raw":
+            self._tone_raw.selected = True
+        elif self._cleaning_mode == "quality":
             self._tone_pro.selected = True
         else:
             self._tone_natural.selected = True
@@ -540,6 +910,7 @@ class SettingsDialog(QDialog):
 
     def _select_mode(self, mode: str) -> None:
         self._cleaning_mode = mode
+        self._tone_raw.selected = (mode == "raw")
         self._tone_natural.selected = (mode == "verbatim")
         self._tone_pro.selected = (mode == "quality")
 
@@ -548,14 +919,15 @@ class SettingsDialog(QDialog):
     # ================================================================
 
     def _build_page_audio(self) -> QWidget:
+        t = _SETTINGS_T.get(self._sys_lang, _SETTINGS_T["en"])
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
 
-        layout.addWidget(self._section_title("PERIPHERIQUE AUDIO"))
+        layout.addWidget(self._section_title(t["section_audio"]))
 
-        layout.addWidget(self._field_label("Microphone"))
+        layout.addWidget(self._field_label(t["label_mic"]))
 
         self._device_combo = QComboBox()
         self._device_combo.addItem("Defaut systeme", None)
@@ -578,7 +950,7 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(self._device_combo)
 
-        hint = QLabel("Selectionnez le micro a utiliser pour la dictee")
+        hint = QLabel(t["hint_mic"])
         hint.setObjectName("hint")
         layout.addWidget(hint)
 
@@ -590,15 +962,16 @@ class SettingsDialog(QDialog):
     # ================================================================
 
     def _build_page_advanced(self) -> QWidget:
+        t = _SETTINGS_T.get(self._sys_lang, _SETTINGS_T["en"])
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
 
-        layout.addWidget(self._section_title("MOTEURS"))
+        layout.addWidget(self._section_title(t["section_advanced"]))
 
         # Provider transcription
-        layout.addWidget(self._field_label("Transcription"))
+        layout.addWidget(self._field_label(t["label_trans_provider"]))
         self._trans_combo = QComboBox()
         trans_options = [
             ("hybrid", "Hybride (cloud + local)"),
@@ -616,7 +989,7 @@ class SettingsDialog(QDialog):
         layout.addSpacing(8)
 
         # Provider nettoyage
-        layout.addWidget(self._field_label("Nettoyage"))
+        layout.addWidget(self._field_label(t["label_clean_provider"]))
         self._clean_combo = QComboBox()
         clean_options = [
             ("hybrid", "Hybride (cloud + local)"),
@@ -638,6 +1011,167 @@ class SettingsDialog(QDialog):
 
         layout.addStretch()
         return page
+
+    # ================================================================
+    # Page Licence
+    # ================================================================
+
+    def _build_page_license(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        layout.addWidget(self._section_title("LICENCE"))
+
+        # Statut
+        status_label = QLabel("Statut : Free tier")
+        status_label.setStyleSheet("color: #60a5fa; font-size: 14px; font-weight: 600;")
+        layout.addWidget(status_label)
+
+        layout.addSpacing(4)
+
+        desc = QLabel(
+            "Le free tier vous permet d'utiliser The Wave avec un nombre\n"
+            "limite de dictees par jour. Activez une licence pour un\n"
+            "usage illimite."
+        )
+        desc.setStyleSheet("color: rgba(255,255,255,0.5); font-size: 12px;")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        layout.addSpacing(12)
+
+        # Bouton activer licence
+        activate_btn = QPushButton("Activer une licence")
+        activate_btn.setStyleSheet(
+            "QPushButton { background-color: rgba(59,130,246,0.15); color: #3b82f6; "
+            "border: 1px solid rgba(59,130,246,0.3); border-radius: 8px; "
+            "padding: 10px 20px; font-size: 13px; font-weight: 600; }"
+            "QPushButton:hover { background-color: rgba(59,130,246,0.25); "
+            "border-color: rgba(59,130,246,0.5); }"
+        )
+        activate_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        activate_btn.clicked.connect(self._on_activate_license_clicked)
+        layout.addWidget(activate_btn)
+
+        layout.addStretch()
+        return page
+
+    def _on_activate_license_clicked(self) -> None:
+        """Lance l'activation de licence."""
+        if self._on_activate_license:
+            self._on_activate_license()
+
+    # ================================================================
+    # Page A propos
+    # ================================================================
+
+    def _build_page_about(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        layout.addWidget(self._section_title("A PROPOS"))
+
+        # Nom + version
+        name_label = QLabel("The Wave")
+        name_font = QFont()
+        name_font.setPointSize(16)
+        name_font.setBold(True)
+        name_label.setFont(name_font)
+        layout.addWidget(name_label)
+
+        version_label = QLabel("Version 2.1")
+        version_label.setStyleSheet("color: #60a5fa; font-size: 14px; font-weight: 600;")
+        layout.addWidget(version_label)
+
+        layout.addSpacing(4)
+
+        desc = QLabel("Dictee vocale intelligente pour Windows et Linux.")
+        desc.setStyleSheet("color: rgba(255,255,255,0.5); font-size: 13px;")
+        layout.addWidget(desc)
+
+        layout.addSpacing(8)
+
+        # Stack technique
+        tech_title = QLabel("Technologies")
+        tech_title.setStyleSheet("color: rgba(255,255,255,0.8); font-size: 13px; font-weight: 600;")
+        layout.addWidget(tech_title)
+
+        tech_text = QLabel(
+            "Whisper (transcription) + GPT-4o-mini (nettoyage)\n"
+            "PySide6 (interface) + Groq API (cloud rapide)"
+        )
+        tech_text.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px;")
+        tech_text.setWordWrap(True)
+        layout.addWidget(tech_text)
+
+        layout.addStretch()
+
+        # Bouton Quitter (rouge)
+        quit_btn = QPushButton("Quitter The Wave")
+        quit_btn.setObjectName("quit-btn")
+        quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        quit_btn.clicked.connect(self._on_quit_clicked)
+        layout.addWidget(quit_btn)
+
+        return page
+
+    # ================================================================
+    # Page Aide
+    # ================================================================
+
+    def _build_page_help(self) -> QWidget:
+        t = _SETTINGS_T.get(self._sys_lang, _SETTINGS_T["en"])
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        layout.addWidget(self._section_title(t["section_help"]))
+
+        # Raccourci actuel
+        shortcut_label = QLabel(f"{t['help_shortcut_label']} {self._hotkey}")
+        shortcut_label.setStyleSheet("color: #60a5fa; font-size: 14px; font-weight: 600;")
+        layout.addWidget(shortcut_label)
+
+        layout.addSpacing(4)
+
+        # Comment ca marche
+        how_title = QLabel(t["help_how_title"])
+        how_title.setStyleSheet("color: rgba(255,255,255,0.8); font-size: 13px; font-weight: 600;")
+        layout.addWidget(how_title)
+
+        how_text = QLabel(t["help_how_text"])
+        how_text.setStyleSheet("color: rgba(255,255,255,0.5); font-size: 12px;")
+        how_text.setWordWrap(True)
+        layout.addWidget(how_text)
+
+        layout.addSpacing(8)
+
+        # Signaler un probleme
+        report_label = QLabel(t["help_report_title"])
+        report_label.setStyleSheet("color: rgba(255,255,255,0.8); font-size: 13px; font-weight: 600;")
+        layout.addWidget(report_label)
+
+        report_hint = QLabel(t["help_report_hint"])
+        report_hint.setObjectName("hint")
+        layout.addWidget(report_hint)
+
+        layout.addStretch()
+        return page
+
+    def _on_quit_clicked(self) -> None:
+        """Quitte l'application via le bouton Quitter."""
+        self.reject()
+        if self._on_quit:
+            self._on_quit()
+
+    def navigate_to_help(self) -> None:
+        """Ouvre directement sur l'onglet Aide (appele depuis tray)."""
+        self._navigate(6)
 
     # ================================================================
     # Helpers
@@ -666,6 +1200,10 @@ class SettingsDialog(QDialog):
         return self._cleaning_mode
 
     @property
+    def system_language(self) -> str:
+        return self._sys_lang_combo.currentData()
+
+    @property
     def language(self) -> str:
         return self._lang_combo.currentData()
 
@@ -680,3 +1218,8 @@ class SettingsDialog(QDialog):
     @property
     def cleaning_provider(self) -> str:
         return self._clean_combo.currentData()
+
+    @property
+    def activation_method(self) -> str:
+        """Retourne la methode d'activation choisie : 'hotkey' | 'icon' | 'both'."""
+        return self._activation_method

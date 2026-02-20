@@ -12,6 +12,8 @@ from typing import Set
 KNOWN_HALLUCINATIONS: Set[str] = {
     "merci.", "merci !", "merci",
     "sous-titrage", "sous-titres",
+    "sous-titrage societe radio-canada",
+    "sous-titrage société radio-canada",
     "merci d'avoir regarde", "merci d'avoir regarde !",
     "merci d'avoir regarde cette video",
     "merci d'avoir regarde cette video !",
@@ -38,6 +40,7 @@ HALLUCINATION_TAILS: re.Pattern = re.compile(
     r"\s*(?:"
     r"Sous-titrag[^\n]*"
     r"|Sous-titres[^\n]*"
+    r"|Sous-titrage Soci\u00e9t\u00e9 Radio-Canada[^\n]*"
     r"|Merci d'avoir regard\u00e9[^\n]*"
     r"|Merci de votre attention[^\n]*"
     r"|Thanks for watching[^\n]*"

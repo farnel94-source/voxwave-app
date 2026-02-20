@@ -319,6 +319,10 @@ class CleaningPipeline:
         if not text:
             return ""
 
+        # Mode raw : zero traitement, retour du texte brut
+        if self.mode == "raw":
+            return text.strip()
+
         # Mode verbatim : ponctuation/majuscules seulement, pas de reformulation
         if self.mode == "verbatim":
             return self._clean_verbatim(text)
