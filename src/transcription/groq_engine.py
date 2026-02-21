@@ -45,12 +45,16 @@ class GroqWhisperEngine:
         self.sample_rate = sample_rate
         self.api_key = (api_key or os.getenv("GROQ_API_KEY") or "").strip()
         self._available = bool(self.api_key)
-        if not self._available:
-            logger.warning("GROQ_API_KEY non configuree, Groq indisponible")
-        self._client = None
         self._circuit: Optional[object] = None
         self._last_detected_language: Optional[str] = None
-        logger.info(f"GroqWhisperEngine: model={model}, lang={language}, available={self._available}")
+        # Connexion persistante : client créé au démarrage pour éviter +200ms au premier appel
+        if self._available:
+            from groq import Groq
+            self._client = Groq(api_key=self.api_key, timeout=10.0)
+            logger.info(f"GroqWhisperEngine: model={model}, lang={language}, client prêt")
+        else:
+            self._client = None
+            logger.warning("GROQ_API_KEY non configuree, Groq indisponible")
 
     def preload(self) -> None:
         """No-op : Groq n'a pas de modele local a precharger."""
@@ -62,10 +66,7 @@ class GroqWhisperEngine:
         return self._last_detected_language
 
     def _get_client(self):
-        """Retourne le client Groq (singleton)."""
-        if self._client is None:
-            from groq import Groq
-            self._client = Groq(api_key=self.api_key, timeout=10.0)
+        """Retourne le client Groq (connexion persistante initialisée au démarrage)."""
         return self._client
 
     def _audio_to_wav_bytes(self, audio: np.ndarray, sample_rate: int = 16000) -> io.BytesIO:

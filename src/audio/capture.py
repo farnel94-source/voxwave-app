@@ -6,9 +6,18 @@ Usage:
     # ... enregistrement ...
     capture.stop()
     audio = capture.get_buffer()
+
+    # Mode auto-stop avec Silero VAD :
+    vad = SileroVAD()
+    capture = AudioCapture(
+        silero_vad=vad,
+        on_silence_detected=lambda: print("silence détecté !"),
+        silence_threshold_ms=500,
+    )
 """
 
 import logging
+import threading
 from typing import Callable, Optional
 
 import numpy as np
@@ -22,6 +31,11 @@ class AudioCapture:
 
     Crée un stream par enregistrement (fiable, pas d'overflow).
     sounddevice est pré-importé pour un démarrage rapide.
+
+    Supporte deux modes :
+    - Push-to-talk : l'utilisateur appuie sur F8 pour arrêter.
+    - Auto-stop    : Silero VAD détecte la fin de parole automatiquement.
+    Les deux modes peuvent coexister simultanément.
     """
 
     def __init__(
@@ -32,6 +46,9 @@ class AudioCapture:
         silence_threshold: float = 0.01,
         device_id: Optional[int] = None,
         on_speech_detected: Optional[Callable] = None,
+        silero_vad: Optional[object] = None,
+        on_silence_detected: Optional[Callable] = None,
+        silence_threshold_ms: int = 500,
     ) -> None:
         self.sample_rate = sample_rate
         self.channels = channels
@@ -39,11 +56,17 @@ class AudioCapture:
         self.silence_threshold = silence_threshold
         self.device_id = device_id
         self.on_speech_detected = on_speech_detected
+        # Auto-stop : VAD + callback + seuil silence
+        self._silero_vad = silero_vad
+        self._on_silence_detected = on_silence_detected
+        self._silence_threshold_ms = silence_threshold_ms
+        # Verrou pour ne déclencher on_silence_detected qu'une seule fois
+        self._silence_triggered = False
         self.buffer: list[np.ndarray] = []
         self._is_recording = False
         self._stream = None
         self._current_amplitude: float = 0.0
-        logger.info(f"AudioCapture init: {sample_rate}Hz, {channels}ch, chunk={chunk_size}, device={device_id}")
+        logger.info(f"AudioCapture init: {sample_rate}Hz, {channels}ch, chunk={chunk_size}, device={device_id}, auto_stop={silero_vad is not None}")
 
     def _audio_callback(self, indata, frames, time_info, status):
         """Callback appelé par sounddevice pour chaque chunk."""
@@ -54,10 +77,32 @@ class AudioCapture:
             self.buffer.append(flat)
             self._current_amplitude = float(np.abs(flat).mean())
 
+            # Auto-stop via Silero VAD (si activé)
+            if (
+                self._silero_vad is not None
+                and self._on_silence_detected is not None
+                and not self._silence_triggered
+            ):
+                self._silero_vad.process_chunk(flat, self.sample_rate)
+                if self._silero_vad.detect_speech_end(
+                    sample_rate=self.sample_rate,
+                    silence_threshold_ms=self._silence_threshold_ms,
+                ):
+                    self._silence_triggered = True
+                    # Déclencher dans un thread séparé pour ne pas bloquer l'audio
+                    threading.Thread(
+                        target=self._on_silence_detected, daemon=True
+                    ).start()
+                    logger.info("Auto-stop : silence détecté, fin d'enregistrement")
+
     def start(self) -> None:
         """Démarre la capture audio."""
         self.buffer = []
         self._is_recording = True
+        self._silence_triggered = False
+        # Réinitialiser les états LSTM du VAD pour le nouvel enregistrement
+        if self._silero_vad is not None:
+            self._silero_vad.reset_states()
         self._stream = sd.InputStream(
             samplerate=self.sample_rate,
             channels=self.channels,

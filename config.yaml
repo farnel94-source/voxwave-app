@@ -53,6 +53,11 @@ cleaning:
     - voilà
     - comment dire
 
+performance:
+  persistent_connections: true  # Client HTTP créé au démarrage (évite +200ms)
+  auto_stop_silence_ms: 500     # Silence consécutif (ms) pour déclencher auto-stop
+  mode: both                    # "push_to_talk" | "auto_stop" | "both"
+
 gui:
   show_transcription_preview: true
 

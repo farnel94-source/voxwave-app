@@ -3,7 +3,7 @@
 import logging
 import os
 import re
-from typing import Callable, Optional
+from typing import Callable, Iterator, Optional
 
 from src.utils.exceptions import CleaningError
 from src.utils.retry import retry_with_backoff
@@ -126,11 +126,15 @@ class CloudLLMCleaner:
         self.model = model
         self.api_key = (api_key or os.getenv("OPENAI_API_KEY") or "").strip()
         self._available = bool(self.api_key)
-        if not self._available:
-            logger.warning("OPENAI_API_KEY non configuree, CloudLLMCleaner indisponible")
-        self._client = None
         self._circuit: Optional[object] = None
-        logger.info(f"CloudLLMCleaner: model={model}, available={self._available}")
+        # Connexion persistante : client créé au démarrage pour éviter +200ms au premier appel
+        if self._available:
+            from openai import OpenAI
+            self._client = OpenAI(api_key=self.api_key, timeout=10.0)
+            logger.info(f"CloudLLMCleaner: model={model}, client prêt")
+        else:
+            self._client = None
+            logger.warning("OPENAI_API_KEY non configuree, CloudLLMCleaner indisponible")
 
     def set_circuit_breaker(self, circuit: "CircuitBreaker") -> None:
         """Attache un circuit breaker a ce cleaner.
@@ -141,10 +145,7 @@ class CloudLLMCleaner:
         self._circuit = circuit
 
     def _get_client(self):
-        """Retourne le client OpenAI (singleton)."""
-        if self._client is None:
-            from openai import OpenAI
-            self._client = OpenAI(api_key=self.api_key, timeout=10.0)
+        """Retourne le client OpenAI (connexion persistante initialisée au démarrage)."""
         return self._client
 
     @retry_with_backoff(
@@ -174,6 +175,56 @@ class CloudLLMCleaner:
             max_tokens=2048,
         )
         return response.choices[0].message.content.strip()
+
+    def clean_streaming(self, text: str) -> Iterator[str]:
+        """Nettoie le texte via OpenAI en mode streaming (tokens un par un).
+
+        Utilise stream=True pour recevoir chaque token dès qu'il est généré.
+        Permet d'afficher le texte nettoyé progressivement sans attendre la fin.
+
+        Args:
+            text: Texte brut à nettoyer.
+
+        Yields:
+            Tokens de texte nettoyé au fur et à mesure.
+        """
+        if not text or not text.strip():
+            return
+
+        if not self._available or self._client is None:
+            yield text  # fallback : retourner le texte brut
+            return
+
+        if self._circuit and not self._circuit.should_allow_request():
+            yield text  # circuit ouvert : fallback texte brut
+            return
+
+        try:
+            with self._client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": f"Corrige cette transcription vocale :\n{text}"},
+                ],
+                temperature=0.0,
+                max_tokens=2048,
+                stream=True,
+            ) as stream:
+                for chunk in stream:
+                    delta = chunk.choices[0].delta.content
+                    if delta:
+                        yield delta
+            if self._circuit:
+                self._circuit.record_success()
+        except Exception as e:
+            logger.warning(f"OpenAI streaming échoué, fallback texte brut: {e}")
+            if self._circuit:
+                from src.utils.retry import _is_network_error
+                if _is_network_error(e):
+                    self._circuit.record_network_failure()
+                else:
+                    self._circuit.record_failure()
+            yield text  # fallback sur le texte brut en cas d'erreur
 
     def clean(self, text: str) -> str:
         """Nettoie le texte via OpenAI.

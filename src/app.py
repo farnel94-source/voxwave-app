@@ -184,6 +184,8 @@ class TheWave:
         self._processing_lock = threading.Lock()
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._settings_dialog = None
+        self._silero_vad = None
+        self._prog_injector = None
 
     def initialize(self) -> None:
         """Initialise tous les composants."""
@@ -208,12 +210,25 @@ class TheWave:
         device_id = self.config["audio"].get("device_id")
         device_id = AudioDeviceManager.validate_device(device_id)
 
+        # Silero VAD : chargé en amont pour l'auto-stop (évite le délai au premier enregistrement)
+        perf_config = self.config.get("performance", {})
+        perf_mode = perf_config.get("mode", "both")
+        silence_threshold_ms = perf_config.get("auto_stop_silence_ms", 500)
+
+        if perf_mode in ("auto_stop", "both"):
+            from src.audio.silero_vad import SileroVAD
+            self._silero_vad = SileroVAD(threshold=0.5)
+            logger.info(f"Silero VAD chargé (mode={perf_mode}, silence={silence_threshold_ms}ms)")
+
         self.capture = AudioCapture(
             sample_rate=self.config["audio"]["sample_rate"],
             channels=self.config["audio"]["channels"],
             chunk_size=self.config["audio"]["chunk_size"],
             silence_threshold=self.config["audio"]["silence_threshold"],
             device_id=device_id,
+            silero_vad=self._silero_vad,
+            on_silence_detected=self._on_stop if self._silero_vad else None,
+            silence_threshold_ms=silence_threshold_ms,
         )
         vad_aggressiveness = self.config.get("audio", {}).get("vad_aggressiveness", 2)
         self.processor = AudioProcessor(
@@ -241,6 +256,11 @@ class TheWave:
         )
 
         self.injector = TextInjector(mode=self.config["injection"])
+
+        # Progressive injector : injection brut immédiat + remplacement par texte nettoyé
+        from src.injection.progressive_injector import ProgressiveInjector
+        self._prog_injector = ProgressiveInjector(self.injector)
+
         self.listener = HotkeyListener(
             hotkey=self.config["hotkey"],
             on_start=self._on_start,
@@ -415,9 +435,9 @@ class TheWave:
         # Jouer le son stop en background (overlap avec debut du pipeline)
         self._executor.submit(self.feedback.play_stop)
 
-        # Lancer le pipeline dans un thread pour ne pas bloquer le listener
+        # Lancer le pipeline progressif dans un thread (injection brut < 800ms)
         self._processing_thread = threading.Thread(
-            target=self._process_audio, args=(audio,), daemon=True,
+            target=self._process_audio_progressive, args=(audio,), daemon=True,
         )
         self._processing_thread.start()
 
@@ -510,6 +530,143 @@ class TheWave:
                 logger.error(f"Erreur nettoyage: {e}")
             else:
                 logger.error(f"Erreur pipeline inattendue: {e}", exc_info=True)
+        finally:
+            self._processing_lock.release()
+            self.listener.set_processing(False)
+            if not had_error:
+                if self.waveform:
+                    self.waveform.show_idle()
+                    if self.config.get("activation_method", "both") == "hotkey":
+                        self.waveform.sig_hide_widget.emit()
+                if self.tray:
+                    self.tray.set_state("idle")
+
+    def _process_audio_progressive(self, audio) -> None:
+        """Pipeline progressif : injection brut < 800ms, puis remplacement nettoyé ~1.1s.
+
+        Flow :
+            1. Validation (licence, durée audio)
+            2. Groq transcription batch (~500ms)
+            3. inject_raw() → texte visible immédiatement
+            4. OpenAI streaming → replace_with_clean() en parallèle de la lecture
+        """
+        if not self._processing_lock.acquire(blocking=False):
+            logger.warning("Pipeline déjà en cours, appui ignoré")
+            return
+        self.listener.set_processing(True)
+        had_error = False
+        t_start = time.time()
+
+        try:
+            # --- Vérification licence ---
+            if self.license_validator and not self.license_validator.increment_usage():
+                msg = "Free tier épuisé. Activez une licence pour continuer."
+                logger.warning(msg)
+                if self.tray:
+                    self.tray.show_notification("The Wave — Licence", msg)
+                return
+
+            # --- Validation durée audio ---
+            audio_config = self.config["audio"]
+            duration = len(audio) / audio_config["sample_rate"]
+            min_duration = audio_config.get("min_audio_duration", 0.5)
+            max_duration = audio_config.get("max_audio_duration", 120.0)
+            logger.info(f"[progressif] Audio: {duration:.2f}s")
+
+            if duration < min_duration:
+                logger.warning(f"Audio trop court ({duration:.2f}s), ignoré")
+                return
+
+            if duration > max_duration:
+                max_samples = int(max_duration * audio_config["sample_rate"])
+                audio = audio[:max_samples]
+
+            # --- Préparation audio ---
+            audio = self.processor.prepare_for_whisper(audio)
+
+            # Vérif taille WAV (limite Groq API : 25MB)
+            if len(audio) * 2 > 24_000_000:
+                audio = audio[:24_000_000 // 2]
+
+            # --- Étape 1 : Transcription batch Groq (~500ms) ---
+            lang = self.config.get("language", "en")
+            if self.waveform:
+                self.waveform.update_step(_app_t(lang, "transcription"))
+
+            t_groq = time.time()
+            raw_text = self.engine.transcribe(audio)
+            logger.info(f"[progressif] Groq: {(time.time()-t_groq)*1000:.0f}ms → '{raw_text}'")
+
+            if not raw_text or not raw_text.strip():
+                logger.warning("[progressif] Transcription vide, ignoré")
+                return
+
+            if is_hallucination(raw_text):
+                logger.warning(f"[progressif] Hallucination ignorée: {raw_text}")
+                return
+
+            # Adapter les filler words à la langue détectée
+            detected_lang = getattr(self.engine, "last_detected_language", None)
+            if detected_lang:
+                self.pipeline.regex_cleaner.set_language(detected_lang)
+
+            # --- Étape 2 : Injection immédiate du texte brut ---
+            if self.waveform:
+                self.waveform.update_step(_app_t(lang, "injection"))
+
+            t_inject = time.time()
+            self._prog_injector.inject_raw(raw_text)
+            logger.info(
+                f"[progressif] Texte brut injecté: {(time.time()-t_inject)*1000:.0f}ms "
+                f"(total depuis fin parole: {(time.time()-t_start)*1000:.0f}ms)"
+            )
+
+            # Mettre l'icône en mode "traitement" pendant le nettoyage
+            if self.tray:
+                self.tray.set_state("processing")
+
+            # --- Étape 3 : Nettoyage streaming + remplacement ---
+            cloud_cleaner = getattr(self.pipeline, "_cloud_cleaner", None)
+
+            if cloud_cleaner is not None and cloud_cleaner._available:
+                # Chemin rapide : OpenAI streaming (~300ms) + remplacement
+                if self.waveform:
+                    self.waveform.update_step(_app_t(lang, "cleaning"))
+                t_clean = time.time()
+                clean_gen = cloud_cleaner.clean_streaming(raw_text)
+                self._prog_injector.replace_with_clean(raw_text, clean_gen)
+                logger.info(
+                    f"[progressif] Remplacement nettoyé: {(time.time()-t_clean)*1000:.0f}ms "
+                    f"(total: {(time.time()-t_start)*1000:.0f}ms)"
+                )
+            else:
+                # Fallback : nettoyage synchrone via pipeline (regex / Ollama)
+                clean_text = self.pipeline.clean(raw_text)
+                if clean_text and clean_text.strip() and clean_text != raw_text:
+                    self._prog_injector.replace_with_clean(raw_text, iter([clean_text]))
+
+            self.feedback.play_complete()
+            logger.info(f"[progressif] Pipeline terminé en {(time.time()-t_start)*1000:.0f}ms")
+
+        except Exception as e:
+            had_error = True
+            self.feedback.play_error()
+            if self.tray:
+                self.tray.set_state("error")
+                self.tray.show_notification("The Wave — Erreur", str(e))
+            if self.waveform:
+                _err_lang = self.config.get("language", "en")
+                self.waveform.set_error_text(_ERROR_T.get(_err_lang, "Error"))
+                self.waveform.show_error()
+                if self.config.get("activation_method", "both") == "hotkey":
+                    self.waveform.sig_hide_widget.emit()
+            from src.utils.exceptions import TranscriptionError, CleaningError
+            if isinstance(e, TranscriptionError):
+                logger.error(f"[progressif] Erreur transcription: {e}")
+            elif isinstance(e, CleaningError):
+                logger.error(f"[progressif] Erreur nettoyage: {e}")
+            else:
+                logger.error(f"[progressif] Erreur inattendue: {e}", exc_info=True)
         finally:
             self._processing_lock.release()
             self.listener.set_processing(False)

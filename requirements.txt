@@ -10,6 +10,7 @@ click>=8.1.0
 
 # Audio processing
 webrtcvad-wheels>=2.0.10
+onnxruntime>=1.16.0  # Silero VAD (détection auto-stop en temps réel)
 
 # GUI (PySide6 remplace pystray pour tray + widget waveform)
 # PySide6 meta-package inclut Essentials + Addons (WebEngine)
