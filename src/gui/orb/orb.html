@@ -352,6 +352,21 @@ function stopBarAnimation() {
     bars.forEach(bar => bar.style.height = '2px');
 }
 
+// === Called from Python to update processing step text ===
+function updateStep(text) {
+    processingText.textContent = text;
+}
+
+// === Called from Python to update error text ===
+function setErrorText(text) {
+    document.getElementById('error-text').textContent = text;
+}
+
+// === Called from Python to show transcription preview ===
+function showPreview(text) {
+    processingText.textContent = text;
+}
+
 function animateBars() {
     amplitude += (targetAmplitude - amplitude) * 0.15;
 

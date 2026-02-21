@@ -11,6 +11,128 @@ from src.gui.icons import IconState, create_qicon
 
 logger = logging.getLogger(__name__)
 
+_TRAY_T = {
+    "en": {
+        "start": "\u25b6  Start dictation",
+        "stop": "\u25a0  Stop dictation",
+        "settings": "\u2699  Settings",
+        "help": "\u2753  Help",
+        "license": "\u2727  Activate license",
+        "about": "\u24d8  About",
+        "quit": "\u2715  Quit",
+        "tooltip": "The Wave \u2014 Voice dictation",
+    },
+    "fr": {
+        "start": "\u25b6  Demarrer la dictee",
+        "stop": "\u25a0  Arreter la dictee",
+        "settings": "\u2699  Parametres",
+        "help": "\u2753  Aide",
+        "license": "\u2727  Activer licence",
+        "about": "\u24d8  A propos",
+        "quit": "\u2715  Quitter",
+        "tooltip": "The Wave \u2014 Dictee vocale",
+    },
+    "es": {
+        "start": "\u25b6  Iniciar dictado",
+        "stop": "\u25a0  Detener dictado",
+        "settings": "\u2699  Configuracion",
+        "help": "\u2753  Ayuda",
+        "license": "\u2727  Activar licencia",
+        "about": "\u24d8  Acerca de",
+        "quit": "\u2715  Salir",
+        "tooltip": "The Wave \u2014 Dictado por voz",
+    },
+    "de": {
+        "start": "\u25b6  Diktat starten",
+        "stop": "\u25a0  Diktat stoppen",
+        "settings": "\u2699  Einstellungen",
+        "help": "\u2753  Hilfe",
+        "license": "\u2727  Lizenz aktivieren",
+        "about": "\u24d8  Uber",
+        "quit": "\u2715  Beenden",
+        "tooltip": "The Wave \u2014 Sprachdiktat",
+    },
+    "it": {
+        "start": "\u25b6  Avvia dettatura",
+        "stop": "\u25a0  Ferma dettatura",
+        "settings": "\u2699  Impostazioni",
+        "help": "\u2753  Aiuto",
+        "license": "\u2727  Attiva licenza",
+        "about": "\u24d8  Informazioni",
+        "quit": "\u2715  Esci",
+        "tooltip": "The Wave \u2014 Dettatura vocale",
+    },
+    "pt": {
+        "start": "\u25b6  Iniciar ditado",
+        "stop": "\u25a0  Parar ditado",
+        "settings": "\u2699  Configuracoes",
+        "help": "\u2753  Ajuda",
+        "license": "\u2727  Ativar licenca",
+        "about": "\u24d8  Sobre",
+        "quit": "\u2715  Sair",
+        "tooltip": "The Wave \u2014 Ditado por voz",
+    },
+    "nl": {
+        "start": "▶  Dicteren starten", "stop": "■  Dicteren stoppen",
+        "settings": "⚙  Instellingen", "help": "❓  Help",
+        "license": "✧  Licentie activeren", "about": "ⓘ  Over",
+        "quit": "✕  Afsluiten", "tooltip": "The Wave — Spraakdictaat",
+    },
+    "ja": {
+        "start": "▶  ディクテーション開始", "stop": "■  ディクテーション停止",
+        "settings": "⚙  設定", "help": "❓  ヘルプ",
+        "license": "✧  ライセンスを有効化", "about": "ⓘ  概要",
+        "quit": "✕  終了", "tooltip": "The Wave — 音声ディクテーション",
+    },
+    "ko": {
+        "start": "▶  받아쓰기 시작", "stop": "■  받아쓰기 중지",
+        "settings": "⚙  설정", "help": "❓  도움말",
+        "license": "✧  라이선스 활성화", "about": "ⓘ  정보",
+        "quit": "✕  종료", "tooltip": "The Wave — 음성 받아쓰기",
+    },
+    "zh": {
+        "start": "▶  开始听写", "stop": "■  停止听写",
+        "settings": "⚙  设置", "help": "❓  帮助",
+        "license": "✧  激活许可证", "about": "ⓘ  关于",
+        "quit": "✕  退出", "tooltip": "The Wave — 语音听写",
+    },
+    "ru": {
+        "start": "▶  Nachat diktovku", "stop": "■  Ostanovit diktovku",
+        "settings": "⚙  Nastrojki", "help": "❓  Pomosh",
+        "license": "✧  Aktivirovat licenziju", "about": "ⓘ  O programme",
+        "quit": "✕  Vyjti", "tooltip": "The Wave — Golosovaja diktovka",
+    },
+    "ar": {
+        "start": "▶  بدء الإملاء", "stop": "■  إيقاف الإملاء",
+        "settings": "⚙  الإعدادات", "help": "❓  مساعدة",
+        "license": "✧  تفعيل الترخيص", "about": "ⓘ  حول",
+        "quit": "✕  خروج", "tooltip": "The Wave — الإملاء الصوتي",
+    },
+    "tr": {
+        "start": "▶  Dikteyi baslat", "stop": "■  Dikteyi durdur",
+        "settings": "⚙  Ayarlar", "help": "❓  Yardim",
+        "license": "✧  Lisansi etkinlestir", "about": "ⓘ  Hakkinda",
+        "quit": "✕  Cikis", "tooltip": "The Wave — Sesli dikte",
+    },
+    "pl": {
+        "start": "▶  Rozpocznij dyktowanie", "stop": "■  Zatrzymaj dyktowanie",
+        "settings": "⚙  Ustawienia", "help": "❓  Pomoc",
+        "license": "✧  Aktywuj licencje", "about": "ⓘ  O programie",
+        "quit": "✕  Wyjdz", "tooltip": "The Wave — Dyktowanie glosowe",
+    },
+    "sv": {
+        "start": "▶  Starta diktering", "stop": "■  Stoppa diktering",
+        "settings": "⚙  Installningar", "help": "❓  Hjalp",
+        "license": "✧  Aktivera licens", "about": "ⓘ  Om",
+        "quit": "✕  Avsluta", "tooltip": "The Wave — Rostdiktering",
+    },
+}
+
+
+def _tt(lang: str, key: str) -> str:
+    d = _TRAY_T.get(lang, _TRAY_T["en"])
+    return d.get(key, _TRAY_T["en"][key])
+
 
 class TrayIcon:
     """Icone system tray avec menu contextuel (PySide6)."""
@@ -24,6 +146,7 @@ class TrayIcon:
         on_settings: Optional[Callable] = None,
         on_help: Optional[Callable] = None,
         on_tray_clicked: Optional[Callable] = None,
+        language: str = "en",
     ) -> None:
         """Initialise le tray icon.
 
@@ -35,6 +158,7 @@ class TrayIcon:
             on_settings: Callback pour ouvrir les parametres.
             on_help: Callback pour ouvrir l'aide (settings onglet Aide).
             on_tray_clicked: Callback quand l'icone tray est cliquee (clic simple).
+            language: Code langue de l'interface (ex: "fr", "en").
         """
         self.on_start = on_start
         self.on_stop = on_stop
@@ -43,23 +167,29 @@ class TrayIcon:
         self.on_settings = on_settings
         self.on_help = on_help
         self.on_tray_clicked = on_tray_clicked
+        self._language = language
         self._state: IconState = "idle"
         self._is_recording = False
         self._tray: Optional[QSystemTrayIcon] = None
         self._menu: Optional[QMenu] = None
         self._start_action: Optional[QAction] = None
         self._stop_action: Optional[QAction] = None
+        self._settings_action: Optional[QAction] = None
+        self._help_action: Optional[QAction] = None
+        self._license_action: Optional[QAction] = None
+        self._about_action: Optional[QAction] = None
+        self._quit_action: Optional[QAction] = None
 
     def _create_menu(self) -> QMenu:
         """Cree le menu contextuel du tray."""
         menu = QMenu()
 
         # --- Groupe enregistrement ---
-        self._start_action = QAction("\u25b6  Demarrer la dictee", menu)
+        self._start_action = QAction(_tt(self._language, "start"), menu)
         self._start_action.triggered.connect(self._toggle_start)
         menu.addAction(self._start_action)
 
-        self._stop_action = QAction("\u25a0  Arreter la dictee", menu)
+        self._stop_action = QAction(_tt(self._language, "stop"), menu)
         self._stop_action.triggered.connect(self._toggle_stop)
         self._stop_action.setVisible(False)
         menu.addAction(self._stop_action)
@@ -67,31 +197,31 @@ class TrayIcon:
         menu.addSeparator()
 
         # --- Groupe parametres ---
-        settings_action = QAction("\u2699  Parametres", menu)
-        settings_action.triggered.connect(self._on_settings_click)
-        menu.addAction(settings_action)
+        self._settings_action = QAction(_tt(self._language, "settings"), menu)
+        self._settings_action.triggered.connect(self._on_settings_click)
+        menu.addAction(self._settings_action)
 
-        help_action = QAction("\u2753  Aide", menu)
-        help_action.triggered.connect(self._on_help_click)
-        menu.addAction(help_action)
+        self._help_action = QAction(_tt(self._language, "help"), menu)
+        self._help_action.triggered.connect(self._on_help_click)
+        menu.addAction(self._help_action)
 
         menu.addSeparator()
 
         # --- Groupe licence / about ---
-        license_action = QAction("\u2727  Activer licence", menu)
-        license_action.triggered.connect(self._on_activate_license_click)
-        menu.addAction(license_action)
+        self._license_action = QAction(_tt(self._language, "license"), menu)
+        self._license_action.triggered.connect(self._on_activate_license_click)
+        menu.addAction(self._license_action)
 
-        about_action = QAction("\u24d8  A propos", menu)
-        about_action.triggered.connect(self._on_about)
-        menu.addAction(about_action)
+        self._about_action = QAction(_tt(self._language, "about"), menu)
+        self._about_action.triggered.connect(self._on_about)
+        menu.addAction(self._about_action)
 
         menu.addSeparator()
 
         # --- Quitter ---
-        quit_action = QAction("\u2715  Quitter", menu)
-        quit_action.triggered.connect(self._on_quit_click)
-        menu.addAction(quit_action)
+        self._quit_action = QAction(_tt(self._language, "quit"), menu)
+        self._quit_action.triggered.connect(self._on_quit_click)
+        menu.addAction(self._quit_action)
 
         return menu
 
@@ -185,11 +315,35 @@ class TrayIcon:
         self._menu = self._create_menu()
         self._tray = QSystemTrayIcon()
         self._tray.setIcon(create_qicon("idle"))
-        self._tray.setToolTip("The Wave — Dictee vocale")
+        self._tray.setToolTip(_tt(self._language, "tooltip"))
         self._tray.setContextMenu(self._menu)
         self._tray.activated.connect(self._on_tray_activated)
         self._tray.show()
         logger.info("System tray demarre (QSystemTrayIcon)")
+
+    def update_language(self, lang: str) -> None:
+        """Met a jour la langue du menu tray (hot-reload sans redemarrage).
+
+        Args:
+            lang: Nouveau code langue (ex: "fr", "en").
+        """
+        self._language = lang
+        if self._start_action:
+            self._start_action.setText(_tt(lang, "start"))
+        if self._stop_action:
+            self._stop_action.setText(_tt(lang, "stop"))
+        if self._settings_action:
+            self._settings_action.setText(_tt(lang, "settings"))
+        if self._help_action:
+            self._help_action.setText(_tt(lang, "help"))
+        if self._license_action:
+            self._license_action.setText(_tt(lang, "license"))
+        if self._about_action:
+            self._about_action.setText(_tt(lang, "about"))
+        if self._quit_action:
+            self._quit_action.setText(_tt(lang, "quit"))
+        if self._tray:
+            self._tray.setToolTip(_tt(lang, "tooltip"))
 
     def run(self) -> None:
         """Lance le tray icon (pour compatibilite — appelle setup)."""

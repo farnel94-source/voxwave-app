@@ -30,6 +30,35 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+_APP_STEP_T = {
+    "en": {"transcription": "Transcription...", "cleaning": "Cleaning...", "injection": "Injecting...", "processing": "Processing..."},
+    "fr": {"transcription": "Transcription...", "cleaning": "Nettoyage...", "injection": "Injection...", "processing": "Traitement..."},
+    "es": {"transcription": "Transcripcion...", "cleaning": "Limpieza...", "injection": "Inyectando...", "processing": "Procesando..."},
+    "de": {"transcription": "Transkription...", "cleaning": "Bereinigung...", "injection": "Einfuegen...", "processing": "Verarbeitung..."},
+    "it": {"transcription": "Trascrizione...", "cleaning": "Pulizia...", "injection": "Inserimento...", "processing": "Elaborazione..."},
+    "pt": {"transcription": "Transcricao...", "cleaning": "Limpeza...", "injection": "Injecao...", "processing": "Processando..."},
+    "nl": {"transcription": "Transcriptie...", "cleaning": "Verwerking...", "injection": "Invoegen...", "processing": "Bezig..."},
+    "ja": {"transcription": "文字起こし...", "cleaning": "整理中...", "injection": "貼り付け中...", "processing": "処理中..."},
+    "ko": {"transcription": "전사 중...", "cleaning": "정리 중...", "injection": "입력 중...", "processing": "처리 중..."},
+    "zh": {"transcription": "转录中...", "cleaning": "整理中...", "injection": "粘贴中...", "processing": "处理中..."},
+    "ru": {"transcription": "Transkriptsija...", "cleaning": "Obrabotka...", "injection": "Vstavka...", "processing": "Obrabotka..."},
+    "ar": {"transcription": "نسخ...", "cleaning": "تنظيف...", "injection": "لصق...", "processing": "معالجة..."},
+    "tr": {"transcription": "Transkripsiyon...", "cleaning": "Temizleniyor...", "injection": "Yapistiriliyor...", "processing": "Isleniyor..."},
+    "pl": {"transcription": "Transkrypcja...", "cleaning": "Czyszczenie...", "injection": "Wklejanie...", "processing": "Przetwarzanie..."},
+    "sv": {"transcription": "Transkription...", "cleaning": "Rensning...", "injection": "Inklistring...", "processing": "Bearbetar..."},
+}
+
+_ERROR_T = {
+    "en": "Error", "fr": "Erreur", "es": "Error", "de": "Fehler", "it": "Errore", "pt": "Erro",
+    "nl": "Fout", "ja": "エラー", "ko": "오류", "zh": "错误",
+    "ru": "Oshibka", "ar": "خطأ", "tr": "Hata", "pl": "Blad", "sv": "Fel",
+}
+
+
+def _app_t(lang: str, key: str) -> str:
+    d = _APP_STEP_T.get(lang, _APP_STEP_T["en"])
+    return d.get(key, _APP_STEP_T["en"][key])
+
 
 def setup_logging(level: str = "INFO") -> None:
     logging.basicConfig(
@@ -237,6 +266,9 @@ class TheWave:
             on_settings=self._on_settings,
             on_quit=self._shutdown,
         )
+        # Cacher l'icone Wave si le mode est "hotkey uniquement"
+        if self.config.get("activation_method", "both") == "hotkey":
+            self.waveform.hide()
 
         # System tray (PySide6 QSystemTrayIcon)
         from src.gui.tray_icon import TrayIcon
@@ -248,6 +280,7 @@ class TheWave:
             on_settings=self._on_settings,
             on_help=self._on_help,
             on_tray_clicked=self._on_settings,
+            language=self.config.get("language", "en"),
         )
         self.tray.setup()
 
@@ -365,13 +398,18 @@ class TheWave:
             self.tray.set_state("processing")
         if self.waveform:
             self.waveform.show_processing()
+            lang = self.config.get("language", "en")
+            self.waveform.update_step(_app_t(lang, "processing"))
         self.capture.stop()
         audio = self.capture.get_buffer()
+        self.capture.clear_buffer()
 
         if len(audio) == 0:
             logger.warning("Aucun audio capture")
             if self.waveform:
                 self.waveform.show_idle()
+                if self.config.get("activation_method", "both") == "hotkey":
+                    self.waveform.sig_hide_widget.emit()
             return
 
         # Jouer le son stop en background (overlap avec debut du pipeline)
@@ -429,8 +467,9 @@ class TheWave:
             audio_duration = len(audio) / self.config["audio"]["sample_rate"]
 
             # Indicateur d'etape
+            lang = self.config.get("language", "en")
             if self.waveform:
-                self.waveform.update_step("Transcription...")
+                self.waveform.update_step(_app_t(lang, "transcription"))
 
             if audio_duration > chunking_threshold:
                 clean_text = self._process_chunked(audio)
@@ -448,7 +487,7 @@ class TheWave:
 
             # Injecter
             if self.waveform:
-                self.waveform.update_step("Injection...")
+                self.waveform.update_step(_app_t(lang, "injection"))
             self.injector.inject(clean_text)
             self.feedback.play_complete()
             logger.info("Texte injecte !")
@@ -459,7 +498,11 @@ class TheWave:
                 self.tray.set_state("error")
                 self.tray.show_notification("The Wave — Erreur", str(e))
             if self.waveform:
+                _err_lang = self.config.get("language", "en")
+                self.waveform.set_error_text(_ERROR_T.get(_err_lang, "Error"))
                 self.waveform.show_error()  # revient a idle apres ERROR_DISPLAY_MS
+                if self.config.get("activation_method", "both") == "hotkey":
+                    self.waveform.sig_hide_widget.emit()
             from src.utils.exceptions import TranscriptionError, CleaningError
             if isinstance(e, TranscriptionError):
                 logger.error(f"Erreur transcription: {e}")
@@ -473,6 +516,8 @@ class TheWave:
             if not had_error:
                 if self.waveform:
                     self.waveform.show_idle()
+                    if self.config.get("activation_method", "both") == "hotkey":
+                        self.waveform.sig_hide_widget.emit()
                 if self.tray:
                     self.tray.set_state("idle")
 
@@ -505,7 +550,7 @@ class TheWave:
 
         # Nettoyer
         if self.waveform:
-            self.waveform.update_step("Nettoyage...")
+            self.waveform.update_step(_app_t(self.config.get("language", "en"), "cleaning"))
         clean_text = self.pipeline.clean(raw_text)
         logger.info(f"Propre: {clean_text}")
 
@@ -615,6 +660,8 @@ class TheWave:
         if new_sys_lang != self.config.get("language"):
             self.config["language"] = new_sys_lang
             self._save_config("language", new_sys_lang)
+            if self.tray:
+                self.tray.update_language(new_sys_lang)
             changes.append(f"Interface : {new_sys_lang}")
 
         # Dictation language
@@ -655,10 +702,19 @@ class TheWave:
         if new_activation != self.config.get("activation_method", "both"):
             self.config["activation_method"] = new_activation
             self._save_config("activation_method", new_activation)
-            if new_activation == "icon":
+            if new_activation == "hotkey":
+                if self.waveform:
+                    self.waveform.hide()
+                if self.listener:
+                    self.listener.start()
+            elif new_activation == "icon":
+                if self.waveform:
+                    self.waveform.show()
                 if self.listener:
                     self.listener.stop()
-            else:
+            else:  # "both"
+                if self.waveform:
+                    self.waveform.show()
                 if self.listener:
                     self.listener.start()
             changes.append(f"Activation : {new_activation}")
@@ -855,7 +911,8 @@ class TheWave:
                 self.config["first_launch"] = False
                 self._save_config("first_launch", "false")
 
-        self.listener.start()
+        if self.config.get("activation_method", "both") != "icon":
+            self.listener.start()
 
         # Signal handlers pour shutdown propre (Ctrl+C, SIGTERM)
         def _signal_handler(signum: int, frame: object) -> None:

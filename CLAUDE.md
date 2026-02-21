@@ -98,7 +98,7 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
   - **Error** : logo + pill avec "Erreur" en rouge + animation shake
 - **Barres de frequences** : 12 barres, 3px large, hauteur max 80px, animees par l'amplitude audio
 - **Hover icons** : au survol du logo (idle uniquement), 2 boutons ronds apparaissent (settings + quit)
-- **Bridge Python ↔ JS** : QWebChannel (setState, updateAmplitude, updateStep, showPreview, on_quit_clicked)
+- **Bridge Python ↔ JS** : QWebChannel (setState, updateAmplitude, updateStep, setErrorText, showPreview, on_quit_clicked)
 - **Tray icon** : menu avec icones unicode et separateurs (▶ Dictee / ⚙ Parametres / ❓ Aide / ✧ Licence / ⓘ A propos / ✕ Quitter). Clic gauche tray → ouvre directement les Parametres (via `_on_settings`)
 - **Barre des taches Windows** : `_TaskbarWindow` (dans `app.py`) — fenetre fantome minimisee (opacity=0, WA_ShowWithoutActivating) qui donne a l'app une presence permanente dans la barre des taches avec le logo The Wave.
   - Necessite `SetCurrentProcessExplicitAppUserModelID("com.thewave.app")` (via `ctypes`) appele avant la creation de la fenetre
@@ -149,6 +149,25 @@ Fenetre moderne dark theme 620x580 avec **sidebar navigation a gauche** (7 ongle
 - `_save_config_nested()` : charge YAML complet, modifie la cle nested, re-ecrit (supporte cleaning.mode, whisper.language, etc.)
 - Onboarding sauvegarde aussi la langue choisie via `_save_config_nested("whisper", "language", ...)`
 - Notification tray "Parametres mis a jour" apres sauvegarde
+
+## Internationalisation (i18n)
+
+15 langues supportees dans l'interface, **toutes completement traduites** :
+`en`, `fr`, `es`, `de`, `it`, `pt`, `nl`, `ja`, `ko`, `zh`, `ru`, `ar`, `tr`, `pl`, `sv`
+
+3 dictionnaires de traduction (tous couvrent les 15 langues) :
+- `_SETTINGS_T` dans `settings_dialog.py` — labels, tooltips, sections, textes d'aide
+- `_TRAY_T` dans `tray_icon.py` — menu tray (start, stop, settings, quit, tooltip...)
+- `_APP_STEP_T` + `_ERROR_T` dans `app.py` — etapes du pipeline (transcription, cleaning, injection) + mot "Erreur"
+
+Fonction de lookup avec fallback vers `"en"` si cle manquante :
+```python
+_st(lang, key)   # settings_dialog.py
+_tt(lang, key)   # tray_icon.py
+_app_t(lang, key)  # app.py
+```
+
+La langue est sauvegardee dans `config.yaml` → `whisper.language` et rechargee au demarrage.
 
 ## Hotkey personnalisable
 - Supporte les combos : `Ctrl+Shift+V`, `Alt+R`, `F1`-`F12`, lettres seules, etc.

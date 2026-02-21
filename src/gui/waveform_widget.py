@@ -142,6 +142,8 @@ class WaveformWidget(QWidget):
     sig_show_error = Signal()
     sig_update_step = Signal(str)
     sig_show_preview = Signal(str)
+    sig_hide_widget = Signal()
+    sig_set_error_text = Signal(str)
 
     def __init__(
         self,
@@ -238,6 +240,8 @@ class WaveformWidget(QWidget):
         self.sig_show_error.connect(self._do_show_error)
         self.sig_update_step.connect(self._do_update_step)
         self.sig_show_preview.connect(self._do_show_preview)
+        self.sig_hide_widget.connect(self.hide)
+        self.sig_set_error_text.connect(self._do_set_error_text)
 
     # === Public API (thread-safe) ===
 
@@ -256,6 +260,14 @@ class WaveformWidget(QWidget):
     def show_error(self) -> None:
         """Affiche l'etat erreur pendant 3s puis revient a idle (thread-safe)."""
         self.sig_show_error.emit()
+
+    def set_error_text(self, text: str) -> None:
+        """Met a jour le texte d'erreur dans l'orb (thread-safe).
+
+        Args:
+            text: Texte a afficher dans le widget erreur.
+        """
+        self.sig_set_error_text.emit(text)
 
     def update_step(self, step_text: str) -> None:
         """Met a jour l'indicateur d'etape (thread-safe).
@@ -315,6 +327,12 @@ class WaveformWidget(QWidget):
         """Met a jour l'indicateur d'etape (main thread)."""
         escaped = step_text.replace("'", "\\'")
         self._run_js(f"updateStep('{escaped}')")
+
+    @Slot(str)
+    def _do_set_error_text(self, text: str) -> None:
+        """Met a jour le texte d'erreur dans l'orb (main thread)."""
+        escaped = text.replace("'", "\\'")
+        self._run_js(f"setErrorText('{escaped}')")
 
     @Slot(str)
     def _do_show_preview(self, text: str) -> None:
