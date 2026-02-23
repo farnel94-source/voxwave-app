@@ -337,6 +337,26 @@ class TheWave:
         self._executor.submit(_prewarm_ollama)
         self._executor.submit(_check_cloud_connectivity)
 
+    def _rebuild_pipeline(self) -> None:
+        """Recrée le CleaningPipeline avec la config courante.
+
+        Appelé quand le mode ou le provider change en cours de session,
+        pour garantir que les cleaners LLM sont bien initialisés.
+        """
+        from src.cleaning.llm_cleaner import CleaningPipeline
+
+        cleaning_config = self.config.get("cleaning", {})
+        self.pipeline = CleaningPipeline(
+            mode=cleaning_config["mode"],
+            llm_model=cleaning_config["llm_model"],
+            cloud_model=cleaning_config.get("cloud_model", "gpt-4o-mini"),
+            cleaning_provider=cleaning_config.get("provider", "local"),
+            language=self.config["whisper"]["language"],
+            filler_words=cleaning_config.get("filler_words"),
+            on_fallback=self._on_fallback,
+        )
+        logger.info(f"Pipeline recréé : mode={cleaning_config['mode']}, provider={cleaning_config.get('provider', 'local')}")
+
     def _create_transcription_engine(self, provider: str) -> object:
         """Cree le moteur de transcription selon le provider configure.
 
@@ -649,9 +669,8 @@ class TheWave:
         new_mode = dialog.cleaning_mode
         if new_mode != cleaning_config.get("mode"):
             self.config.setdefault("cleaning", {})["mode"] = new_mode
-            if self.pipeline:
-                self.pipeline.mode = new_mode
             self._save_config_nested("cleaning", "mode", new_mode)
+            self._rebuild_pipeline()
             mode_names = {"raw": "Brut", "verbatim": "Naturel", "quality": "Professionnel"}
             changes.append(f"Mode : {mode_names.get(new_mode, new_mode)}")
 
@@ -695,6 +714,7 @@ class TheWave:
         if new_clean != cleaning_config.get("provider"):
             self.config.setdefault("cleaning", {})["provider"] = new_clean
             self._save_config_nested("cleaning", "provider", new_clean)
+            self._rebuild_pipeline()
             changes.append(f"Nettoyage : {new_clean}")
 
         # Activation method (hotkey / icon / both)
@@ -896,9 +916,8 @@ class TheWave:
                 new_mode = dialog.cleaning_mode
                 if new_mode != self.config.get("cleaning", {}).get("mode"):
                     self.config.setdefault("cleaning", {})["mode"] = new_mode
-                    if self.pipeline:
-                        self.pipeline.mode = new_mode
                     self._save_config_nested("cleaning", "mode", new_mode)
+                    self._rebuild_pipeline()
                 # Appliquer la langue choisie (interface + dictee)
                 new_lang = dialog.language
                 if new_lang != self.config.get("language"):
