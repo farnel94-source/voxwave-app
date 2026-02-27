@@ -346,17 +346,16 @@ class CleaningPipeline:
         self._local_cleaner: Optional[LLMCleaner] = None
         self._cloud_circuit = CircuitBreaker(name="openai", failure_threshold=2, cooldown_seconds=30.0)
 
-        if mode == "quality":
-            if cleaning_provider in ("hybrid", "cloud"):
-                try:
-                    self._cloud_cleaner = CloudLLMCleaner(model=cloud_model or "gpt-4o-mini")
-                    self._cloud_cleaner.set_circuit_breaker(self._cloud_circuit)
-                    logger.info("CloudLLMCleaner initialisé")
-                except Exception as e:
-                    logger.warning(f"CloudLLMCleaner indisponible: {e}")
+        if cleaning_provider in ("hybrid", "cloud"):
+            try:
+                self._cloud_cleaner = CloudLLMCleaner(model=cloud_model or "gpt-4o-mini")
+                self._cloud_cleaner.set_circuit_breaker(self._cloud_circuit)
+                logger.info("CloudLLMCleaner initialisé")
+            except Exception as e:
+                logger.warning(f"CloudLLMCleaner indisponible: {e}")
 
-            if cleaning_provider in ("hybrid", "local"):
-                self._local_cleaner = LLMCleaner(model=llm_model)
+        if cleaning_provider in ("hybrid", "local"):
+            self._local_cleaner = LLMCleaner(model=llm_model)
 
     def clean(self, text: str) -> str:
         """Nettoie le texte avec cascade de fallback.
@@ -374,9 +373,10 @@ class CleaningPipeline:
         if self.mode == "raw":
             return text.strip()
 
-        # Mode verbatim : ponctuation/majuscules seulement, pas de reformulation
+        # Mode verbatim : filler words supprimés par regex, puis formatage minimal
         if self.mode == "verbatim":
-            return self._clean_verbatim(text)
+            result = self.regex_cleaner.clean(text)
+            return self._clean_verbatim(result)
 
         result = self.regex_cleaner.clean(text)
 

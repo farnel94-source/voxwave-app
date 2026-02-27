@@ -49,6 +49,8 @@ class SileroVAD:
         """
         self.threshold = threshold
         self._session = None
+        # Noms d'inputs réels du modèle ONNX (chargés au démarrage)
+        self._input_names: set = set()
         # États LSTM internes du modèle Silero (réinitialisés à chaque enregistrement)
         self._h = np.zeros((2, 1, 64), dtype=np.float32)
         self._c = np.zeros((2, 1, 64), dtype=np.float32)
@@ -98,9 +100,13 @@ class SileroVAD:
                 sess_options=opts,
                 providers=["CPUExecutionProvider"],
             )
-            logger.info("Silero VAD ONNX chargé avec succès")
+            self._input_names = {i.name for i in self._session.get_inputs()}
+            logger.info(f"Silero VAD ONNX chargé avec succès (inputs: {self._input_names})")
         except Exception as e:
-            logger.warning(f"Echec chargement Silero VAD: {e} — fallback désactivé")
+            logger.warning(
+                f"Echec chargement Silero VAD: {e} — "
+                "fallback amplitude actif (seuil=0.005, auto-stop fonctionnel)"
+            )
             self._session = None
 
     @property
@@ -129,23 +135,35 @@ class SileroVAD:
             True si le chunk contient de la parole.
         """
         if self._session is None:
-            # Fallback : on ne peut pas détecter, on assume de la parole
-            return True
+            # Fallback amplitude-based : silence si amplitude < seuil
+            amplitude = float(np.abs(chunk).mean())
+            is_sp = amplitude > 0.005
+            if is_sp:
+                self._had_speech = True
+                self._consecutive_silent_chunks = 0
+            else:
+                self._consecutive_silent_chunks += 1
+            return is_sp
 
         try:
             audio = chunk.astype(np.float32)
             if audio.ndim == 1:
                 audio = audio[np.newaxis, :]  # (1, samples)
 
-            ort_inputs = {
-                "input": audio,
-                "h": self._h,
-                "c": self._c,
-                "sr": np.array(sample_rate, dtype=np.int64),
-            }
+            ort_inputs = {"input": audio, "h": self._h, "c": self._c}
+            if "sr" in self._input_names:
+                ort_inputs["sr"] = np.array(sample_rate, dtype=np.int64)
             out, self._h, self._c = self._session.run(None, ort_inputs)
             speech_prob = float(out[0][0])
-            is_sp = speech_prob >= self.threshold
+            amplitude = float(np.abs(chunk).mean())
+            logger.debug(
+                f"VAD speech_prob={speech_prob:.3f}, amplitude={amplitude:.4f}, seuil={self.threshold}"
+            )
+            # Amplitude très faible → silence évident, même si ONNX dit parole (bruit de fond)
+            if amplitude < 0.003:
+                is_sp = False
+            else:
+                is_sp = speech_prob >= self.threshold
         except Exception as e:
             logger.debug(f"Silero VAD process_chunk erreur: {e}")
             is_sp = True  # fallback en cas d'erreur ONNX

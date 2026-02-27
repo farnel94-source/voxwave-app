@@ -183,7 +183,8 @@ class ProgressiveInjector:
         # Backspace = touche simple sans modificateur → aucun problème de timing
         # Fonctionne dans VS Code, Terminal, Notepad, Word et toutes les apps Electron.
         self._send_backspaces(len(raw_text))
-        time.sleep(0.05)
+        time.sleep(0.35)  # 350ms : WinUI3 traite WM_CLIPBOARDUPDATE en async — les derniers
+        # backspaces peuvent arriver après le Ctrl+V si le buffer est trop court
         self._send_ctrl_v()
 
         logger.info(
@@ -377,21 +378,13 @@ class ProgressiveInjector:
             self._backspace_pynput(count)
 
     def _backspace_pynput(self, count: int) -> None:
-        """Backspaces via keyboard lib (Windows) ou pynput (fallback)."""
-        if self._os_name == "windows":
-            try:
-                import keyboard as kb
-                for _ in range(count):
-                    kb.send('backspace')
-                    time.sleep(0.002)  # 2ms — évite que Windows "mange" des backspaces
-                return
-            except Exception:
-                pass  # fallback pynput
+        """Backspaces via pynput (compatible WinUI3 Notepad — keyboard lib problématique)."""
         try:
             from pynput.keyboard import Controller, Key
             ctrl = Controller()
             for _ in range(count):
                 ctrl.press(Key.backspace)
                 ctrl.release(Key.backspace)
+                time.sleep(0.002)  # 2ms — évite que Windows "mange" des backspaces
         except Exception as e:
             logger.warning(f"pynput backspace échoué: {e}")
