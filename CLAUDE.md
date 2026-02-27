@@ -188,6 +188,10 @@ Pipeline en 2 temps pour la latence < 1s :
 - Fonctionne dans VS Code, Terminal, Notepad, Word, toutes les apps Electron
 - `Shift+Left × N` échouait sur Electron (timing asynchrone Chromium)
 - `Ctrl+Z` échouait en terminal (doublon) et dans les apps Electron (comportement inattendu)
+- **PIÈGE WinUI3** : `keyboard` lib causait une race condition sur Win11 Notepad (WinUI3)
+  → utiliser **pynput uniquement** pour `_backspace_pynput` (cohérent avec `_do_pynput_paste`)
+- **350ms** de sleep avant Ctrl+V (WinUI3 traite `WM_CLIPBOARDUPDATE` en async — les 6 derniers
+  backspaces peuvent arriver après le paste si le buffer est trop court ; 150ms insuffisant)
 
 ### Garde-fous anti-effacement accidentel
 Avant d'envoyer les Backspaces, 2 conditions vérifiées dans l'ordre :

@@ -15,6 +15,8 @@ audio:
   vad_aggressiveness: 2    # 0-3, agressivité webrtcvad (0=moins, 3=plus)
   chunking_threshold: 30.0  # secondes — au-dessus, audio découpé en chunks
   device_id: null  # null = micro par défaut
+  auto_stop_enabled: false
+  auto_stop_silence_duration: 2.0  # secondes de silence avant arrêt auto
   feedback:
     enabled: true
     volume: 0.5

@@ -230,6 +230,9 @@ class TheWave:
             silero_vad=self._silero_vad,
             on_silence_detected=self._on_stop if self._silero_vad else None,
             silence_threshold_ms=silence_threshold_ms,
+            on_auto_stop=self._schedule_auto_stop,
+            auto_stop_enabled=self.config["audio"].get("auto_stop_enabled", False),
+            auto_stop_silence_duration=self.config["audio"].get("auto_stop_silence_duration", 2.0),
         )
         vad_aggressiveness = self.config.get("audio", {}).get("vad_aggressiveness", 2)
         self.processor = AudioProcessor(
@@ -455,6 +458,13 @@ class TheWave:
             target=self._process_audio_progressive, args=(audio,), daemon=True,
         )
         self._processing_thread.start()
+
+    def _schedule_auto_stop(self) -> None:
+        """Appelé depuis le thread audio — schedule _on_stop sur le thread Qt principal."""
+        from PySide6.QtCore import QTimer
+        if self.capture.is_recording and not self._shutting_down:
+            logger.info("Auto-stop: declenchement depuis thread audio")
+            QTimer.singleShot(0, self._on_stop)
 
     def _process_audio(self, audio) -> None:
         """Pipeline complet : transcription -> nettoyage -> injection (thread separe)."""
@@ -815,6 +825,8 @@ class TheWave:
             current_transcription_provider=self.config.get("transcription", {}).get("provider", "hybrid"),
             current_cleaning_provider=cleaning_config.get("provider", "hybrid"),
             current_activation_method=self.config.get("activation_method", "both"),
+            current_auto_stop_enabled=self.config.get("audio", {}).get("auto_stop_enabled", False),
+            current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
         )
@@ -913,6 +925,22 @@ class TheWave:
                     self.listener.start()
             changes.append(f"Activation : {new_activation}")
 
+        # Auto-stop
+        new_auto_stop = dialog.auto_stop_enabled
+        new_auto_stop_dur = dialog.auto_stop_silence_duration
+        audio_config = self.config.setdefault("audio", {})
+        if new_auto_stop != audio_config.get("auto_stop_enabled", False):
+            audio_config["auto_stop_enabled"] = new_auto_stop
+            self._save_config_nested("audio", "auto_stop_enabled", new_auto_stop)
+            self.capture.update_auto_stop(new_auto_stop, new_auto_stop_dur)
+            state = "active" if new_auto_stop else "desactive"
+            changes.append(f"Auto-stop : {state}")
+        if new_auto_stop_dur != audio_config.get("auto_stop_silence_duration", 2.0):
+            audio_config["auto_stop_silence_duration"] = new_auto_stop_dur
+            self._save_config_nested("audio", "auto_stop_silence_duration", new_auto_stop_dur)
+            self.capture.update_auto_stop(new_auto_stop, new_auto_stop_dur)
+            changes.append(f"Silence : {new_auto_stop_dur}s")
+
         if changes and self.tray:
             self.tray.show_notification("The Wave", "Parametres mis a jour")
         logger.info(f"Settings: {', '.join(changes) if changes else 'aucun changement'}")
@@ -939,6 +967,8 @@ class TheWave:
             current_transcription_provider=self.config.get("transcription", {}).get("provider", "hybrid"),
             current_cleaning_provider=cleaning_config.get("provider", "hybrid"),
             current_activation_method=self.config.get("activation_method", "both"),
+            current_auto_stop_enabled=self.config.get("audio", {}).get("auto_stop_enabled", False),
+            current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
         )

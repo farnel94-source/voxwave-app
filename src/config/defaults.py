@@ -19,6 +19,8 @@ DEFAULT_CONFIG: dict = {
         "vad_aggressiveness": 2,
         "chunking_threshold": 30.0,
         "device_id": None,
+        "auto_stop_enabled": False,
+        "auto_stop_silence_duration": 2.0,
         "feedback": {
             "enabled": True,
             "volume": 0.5,
