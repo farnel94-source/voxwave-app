@@ -61,6 +61,46 @@ _SYSTEM_PROMPT = (
 )
 
 
+# Prompts contextuels par profil d'application
+_CONTEXT_PROMPTS: dict[str, Optional[str]] = {
+    "code": None,  # Skip LLM — verbatim uniquement (pas de reformulation du code)
+    "casual": (
+        "Tu es un correcteur léger de transcription vocale.\n"
+        "RÈGLES STRICTES :\n"
+        "1. Retourne UNIQUEMENT le texte, rien d'autre\n"
+        "2. Supprime UNIQUEMENT les hésitations (euh, hum, ben)\n"
+        "3. NE corrige PAS le style, la grammaire ou le registre\n"
+        "4. Garde le ton informel, les abréviations, le langage familier\n"
+        "5. Si aucune correction n'est utile, retourne le texte TEL QUEL\n"
+    ),
+    "email": (
+        "Tu es un correcteur de transcription vocale pour emails professionnels.\n"
+        "RÈGLES STRICTES :\n"
+        "1. Retourne UNIQUEMENT le texte corrigé, rien d'autre\n"
+        "2. Applique grammaire formelle et ponctuation soignée\n"
+        "3. Supprime les hésitations et répétitions\n"
+        "4. Corrige les fautes d'orthographe\n"
+        "5. Maintiens un ton professionnel\n"
+        "6. NE REFORMULE PAS, NE RÉSUME PAS\n"
+        "7. Si aucune correction n'est utile, retourne le texte TEL QUEL\n"
+    ),
+    "document": _SYSTEM_PROMPT,  # Correction maximale (prompt actuel)
+    "default": _SYSTEM_PROMPT,   # Mode configuré par l'utilisateur
+}
+
+
+def _get_system_prompt(context_profile: str = "default") -> Optional[str]:
+    """Retourne le prompt système pour un profil donné.
+
+    Args:
+        context_profile: "code" | "casual" | "email" | "document" | "default"
+
+    Returns:
+        Prompt string, ou None si le LLM doit être skippé (profil "code").
+    """
+    return _CONTEXT_PROMPTS.get(context_profile, _SYSTEM_PROMPT)
+
+
 def _validate_output(input_text: str, output_text: str) -> bool:
     """Valide que la sortie LLM est fidele a l'entree.
 
@@ -176,7 +216,7 @@ class CloudLLMCleaner:
         )
         return response.choices[0].message.content.strip()
 
-    def clean_streaming(self, text: str) -> Iterator[str]:
+    def clean_streaming(self, text: str, context_profile: str = "default") -> Iterator[str]:
         """Nettoie le texte via OpenAI en mode streaming (tokens un par un).
 
         Utilise stream=True pour recevoir chaque token dès qu'il est généré.
@@ -184,11 +224,18 @@ class CloudLLMCleaner:
 
         Args:
             text: Texte brut à nettoyer.
+            context_profile: Profil contextuel ("code"|"casual"|"email"|"document"|"default").
 
         Yields:
             Tokens de texte nettoyé au fur et à mesure.
         """
         if not text or not text.strip():
+            return
+
+        # Profil "code" : skip LLM, retourner texte brut (sera nettoyé par regex en amont)
+        system_prompt = _get_system_prompt(context_profile)
+        if system_prompt is None:
+            yield text
             return
 
         if not self._available or self._client is None:
@@ -203,7 +250,7 @@ class CloudLLMCleaner:
             with self._client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"Corrige cette transcription vocale :\n{text}"},
                 ],
                 temperature=0.0,

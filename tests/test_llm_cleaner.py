@@ -119,3 +119,42 @@ class TestCleaningPipeline:
         result = pipeline.clean("euh je vais tester quoi")
         # Should get regex-cleaned result
         assert "euh" not in result.lower()
+
+
+class TestContextPrompts:
+    """Tests pour les prompts contextuels par profil d'application."""
+
+    def test_context_prompts_are_different(self):
+        """Vérifie que chaque profil a un prompt distinct."""
+        from src.cleaning.llm_cleaner import _get_system_prompt
+        prompts = {
+            profile: _get_system_prompt(profile)
+            for profile in ["code", "casual", "email", "document", "default"]
+        }
+        # "code" ne doit pas appeler le LLM (None)
+        assert prompts["code"] is None
+        # Les autres doivent être différents
+        assert prompts["casual"] != prompts["email"]
+        assert prompts["email"] != prompts["default"]
+        assert prompts["document"] == prompts["default"]  # document = prompt complet
+
+    def test_clean_streaming_accepts_context_profile(self):
+        """Vérifie que clean_streaming accepte context_profile sans erreur."""
+        import inspect
+        from src.cleaning.llm_cleaner import CloudLLMCleaner
+        sig = inspect.signature(CloudLLMCleaner.clean_streaming)
+        assert "context_profile" in sig.parameters
+
+    def test_clean_streaming_code_profile_skips_llm(self):
+        """Profil 'code' doit retourner le texte sans appel API."""
+        from src.cleaning.llm_cleaner import CloudLLMCleaner
+        cleaner = CloudLLMCleaner(api_key="fake-key")
+        # Même avec _available=True, profil 'code' doit skip le LLM
+        cleaner._available = True
+        mock_client = MagicMock()
+        cleaner._client = mock_client
+
+        result = list(cleaner.clean_streaming("git push origin main", context_profile="code"))
+        # Aucun appel API
+        mock_client.chat.completions.create.assert_not_called()
+        assert result == ["git push origin main"]
