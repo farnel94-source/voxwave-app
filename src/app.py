@@ -32,21 +32,21 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 _APP_STEP_T = {
-    "en": {"transcription": "Transcription...", "cleaning": "Cleaning...", "injection": "Injecting...", "processing": "Processing...", "quality_no_api": "Pro mode: OpenAI key not configured (→ Natural mode)"},
-    "fr": {"transcription": "Transcription...", "cleaning": "Nettoyage...", "injection": "Injection...", "processing": "Traitement...", "quality_no_api": "Mode Pro : clé OpenAI non configurée (→ mode Naturel)"},
-    "es": {"transcription": "Transcripcion...", "cleaning": "Limpieza...", "injection": "Inyectando...", "processing": "Procesando...", "quality_no_api": "Modo Pro: clave OpenAI no configurada (→ modo Natural)"},
-    "de": {"transcription": "Transkription...", "cleaning": "Bereinigung...", "injection": "Einfuegen...", "processing": "Verarbeitung...", "quality_no_api": "Pro-Modus: OpenAI-Schlüssel nicht konfiguriert (→ Natürlich)"},
-    "it": {"transcription": "Trascrizione...", "cleaning": "Pulizia...", "injection": "Inserimento...", "processing": "Elaborazione...", "quality_no_api": "Modalità Pro: chiave OpenAI non configurata (→ Naturale)"},
-    "pt": {"transcription": "Transcricao...", "cleaning": "Limpeza...", "injection": "Injecao...", "processing": "Processando...", "quality_no_api": "Modo Pro: chave OpenAI não configurada (→ Natural)"},
-    "nl": {"transcription": "Transcriptie...", "cleaning": "Verwerking...", "injection": "Invoegen...", "processing": "Bezig...", "quality_no_api": "Pro-modus: OpenAI-sleutel niet geconfigureerd (→ Natuurlijk)"},
-    "ja": {"transcription": "文字起こし...", "cleaning": "整理中...", "injection": "貼り付け中...", "processing": "処理中...", "quality_no_api": "Proモード: OpenAIキー未設定 (→ 自然モード)"},
-    "ko": {"transcription": "전사 중...", "cleaning": "정리 중...", "injection": "입력 중...", "processing": "처리 중...", "quality_no_api": "Pro 모드: OpenAI 키 미설정 (→ 자연 모드)"},
-    "zh": {"transcription": "转录中...", "cleaning": "整理中...", "injection": "粘贴中...", "processing": "处理中...", "quality_no_api": "专业模式：OpenAI密钥未配置（→ 自然模式）"},
-    "ru": {"transcription": "Transkriptsija...", "cleaning": "Obrabotka...", "injection": "Vstavka...", "processing": "Obrabotka...", "quality_no_api": "Pro-rezhim: klyuch OpenAI ne nastroyen (→ Estestvennyy)"},
-    "ar": {"transcription": "نسخ...", "cleaning": "تنظيف...", "injection": "لصق...", "processing": "معالجة...", "quality_no_api": "الوضع الاحترافي: مفتاح OpenAI غير مهيأ (→ الطبيعي)"},
-    "tr": {"transcription": "Transkripsiyon...", "cleaning": "Temizleniyor...", "injection": "Yapistiriliyor...", "processing": "Isleniyor...", "quality_no_api": "Pro mod: OpenAI anahtarı yapılandırılmadı (→ Doğal mod)"},
-    "pl": {"transcription": "Transkrypcja...", "cleaning": "Czyszczenie...", "injection": "Wklejanie...", "processing": "Przetwarzanie...", "quality_no_api": "Tryb Pro: klucz OpenAI nie skonfigurowany (→ Naturalny)"},
-    "sv": {"transcription": "Transkription...", "cleaning": "Rensning...", "injection": "Inklistring...", "processing": "Bearbetar...", "quality_no_api": "Pro-läge: OpenAI-nyckel ej konfigurerad (→ Naturligt)"},
+    "en": {"transcription": "Transcription...", "cleaning": "Cleaning...", "injection": "Injecting...", "processing": "Processing..."},
+    "fr": {"transcription": "Transcription...", "cleaning": "Nettoyage...", "injection": "Injection...", "processing": "Traitement..."},
+    "es": {"transcription": "Transcripcion...", "cleaning": "Limpieza...", "injection": "Inyectando...", "processing": "Procesando..."},
+    "de": {"transcription": "Transkription...", "cleaning": "Bereinigung...", "injection": "Einfuegen...", "processing": "Verarbeitung..."},
+    "it": {"transcription": "Trascrizione...", "cleaning": "Pulizia...", "injection": "Inserimento...", "processing": "Elaborazione..."},
+    "pt": {"transcription": "Transcricao...", "cleaning": "Limpeza...", "injection": "Injecao...", "processing": "Processando..."},
+    "nl": {"transcription": "Transcriptie...", "cleaning": "Verwerking...", "injection": "Invoegen...", "processing": "Bezig..."},
+    "ja": {"transcription": "文字起こし...", "cleaning": "整理中...", "injection": "貼り付け中...", "processing": "処理中..."},
+    "ko": {"transcription": "전사 중...", "cleaning": "정리 중...", "injection": "입력 중...", "processing": "처리 중..."},
+    "zh": {"transcription": "转录中...", "cleaning": "整理中...", "injection": "粘贴中...", "processing": "处理中..."},
+    "ru": {"transcription": "Transkriptsija...", "cleaning": "Obrabotka...", "injection": "Vstavka...", "processing": "Obrabotka..."},
+    "ar": {"transcription": "نسخ...", "cleaning": "تنظيف...", "injection": "لصق...", "processing": "معالجة..."},
+    "tr": {"transcription": "Transkripsiyon...", "cleaning": "Temizleniyor...", "injection": "Yapistiriliyor...", "processing": "Isleniyor..."},
+    "pl": {"transcription": "Transkrypcja...", "cleaning": "Czyszczenie...", "injection": "Wklejanie...", "processing": "Przetwarzanie..."},
+    "sv": {"transcription": "Transkription...", "cleaning": "Rensning...", "injection": "Inklistring...", "processing": "Bearbetar..."},
 }
 
 _ERROR_T = {
@@ -261,14 +261,12 @@ class TheWave:
             on_fallback=self._on_fallback,
         )
 
-        # Avertir si mode quality actif sans clé OpenAI disponible
-        if cleaning_config.get("mode") == "quality":
+        # Informer si mode auto actif sans clé OpenAI disponible
+        if cleaning_config.get("mode", "auto") != "raw":
             cloud_cleaner = getattr(self.pipeline, "_cloud_cleaner", None)
             if cloud_cleaner is None or not cloud_cleaner._available:
-                logger.warning(
-                    "Mode Quality activé mais OpenAI indisponible (OPENAI_API_KEY absente ou invalide). "
-                    "Le nettoyage sera effectué par regex uniquement (= identique au mode Naturel). "
-                    "Ajoutez OPENAI_API_KEY dans .env pour activer le nettoyage IA."
+                logger.info(
+                    "Mode Auto sans clé OpenAI : nettoyage regex/Ollama uniquement."
                 )
 
         self.injector = TextInjector(mode=self.config["injection"])
@@ -662,24 +660,16 @@ class TheWave:
             if cloud_cleaner is not None and not cloud_cleaner._available:
                 logger.warning("[progressif] _cloud_cleaner indisponible — OPENAI_API_KEY manquante dans .env")
 
-            cleaning_mode = self.config.get("cleaning", {}).get("mode", "verbatim")
+            cleaning_mode = self.config.get("cleaning", {}).get("mode", "auto")
+            app_profile = getattr(self, "_current_app_profile", "default")
 
             if cleaning_mode == "raw":
                 pass  # Mode brut : pas de remplacement du tout
 
-            elif cleaning_mode == "verbatim":
-                # Mode naturel : regex seulement (filler words + majuscule + point)
-                # PAS d'OpenAI — verbatim = respecter le texte dicté, juste le formater
-                clean_text = self.pipeline.clean(raw_text)
-                if clean_text and clean_text.strip() and clean_text != raw_text:
-                    self._prog_injector.replace_with_clean(raw_text, iter([clean_text]))
-
-            elif cleaning_mode == "quality":
-                app_profile = getattr(self, "_current_app_profile", "default")
-
-                # Profil "code" : skip LLM, verbatim seulement
+            else:  # Mode auto (+ compat verbatim/quality si config non migrée)
+                # Profil "code" : skip LLM, regex seulement
                 if app_profile == "code":
-                    logger.info("[progressif] Profil 'code' → skip LLM, verbatim uniquement")
+                    logger.info("[progressif] Profil 'code' → verbatim uniquement")
                     clean_text = self.pipeline.clean(raw_text)
                     if clean_text and clean_text.strip() and clean_text != raw_text:
                         self._prog_injector.replace_with_clean(raw_text, iter([clean_text]))
@@ -868,15 +858,8 @@ class TheWave:
             if self.pipeline:
                 self.pipeline.mode = new_mode
             self._save_config_nested("cleaning", "mode", new_mode)
-            mode_names = {"raw": "Brut", "verbatim": "Naturel", "quality": "Professionnel"}
+            mode_names = {"raw": "Brut", "auto": "Auto"}
             changes.append(f"Mode : {mode_names.get(new_mode, new_mode)}")
-            # Notification si mode quality sélectionné sans clé OpenAI disponible
-            if new_mode == "quality":
-                cloud_cleaner = getattr(self.pipeline, "_cloud_cleaner", None)
-                if cloud_cleaner is None or not cloud_cleaner._available:
-                    lang = self.config.get("language", "en")
-                    if self.tray:
-                        self.tray.show_notification("The Wave", _app_t(lang, "quality_no_api"))
 
         # System language (interface)
         new_sys_lang = dialog.system_language
