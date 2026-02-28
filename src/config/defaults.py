@@ -38,9 +38,9 @@ DEFAULT_CONFIG: dict = {
     "groq": {
         "model": "whisper-large-v3-turbo",
     },
-    # cleaning.mode: "raw" (brut, zero traitement) | "verbatim" (naturel) | "quality" (professionnel)
+    # cleaning.mode: "raw" (brut, zero traitement) | "auto" (détection app → regex ou LLM contextuel)
     "cleaning": {
-        "mode": "verbatim",
+        "mode": "auto",
         "provider": "hybrid",
         "cloud_model": "gpt-4o-mini",
         "llm_model": "gemma3:4b",
