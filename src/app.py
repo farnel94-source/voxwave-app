@@ -25,6 +25,7 @@ import yaml
 from dotenv import load_dotenv
 
 from src.transcription.hallucinations import is_hallucination
+from src.utils.window_detector import get_active_exe, get_app_profile
 
 load_dotenv()
 
@@ -181,6 +182,7 @@ class TheWave:
         self._qt_app = None
         self._shutting_down = False
         self._stop_event = threading.Event()
+        self._current_app_profile: str = "default"
         self._processing_thread: Optional[threading.Thread] = None
         self._processing_lock = threading.Lock()
         self._executor = ThreadPoolExecutor(max_workers=2)
@@ -418,6 +420,11 @@ class TheWave:
 
     def _on_start(self) -> None:
         """Callback: debut enregistrement."""
+        # Capturer l'app active AVANT de démarrer l'enregistrement
+        exe = get_active_exe()
+        self._current_app_profile = get_app_profile(exe)
+        logger.info(f"[context] App détectée: '{exe}' → profil '{self._current_app_profile}'")
+
         logger.info("Enregistrement...")
         self._stop_event.clear()
         self.feedback.play_start()
@@ -668,15 +675,25 @@ class TheWave:
                     self._prog_injector.replace_with_clean(raw_text, iter([clean_text]))
 
             elif cleaning_mode == "quality":
-                if cloud_cleaner is not None and cloud_cleaner._available:
-                    # Chemin rapide : OpenAI streaming (~300ms) + remplacement
+                app_profile = getattr(self, "_current_app_profile", "default")
+
+                # Profil "code" : skip LLM, verbatim seulement
+                if app_profile == "code":
+                    logger.info("[progressif] Profil 'code' → skip LLM, verbatim uniquement")
+                    clean_text = self.pipeline.clean(raw_text)
+                    if clean_text and clean_text.strip() and clean_text != raw_text:
+                        self._prog_injector.replace_with_clean(raw_text, iter([clean_text]))
+
+                elif cloud_cleaner is not None and cloud_cleaner._available:
+                    # Chemin rapide : OpenAI streaming contextuel (~300ms) + remplacement
                     if self.waveform:
                         self.waveform.update_step(_app_t(lang, "cleaning"))
                     t_clean = time.time()
-                    clean_gen = cloud_cleaner.clean_streaming(raw_text)
+                    clean_gen = cloud_cleaner.clean_streaming(raw_text, context_profile=app_profile)
                     self._prog_injector.replace_with_clean(raw_text, clean_gen)
                     logger.info(
-                        f"[progressif] Remplacement nettoyé: {(time.time()-t_clean)*1000:.0f}ms "
+                        f"[progressif] Remplacement nettoyé [{app_profile}]: "
+                        f"{(time.time()-t_clean)*1000:.0f}ms "
                         f"(total: {(time.time()-t_start)*1000:.0f}ms)"
                     )
                 else:
