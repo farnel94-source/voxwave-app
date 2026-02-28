@@ -75,28 +75,29 @@ class TestLLMCleaner:
 class TestCleaningPipeline:
     """Tests CleaningPipeline."""
 
-    def test_verbatim_mode(self):
+    def test_auto_mode_no_llm_applies_verbatim(self):
         from src.cleaning.llm_cleaner import CleaningPipeline
-        pipeline = CleaningPipeline(mode="verbatim")
+        # Mode auto sans LLM configuré → regex + _clean_verbatim
+        pipeline = CleaningPipeline(mode="auto")
         result = pipeline.clean("bonjour le monde")
         assert result == "Bonjour le monde."
 
-    def test_verbatim_preserves_existing_punctuation(self):
+    def test_auto_mode_preserves_existing_punctuation(self):
         from src.cleaning.llm_cleaner import CleaningPipeline
-        pipeline = CleaningPipeline(mode="verbatim")
+        pipeline = CleaningPipeline(mode="auto")
         result = pipeline.clean("Déjà propre!")
         assert result == "Déjà propre!"
 
     def test_empty_text(self):
         from src.cleaning.llm_cleaner import CleaningPipeline
-        pipeline = CleaningPipeline(mode="verbatim")
+        pipeline = CleaningPipeline(mode="auto")
         assert pipeline.clean("") == ""
 
     @patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"})
-    def test_quality_mode_cloud_success(self):
+    def test_auto_mode_cloud_success(self):
         from src.cleaning.llm_cleaner import CleaningPipeline
         pipeline = CleaningPipeline(
-            mode="quality",
+            mode="auto",
             cleaning_provider="cloud",
             cloud_model="gpt-4o-mini",
         )
@@ -111,13 +112,13 @@ class TestCleaningPipeline:
         result = pipeline.clean("euh texte brut")
         assert result == "Nettoyé."
 
-    def test_quality_mode_regex_fallback(self):
+    def test_auto_mode_regex_fallback_no_llm(self):
         from src.cleaning.llm_cleaner import CleaningPipeline
         # No cloud or local configured
-        pipeline = CleaningPipeline(mode="quality", cleaning_provider="local")
+        pipeline = CleaningPipeline(mode="auto", cleaning_provider="local")
         pipeline._local_cleaner = None
         result = pipeline.clean("euh je vais tester quoi")
-        # Should get regex-cleaned result
+        # Should get regex-cleaned + verbatim result
         assert "euh" not in result.lower()
 
 

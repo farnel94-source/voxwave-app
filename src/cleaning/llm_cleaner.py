@@ -420,14 +420,10 @@ class CleaningPipeline:
         if self.mode == "raw":
             return text.strip()
 
-        # Mode verbatim : filler words supprimés par regex, puis formatage minimal
-        if self.mode == "verbatim":
-            result = self.regex_cleaner.clean(text)
-            return self._clean_verbatim(result)
-
+        # Mode auto (+ backward-compat verbatim/quality si config non migrée) : regex → LLM si dispo
         result = self.regex_cleaner.clean(text)
 
-        if self.mode != "quality":
+        if self.mode not in ("auto", "verbatim", "quality"):
             return result
 
         # Cloud d'abord
@@ -450,7 +446,7 @@ class CleaningPipeline:
 
         if self.on_fallback:
             self.on_fallback("Nettoyage : mode regex (LLM indisponible)")
-        return result
+        return self._clean_verbatim(result)
 
     @staticmethod
     def _clean_verbatim(text: str) -> str:
