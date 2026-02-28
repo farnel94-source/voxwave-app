@@ -99,12 +99,9 @@ _TRANSLATIONS = {
         "tone_raw_title": "Raw",
         "tone_raw_desc": "No processing, exact transcription text",
         "tone_raw_example": '  "uh I think that like we should meet tomorrow"',
-        "tone_natural_title": "Natural",
-        "tone_natural_desc": "Keeps your speaking style, minimal corrections",
-        "tone_natural_example": '  "I think we should meet tomorrow"',
-        "tone_pro_title": "Professional",
-        "tone_pro_desc": "Properly reformulated, formal tone",
-        "tone_pro_example": '  "I believe we should meet tomorrow."',
+        "tone_auto_title": "Auto",
+        "tone_auto_desc": "Detects the application and adapts automatically",
+        "tone_auto_example": '  "I think we should meet tomorrow"',
         # Page 7 - Ready
         "ready_title": "All set!",
         "ready_subtitle": "You're ready to dictate 4x faster",
@@ -113,8 +110,7 @@ _TRANSLATIONS = {
         "ready_btn": "Finish",
         # Mode names
         "mode_raw": "Raw",
-        "mode_verbatim": "Natural",
-        "mode_quality": "Professional",
+        "mode_auto": "Auto",
         # Navigation
         "btn_previous": "Previous",
         "btn_next": "Next",
@@ -178,20 +174,16 @@ _TRANSLATIONS = {
         "tone_raw_title": "Brut",
         "tone_raw_desc": "Aucun traitement, texte exact de la transcription",
         "tone_raw_example": '  "euh je pense que du coup on devrait se voir demain"',
-        "tone_natural_title": "Naturel",
-        "tone_natural_desc": "Garde votre style oral, corrections minimales",
-        "tone_natural_example": '  "je pense qu\'on devrait se voir demain"',
-        "tone_pro_title": "Professionnel",
-        "tone_pro_desc": "Reformule proprement, ton formel",
-        "tone_pro_example": '  "Je pense que nous devrions nous voir demain."',
+        "tone_auto_title": "Auto",
+        "tone_auto_desc": "Détecte l'application et adapte automatiquement",
+        "tone_auto_example": '  "je pense qu\'on devrait se voir demain"',
         "ready_title": "Tout est pret !",
         "ready_subtitle": "Vous etes pret a dicter 4x plus vite",
         "ready_mode_label": "Mode d'ecriture : {mode}",
         "ready_hint": "Vous pouvez modifier les parametres a tout moment\nvia l'icone dans la barre de taches (clic droit).",
         "ready_btn": "Terminer",
         "mode_raw": "Brut",
-        "mode_verbatim": "Naturel",
-        "mode_quality": "Professionnel",
+        "mode_auto": "Auto",
         "btn_previous": "Precedent",
         "btn_next": "Suivant",
         "btn_skip": "Passer",
@@ -537,7 +529,7 @@ class WelcomeDialog(QDialog):
         self._engine = engine
         self._processor = processor
         self._feedback = feedback
-        self._cleaning_mode = "verbatim"
+        self._cleaning_mode = "auto"
         self._language = "en"
 
         # Micro test state
@@ -617,7 +609,8 @@ class WelcomeDialog(QDialog):
             QTimer.singleShot(3000, lambda: self._hotkey_next_btn.setEnabled(True))
         if index == 7:
             self._hotkey_reminder.setText(f"{self._hotkey}")
-            mode_key = f"mode_{self._cleaning_mode}"
+            display_mode = self._cleaning_mode if self._cleaning_mode in ("raw", "auto") else "auto"
+            mode_key = f"mode_{display_mode}"
             mode_text = _t(lang, mode_key)
             self._mode_reminder.setText(
                 _t(lang, "ready_mode_label").format(mode=mode_text)
@@ -651,15 +644,11 @@ class WelcomeDialog(QDialog):
         self._tone_cards["raw"].set_texts(
             _t(lang, "tone_raw_title"), _t(lang, "tone_raw_desc"),
         )
-        self._tone_cards["verbatim"].set_texts(
-            _t(lang, "tone_natural_title"), _t(lang, "tone_natural_desc"),
-        )
-        self._tone_cards["quality"].set_texts(
-            _t(lang, "tone_pro_title"), _t(lang, "tone_pro_desc"),
+        self._tone_cards["auto"].set_texts(
+            _t(lang, "tone_auto_title"), _t(lang, "tone_auto_desc"),
         )
         self._i18n_tone_raw_ex.setText(_t(lang, "tone_raw_example"))
-        self._i18n_tone_natural_ex.setText(_t(lang, "tone_natural_example"))
-        self._i18n_tone_pro_ex.setText(_t(lang, "tone_pro_example"))
+        self._i18n_tone_auto_ex.setText(_t(lang, "tone_auto_example"))
 
         # Update demo placeholder
         self._demo_text.setPlaceholderText(_t(lang, "demo_placeholder"))
@@ -1302,28 +1291,17 @@ class WelcomeDialog(QDialog):
 
         layout.addSpacing(4)
 
-        naturel_card = _ClickableCard("", "")
-        naturel_card.clicked.connect(lambda: self._select_tone("verbatim"))
-        layout.addWidget(naturel_card)
+        auto_card = _ClickableCard("", "")
+        auto_card.clicked.connect(lambda: self._select_tone("auto"))
+        layout.addWidget(auto_card)
 
-        self._i18n_tone_natural_ex = QLabel("")
-        self._i18n_tone_natural_ex.setObjectName("hint")
-        self._i18n_tone_natural_ex.setStyleSheet("color: rgba(255,255,255,0.35); font-size: 11px; margin-left: 16px;")
-        layout.addWidget(self._i18n_tone_natural_ex)
+        self._i18n_tone_auto_ex = QLabel("")
+        self._i18n_tone_auto_ex.setObjectName("hint")
+        self._i18n_tone_auto_ex.setStyleSheet("color: rgba(255,255,255,0.35); font-size: 11px; margin-left: 16px;")
+        layout.addWidget(self._i18n_tone_auto_ex)
 
-        layout.addSpacing(4)
-
-        pro_card = _ClickableCard("", "")
-        pro_card.clicked.connect(lambda: self._select_tone("quality"))
-        layout.addWidget(pro_card)
-
-        self._i18n_tone_pro_ex = QLabel("")
-        self._i18n_tone_pro_ex.setObjectName("hint")
-        self._i18n_tone_pro_ex.setStyleSheet("color: rgba(255,255,255,0.35); font-size: 11px; margin-left: 16px;")
-        layout.addWidget(self._i18n_tone_pro_ex)
-
-        self._tone_cards = {"raw": raw_card, "verbatim": naturel_card, "quality": pro_card}
-        naturel_card.selected = True
+        self._tone_cards = {"raw": raw_card, "auto": auto_card}
+        auto_card.selected = True
 
         layout.addStretch()
 
