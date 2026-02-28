@@ -15,6 +15,8 @@ audio:
   vad_aggressiveness: 2    # 0-3, agressivité webrtcvad (0=moins, 3=plus)
   chunking_threshold: 30.0  # secondes — au-dessus, audio découpé en chunks
   device_id: null  # null = micro par défaut
+  auto_stop_enabled: false
+  auto_stop_silence_duration: 2.0  # secondes de silence avant arrêt auto
   feedback:
     enabled: true
     volume: 0.5
@@ -52,6 +54,11 @@ cleaning:
     - quoi
     - voilà
     - comment dire
+
+performance:
+  persistent_connections: true  # Client HTTP créé au démarrage (évite +200ms)
+  auto_stop_silence_ms: 900     # Silence consécutif (ms) pour déclencher auto-stop
+  mode: both                    # "push_to_talk" | "auto_stop" | "both"
 
 gui:
   show_transcription_preview: true

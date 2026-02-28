@@ -6,8 +6,10 @@ from typing import Optional
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont, QKeyEvent, QPainter, QPen
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
+    QDoubleSpinBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -48,13 +50,15 @@ _SETTINGS_T = {
         "desc_writing": "How should The Wave clean your dictations?",
         "tone_raw": "Raw",
         "tone_raw_desc": "No processing, exact transcription",
-        "tone_natural": "Natural",
-        "tone_natural_desc": "Keeps your style, minimal corrections",
-        "tone_pro": "Professional",
-        "tone_pro_desc": "Reformulates cleanly, formal tone",
+        "tone_auto": "Auto",
+        "tone_auto_desc": "Detects the application and adapts automatically",
         "section_audio": "AUDIO DEVICE",
         "label_mic": "Microphone",
         "hint_mic": "Select the microphone to use for dictation",
+        "label_auto_stop": "Auto-stop",
+        "hint_auto_stop": "Automatically stop recording after silence",
+        "label_auto_stop_duration": "Silence duration (seconds)",
+        "hint_auto_stop_duration": "Stop recording after this many seconds of silence",
         "btn_close": "Save",
         "section_advanced": "ADVANCED",
         "label_trans_provider": "Transcription",
@@ -95,13 +99,15 @@ _SETTINGS_T = {
         "desc_writing": "Comment The Wave doit nettoyer vos dictees ?",
         "tone_raw": "Brut",
         "tone_raw_desc": "Aucun traitement, texte exact de la transcription",
-        "tone_natural": "Naturel",
-        "tone_natural_desc": "Garde votre style oral, corrections minimales",
-        "tone_pro": "Professionnel",
-        "tone_pro_desc": "Reformule proprement, ton formel",
+        "tone_auto": "Auto",
+        "tone_auto_desc": "Détecte l'application et adapte automatiquement",
         "section_audio": "PERIPHERIQUE AUDIO",
         "label_mic": "Microphone",
         "hint_mic": "Selectionnez le micro a utiliser pour la dictee",
+        "label_auto_stop": "Arret auto",
+        "hint_auto_stop": "Arreter automatiquement l'enregistrement apres un silence",
+        "label_auto_stop_duration": "Duree de silence (secondes)",
+        "hint_auto_stop_duration": "Arreter apres ce nombre de secondes de silence",
         "btn_close": "Sauvegarder",
         "section_advanced": "AVANCE",
         "label_trans_provider": "Transcription",
@@ -137,11 +143,14 @@ _SETTINGS_T = {
         "section_writing": "MODO DE ESCRITURA",
         "desc_writing": "Como debe limpiar The Wave sus dictados?",
         "tone_raw": "Bruto", "tone_raw_desc": "Sin procesamiento, transcripcion exacta",
-        "tone_natural": "Natural", "tone_natural_desc": "Conserva tu estilo, correcciones minimas",
-        "tone_pro": "Profesional", "tone_pro_desc": "Reformulado correctamente, tono formal",
+        "tone_auto": "Auto", "tone_auto_desc": "Detecta la aplicacion y adapta automaticamente",
         "section_audio": "DISPOSITIVO DE AUDIO",
         "label_mic": "Microfono",
         "hint_mic": "Seleccione el microfono para el dictado",
+        "label_auto_stop": "Parada automatica",
+        "hint_auto_stop": "Detener la grabacion automaticamente despues del silencio",
+        "label_auto_stop_duration": "Duracion del silencio (segundos)",
+        "hint_auto_stop_duration": "Detener despues de este numero de segundos de silencio",
         "btn_close": "Guardar",
         "section_advanced": "AVANZADO",
         "label_trans_provider": "Transcripcion",
@@ -177,11 +186,14 @@ _SETTINGS_T = {
         "section_writing": "SCHREIBMODUS",
         "desc_writing": "Wie soll The Wave Ihre Diktate bereinigen?",
         "tone_raw": "Roh", "tone_raw_desc": "Keine Verarbeitung, genaue Transkription",
-        "tone_natural": "Naturlich", "tone_natural_desc": "Behalt Ihren Stil, minimale Korrekturen",
-        "tone_pro": "Professionell", "tone_pro_desc": "Sauber umformuliert, formeller Ton",
+        "tone_auto": "Auto", "tone_auto_desc": "Erkennt die App und passt sich automatisch an",
         "section_audio": "AUDIOGERAET",
         "label_mic": "Mikrofon",
         "hint_mic": "Wahlen Sie das Mikrofon fur das Diktat",
+        "label_auto_stop": "Automatisch stoppen",
+        "hint_auto_stop": "Aufnahme nach Stille automatisch stoppen",
+        "label_auto_stop_duration": "Stille-Dauer (Sekunden)",
+        "hint_auto_stop_duration": "Stoppen nach dieser Anzahl Sekunden Stille",
         "btn_close": "Speichern",
         "section_advanced": "ERWEITERT",
         "label_trans_provider": "Transkription",
@@ -217,11 +229,14 @@ _SETTINGS_T = {
         "section_writing": "MODALITA DI SCRITTURA",
         "desc_writing": "Come deve pulire The Wave i tuoi dettati?",
         "tone_raw": "Grezzo", "tone_raw_desc": "Nessuna elaborazione, trascrizione esatta",
-        "tone_natural": "Naturale", "tone_natural_desc": "Mantiene il tuo stile, correzioni minime",
-        "tone_pro": "Professionale", "tone_pro_desc": "Riformulato correttamente, tono formale",
+        "tone_auto": "Auto", "tone_auto_desc": "Rileva l'app e si adatta automaticamente",
         "section_audio": "DISPOSITIVO AUDIO",
         "label_mic": "Microfono",
         "hint_mic": "Seleziona il microfono per la dettatura",
+        "label_auto_stop": "Stop automatico",
+        "hint_auto_stop": "Ferma automaticamente la registrazione dopo il silenzio",
+        "label_auto_stop_duration": "Durata silenzio (secondi)",
+        "hint_auto_stop_duration": "Ferma dopo questi secondi di silenzio",
         "btn_close": "Salva",
         "section_advanced": "AVANZATE",
         "label_trans_provider": "Trascrizione",
@@ -257,11 +272,14 @@ _SETTINGS_T = {
         "section_writing": "MODO DE ESCRITA",
         "desc_writing": "Como o The Wave deve limpar seus ditados?",
         "tone_raw": "Bruto", "tone_raw_desc": "Sem processamento, transcricao exata",
-        "tone_natural": "Natural", "tone_natural_desc": "Mantem seu estilo, correcoes minimas",
-        "tone_pro": "Profissional", "tone_pro_desc": "Reformulado corretamente, tom formal",
+        "tone_auto": "Auto", "tone_auto_desc": "Detecta o aplicativo e adapta automaticamente",
         "section_audio": "DISPOSITIVO DE AUDIO",
         "label_mic": "Microfone",
         "hint_mic": "Selecione o microfone para o ditado",
+        "label_auto_stop": "Parada automatica",
+        "hint_auto_stop": "Parar automaticamente a gravacao apos silencio",
+        "label_auto_stop_duration": "Duracao do silencio (segundos)",
+        "hint_auto_stop_duration": "Parar apos este numero de segundos de silencio",
         "btn_close": "Salvar",
         "section_advanced": "AVANCADO",
         "label_trans_provider": "Transcricao",
@@ -297,11 +315,14 @@ _SETTINGS_T = {
         "section_writing": "SCHRIJFMODUS",
         "desc_writing": "Hoe moet The Wave uw dictaten verwerken?",
         "tone_raw": "Rauw", "tone_raw_desc": "Geen verwerking, exacte transcriptie",
-        "tone_natural": "Natuurlijk", "tone_natural_desc": "Behoudt uw stijl, minimale correcties",
-        "tone_pro": "Professioneel", "tone_pro_desc": "Netjes geherformuleerd, formele toon",
+        "tone_auto": "Auto", "tone_auto_desc": "Detecteert de app en past automatisch aan",
         "section_audio": "AUDIOAPPARAAT",
         "label_mic": "Microfoon",
         "hint_mic": "Selecteer de microfoon voor dicteren",
+        "label_auto_stop": "Automatisch stoppen",
+        "hint_auto_stop": "Opname automatisch stoppen na stilte",
+        "label_auto_stop_duration": "Stilteduur (seconden)",
+        "hint_auto_stop_duration": "Stoppen na dit aantal seconden stilte",
         "btn_close": "Opslaan",
         "section_advanced": "GEAVANCEERD",
         "label_trans_provider": "Transcriptie",
@@ -337,11 +358,14 @@ _SETTINGS_T = {
         "section_writing": "書き方モード",
         "desc_writing": "The Waveはどのようにテキストを整理しますか？",
         "tone_raw": "そのまま", "tone_raw_desc": "処理なし、正確な書き起こし",
-        "tone_natural": "自然", "tone_natural_desc": "スタイルを保ち、最小限の修正",
-        "tone_pro": "プロフェッショナル", "tone_pro_desc": "きれいに再構成、フォーマルな文体",
+        "tone_auto": "自動", "tone_auto_desc": "アプリを検出して自動的に適応",
         "section_audio": "音声デバイス",
         "label_mic": "マイク",
         "hint_mic": "ディクテーションに使用するマイクを選択",
+        "label_auto_stop": "自動停止",
+        "hint_auto_stop": "無音後に録音を自動停止",
+        "label_auto_stop_duration": "無音時間（秒）",
+        "hint_auto_stop_duration": "この秒数の無音後に停止",
         "btn_close": "保存",
         "section_advanced": "詳細設定",
         "label_trans_provider": "文字起こし",
@@ -377,11 +401,14 @@ _SETTINGS_T = {
         "section_writing": "작성 모드",
         "desc_writing": "The Wave가 받아쓰기를 어떻게 정리할까요?",
         "tone_raw": "원본", "tone_raw_desc": "처리 없음, 정확한 전사",
-        "tone_natural": "자연스러운", "tone_natural_desc": "스타일 유지, 최소 수정",
-        "tone_pro": "전문적인", "tone_pro_desc": "깔끔하게 재구성, 공식적인 톤",
+        "tone_auto": "자동", "tone_auto_desc": "앱을 감지하여 자동으로 적응",
         "section_audio": "오디오 장치",
         "label_mic": "마이크",
         "hint_mic": "받아쓰기에 사용할 마이크 선택",
+        "label_auto_stop": "자동 중지",
+        "hint_auto_stop": "무음 후 자동으로 녹음 중지",
+        "label_auto_stop_duration": "무음 시간(초)",
+        "hint_auto_stop_duration": "이 초 동안 무음이면 중지",
         "btn_close": "저장",
         "section_advanced": "고급",
         "label_trans_provider": "전사",
@@ -417,11 +444,14 @@ _SETTINGS_T = {
         "section_writing": "写作模式",
         "desc_writing": "The Wave应如何整理您的听写内容？",
         "tone_raw": "原始", "tone_raw_desc": "不处理，精确转录",
-        "tone_natural": "自然", "tone_natural_desc": "保持您的风格，最少修正",
-        "tone_pro": "专业", "tone_pro_desc": "重新整理，正式语气",
+        "tone_auto": "自动", "tone_auto_desc": "检测应用并自动适应",
         "section_audio": "音频设备",
         "label_mic": "麦克风",
         "hint_mic": "选择用于听写的麦克风",
+        "label_auto_stop": "自动停止",
+        "hint_auto_stop": "静音后自动停止录音",
+        "label_auto_stop_duration": "静音时长（秒）",
+        "hint_auto_stop_duration": "静音持续此秒数后停止",
         "btn_close": "保存",
         "section_advanced": "高级",
         "label_trans_provider": "转录",
@@ -457,11 +487,14 @@ _SETTINGS_T = {
         "section_writing": "REZHIM NAPISANIJA",
         "desc_writing": "Kak The Wave dolzhen obrabatyvat vashi diktovki?",
         "tone_raw": "Syroj", "tone_raw_desc": "Bez obrabotki, tochnaja transkriptsija",
-        "tone_natural": "Estestvennyj", "tone_natural_desc": "Sohranaet vash stil, minimalnye pravki",
-        "tone_pro": "Professionalnyj", "tone_pro_desc": "Chisto pereformulirovano, oficialnyj ton",
+        "tone_auto": "Avto", "tone_auto_desc": "Opredeljaet prilozhenie i adaptiruetsja avtomaticheski",
         "section_audio": "AUDIOUSTROJSTVO",
         "label_mic": "Mikrofon",
         "hint_mic": "Vyberite mikrofon dlja diktovki",
+        "label_auto_stop": "Avto-ostanovka",
+        "hint_auto_stop": "Avtomaticheski ostanovit zapis posle tishiny",
+        "label_auto_stop_duration": "Dlitelnost tishiny (sekundy)",
+        "hint_auto_stop_duration": "Ostanovit posle etogo kolichestva sekund tishiny",
         "btn_close": "Sohranit",
         "section_advanced": "DOPOLNITELNO",
         "label_trans_provider": "Transkriptsija",
@@ -497,11 +530,14 @@ _SETTINGS_T = {
         "section_writing": "وضع الكتابة",
         "desc_writing": "كيف يجب أن يعالج The Wave إملاءاتك؟",
         "tone_raw": "خام", "tone_raw_desc": "بدون معالجة، نسخ دقيق",
-        "tone_natural": "طبيعي", "tone_natural_desc": "يحافظ على أسلوبك، تصحيحات بسيطة",
-        "tone_pro": "احترافي", "tone_pro_desc": "معاد صياغته بشكل نظيف، لهجة رسمية",
+        "tone_auto": "تلقائي", "tone_auto_desc": "يكتشف التطبيق ويتكيف تلقائيًا",
         "section_audio": "جهاز الصوت",
         "label_mic": "الميكروفون",
         "hint_mic": "اختر الميكروفون للإملاء",
+        "label_auto_stop": "إيقاف تلقائي",
+        "hint_auto_stop": "إيقاف التسجيل تلقائيًا بعد الصمت",
+        "label_auto_stop_duration": "مدة الصمت (ثوانٍ)",
+        "hint_auto_stop_duration": "إيقاف بعد هذا العدد من ثواني الصمت",
         "btn_close": "حفظ",
         "section_advanced": "متقدم",
         "label_trans_provider": "النسخ",
@@ -537,11 +573,14 @@ _SETTINGS_T = {
         "section_writing": "YAZMA MODU",
         "desc_writing": "The Wave diktelerinizi nasil duzenlemelidir?",
         "tone_raw": "Ham", "tone_raw_desc": "Islem yok, tam transkripsiyon",
-        "tone_natural": "Dogal", "tone_natural_desc": "Uslubunuzu korur, minimal duzeltmeler",
-        "tone_pro": "Profesyonel", "tone_pro_desc": "Temiz sekilde yeniden yazildi, resmi ton",
+        "tone_auto": "Otomatik", "tone_auto_desc": "Uygulamayi tespit eder ve otomatik olarak uyarlar",
         "section_audio": "SES CIHAZI",
         "label_mic": "Mikrofon",
         "hint_mic": "Dikte icin kullanilacak mikrofonu secin",
+        "label_auto_stop": "Otomatik dur",
+        "hint_auto_stop": "Sessizlikten sonra kaydi otomatik durdur",
+        "label_auto_stop_duration": "Sessizlik suresi (saniye)",
+        "hint_auto_stop_duration": "Bu kadar saniye sessizlikten sonra dur",
         "btn_close": "Kaydet",
         "section_advanced": "GELISMIS",
         "label_trans_provider": "Transkripsiyon",
@@ -577,11 +616,14 @@ _SETTINGS_T = {
         "section_writing": "TRYB PISANIA",
         "desc_writing": "Jak The Wave ma czyscic twoje dyktowania?",
         "tone_raw": "Surowy", "tone_raw_desc": "Bez przetwarzania, dokladna transkrypcja",
-        "tone_natural": "Naturalny", "tone_natural_desc": "Zachowuje twoj styl, minimalne korekty",
-        "tone_pro": "Profesjonalny", "tone_pro_desc": "Czyscie przeformulowany, formalny ton",
+        "tone_auto": "Auto", "tone_auto_desc": "Wykrywa aplikacje i automatycznie dostosowuje",
         "section_audio": "URZADZENIE AUDIO",
         "label_mic": "Mikrofon",
         "hint_mic": "Wybierz mikrofon do dyktowania",
+        "label_auto_stop": "Automatyczne zatrzymanie",
+        "hint_auto_stop": "Automatycznie zatrzymaj nagrywanie po ciszy",
+        "label_auto_stop_duration": "Czas ciszy (sekundy)",
+        "hint_auto_stop_duration": "Zatrzymaj po tej liczbie sekund ciszy",
         "btn_close": "Zapisz",
         "section_advanced": "ZAAWANSOWANE",
         "label_trans_provider": "Transkrypcja",
@@ -617,11 +659,14 @@ _SETTINGS_T = {
         "section_writing": "SKRIVLAGE",
         "desc_writing": "Hur ska The Wave rensa dina dikteringar?",
         "tone_raw": "Rakt", "tone_raw_desc": "Ingen behandling, exakt transkription",
-        "tone_natural": "Naturlig", "tone_natural_desc": "Bevarar din stil, minimala korrigeringar",
-        "tone_pro": "Professionell", "tone_pro_desc": "Rent omformulerat, formell ton",
+        "tone_auto": "Auto", "tone_auto_desc": "Identifierar appen och anpassar automatiskt",
         "section_audio": "LJUDENHET",
         "label_mic": "Mikrofon",
         "hint_mic": "Valj mikrofon for diktering",
+        "label_auto_stop": "Automatiskt stopp",
+        "hint_auto_stop": "Stoppa inspelningen automatiskt efter tystnad",
+        "label_auto_stop_duration": "Tystnadstid (sekunder)",
+        "hint_auto_stop_duration": "Stoppa efter detta antal sekunders tystnad",
         "btn_close": "Spara",
         "section_advanced": "AVANCERAT",
         "label_trans_provider": "Transkription",
@@ -964,13 +1009,15 @@ class SettingsDialog(QDialog):
     def __init__(
         self,
         current_hotkey: str = "F8",
-        current_cleaning_mode: str = "verbatim",
+        current_cleaning_mode: str = "auto",
         current_language: str = "en",
         current_system_language: str = "en",
         current_device_id: Optional[int] = None,
         current_transcription_provider: str = "hybrid",
         current_cleaning_provider: str = "hybrid",
         current_activation_method: str = "both",
+        current_auto_stop_enabled: bool = False,
+        current_auto_stop_silence_duration: float = 2.0,
         on_quit: Optional[object] = None,
         on_activate_license: Optional[object] = None,
         parent: Optional[QWidget] = None,
@@ -985,6 +1032,8 @@ class SettingsDialog(QDialog):
         self._transcription_provider = current_transcription_provider
         self._cleaning_provider = current_cleaning_provider
         self._activation_method = current_activation_method
+        self._auto_stop_enabled = current_auto_stop_enabled
+        self._auto_stop_silence_duration = current_auto_stop_silence_duration
         self._on_quit = on_quit
         self._on_activate_license = on_activate_license
 
@@ -1245,25 +1294,19 @@ class SettingsDialog(QDialog):
 
         layout.addSpacing(4)
 
-        # Carte Naturel
-        self._tone_natural = _ToneCard(t["tone_natural"], t["tone_natural_desc"])
-        self._tone_natural.clicked.connect(lambda: self._select_mode("verbatim"))
-        layout.addWidget(self._tone_natural)
+        # Carte Auto
+        self._tone_auto = _ToneCard(t["tone_auto"], t["tone_auto_desc"])
+        self._tone_auto.clicked.connect(lambda: self._select_mode("auto"))
+        layout.addWidget(self._tone_auto)
 
-        layout.addSpacing(4)
-
-        # Carte Pro
-        self._tone_pro = _ToneCard(t["tone_pro"], t["tone_pro_desc"])
-        self._tone_pro.clicked.connect(lambda: self._select_mode("quality"))
-        layout.addWidget(self._tone_pro)
-
-        # Pre-select
-        if self._cleaning_mode == "raw":
+        # Pre-select avec migration backward-compat
+        mode = self._cleaning_mode
+        if mode in ("verbatim", "quality"):
+            mode = "auto"
+        if mode == "raw":
             self._tone_raw.selected = True
-        elif self._cleaning_mode == "quality":
-            self._tone_pro.selected = True
         else:
-            self._tone_natural.selected = True
+            self._tone_auto.selected = True
 
         layout.addStretch()
         return page
@@ -1271,8 +1314,7 @@ class SettingsDialog(QDialog):
     def _select_mode(self, mode: str) -> None:
         self._cleaning_mode = mode
         self._tone_raw.selected = (mode == "raw")
-        self._tone_natural.selected = (mode == "verbatim")
-        self._tone_pro.selected = (mode == "quality")
+        self._tone_auto.selected = (mode == "auto")
 
     # ================================================================
     # Page Audio
@@ -1314,8 +1356,49 @@ class SettingsDialog(QDialog):
         hint.setObjectName("hint")
         layout.addWidget(hint)
 
+        # Séparateur visuel
+        sep = QLabel()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet("background: #2a2a3e;")
+        layout.addWidget(sep)
+
+        # Auto-stop toggle
+        self._auto_stop_check = QCheckBox(t["label_auto_stop"])
+        self._auto_stop_check.setChecked(self._auto_stop_enabled)
+        self._auto_stop_check.setStyleSheet("color: #e0e0e0; font-size: 13px;")
+        self._auto_stop_check.toggled.connect(self._on_auto_stop_toggled)
+        layout.addWidget(self._auto_stop_check)
+
+        hint_as = QLabel(t["hint_auto_stop"])
+        hint_as.setObjectName("hint")
+        layout.addWidget(hint_as)
+
+        # Durée de silence (activée/désactivée selon le checkbox)
+        dur_row = QHBoxLayout()
+        dur_label = QLabel(t["label_auto_stop_duration"])
+        dur_label.setStyleSheet("color: #e0e0e0; font-size: 13px;")
+        self._auto_stop_duration_spin = QDoubleSpinBox()
+        self._auto_stop_duration_spin.setRange(0.5, 10.0)
+        self._auto_stop_duration_spin.setSingleStep(0.5)
+        self._auto_stop_duration_spin.setValue(self._auto_stop_silence_duration)
+        self._auto_stop_duration_spin.setSuffix(" s")
+        self._auto_stop_duration_spin.setEnabled(self._auto_stop_enabled)
+        self._auto_stop_duration_spin.setFixedWidth(90)
+        dur_row.addWidget(dur_label)
+        dur_row.addStretch()
+        dur_row.addWidget(self._auto_stop_duration_spin)
+        layout.addLayout(dur_row)
+
+        hint_dur = QLabel(t["hint_auto_stop_duration"])
+        hint_dur.setObjectName("hint")
+        layout.addWidget(hint_dur)
+
         layout.addStretch()
         return page
+
+    def _on_auto_stop_toggled(self, checked: bool) -> None:
+        """Active/désactive le spin box durée selon l'état du checkbox."""
+        self._auto_stop_duration_spin.setEnabled(checked)
 
     # ================================================================
     # Page Avance
@@ -1583,3 +1666,11 @@ class SettingsDialog(QDialog):
     def activation_method(self) -> str:
         """Retourne la methode d'activation choisie : 'hotkey' | 'icon' | 'both'."""
         return self._activation_method
+
+    @property
+    def auto_stop_enabled(self) -> bool:
+        return self._auto_stop_check.isChecked()
+
+    @property
+    def auto_stop_silence_duration(self) -> float:
+        return self._auto_stop_duration_spin.value()

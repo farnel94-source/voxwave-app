@@ -48,7 +48,7 @@ class ConfigValidator:
     """Valide et complète la configuration utilisateur."""
 
     VALID_PROVIDERS = ("hybrid", "cloud", "local")
-    VALID_CLEANING_MODES = ("verbatim", "quality")
+    VALID_CLEANING_MODES = ("raw", "auto")
     VALID_INJECTION_MODES = ("paste", "type")
 
     @classmethod
@@ -105,11 +105,15 @@ class ConfigValidator:
 
         # Cleaning
         cleaning = config.get("cleaning", {})
-        if cleaning.get("mode") not in cls.VALID_CLEANING_MODES:
-            logger.warning(
-                f"Cleaning mode '{cleaning.get('mode')}' invalide, utilisation de verbatim"
-            )
-            config["cleaning"]["mode"] = "verbatim"
+        mode = cleaning.get("mode")
+        if mode not in cls.VALID_CLEANING_MODES:
+            # Migration depuis anciens modes
+            if mode in ("verbatim", "quality"):
+                logger.info(f"Migration cleaning mode '{mode}' → 'auto'")
+                config["cleaning"]["mode"] = "auto"
+            else:
+                logger.warning(f"Cleaning mode '{mode}' invalide, utilisation de 'auto'")
+                config["cleaning"]["mode"] = "auto"
 
         if cleaning.get("provider") not in cls.VALID_PROVIDERS:
             logger.warning(

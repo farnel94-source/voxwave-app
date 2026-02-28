@@ -3,7 +3,7 @@
 import logging
 import os
 import re
-from typing import Callable, Optional
+from typing import Callable, Iterator, Optional
 
 from src.utils.exceptions import CleaningError
 from src.utils.retry import retry_with_backoff
@@ -59,6 +59,46 @@ _SYSTEM_PROMPT = (
     "Entrée : bon ben voilà c'est c'est tout pour aujourd'hui\n"
     "Sortie : Voilà, c'est tout pour aujourd'hui."
 )
+
+
+# Prompts contextuels par profil d'application
+_CONTEXT_PROMPTS: dict[str, Optional[str]] = {
+    "code": None,  # Skip LLM — verbatim uniquement (pas de reformulation du code)
+    "casual": (
+        "Tu es un correcteur léger de transcription vocale.\n"
+        "RÈGLES STRICTES :\n"
+        "1. Retourne UNIQUEMENT le texte, rien d'autre\n"
+        "2. Supprime UNIQUEMENT les hésitations (euh, hum, ben)\n"
+        "3. NE corrige PAS le style, la grammaire ou le registre\n"
+        "4. Garde le ton informel, les abréviations, le langage familier\n"
+        "5. Si aucune correction n'est utile, retourne le texte TEL QUEL\n"
+    ),
+    "email": (
+        "Tu es un correcteur de transcription vocale pour emails professionnels.\n"
+        "RÈGLES STRICTES :\n"
+        "1. Retourne UNIQUEMENT le texte corrigé, rien d'autre\n"
+        "2. Applique grammaire formelle et ponctuation soignée\n"
+        "3. Supprime les hésitations et répétitions\n"
+        "4. Corrige les fautes d'orthographe\n"
+        "5. Maintiens un ton professionnel\n"
+        "6. NE REFORMULE PAS, NE RÉSUME PAS\n"
+        "7. Si aucune correction n'est utile, retourne le texte TEL QUEL\n"
+    ),
+    "document": _SYSTEM_PROMPT,  # Correction maximale (prompt actuel)
+    "default": _SYSTEM_PROMPT,   # Mode configuré par l'utilisateur
+}
+
+
+def _get_system_prompt(context_profile: str = "default") -> Optional[str]:
+    """Retourne le prompt système pour un profil donné.
+
+    Args:
+        context_profile: "code" | "casual" | "email" | "document" | "default"
+
+    Returns:
+        Prompt string, ou None si le LLM doit être skippé (profil "code").
+    """
+    return _CONTEXT_PROMPTS.get(context_profile, _SYSTEM_PROMPT)
 
 
 def _validate_output(input_text: str, output_text: str) -> bool:
@@ -126,11 +166,15 @@ class CloudLLMCleaner:
         self.model = model
         self.api_key = (api_key or os.getenv("OPENAI_API_KEY") or "").strip()
         self._available = bool(self.api_key)
-        if not self._available:
-            logger.warning("OPENAI_API_KEY non configuree, CloudLLMCleaner indisponible")
-        self._client = None
         self._circuit: Optional[object] = None
-        logger.info(f"CloudLLMCleaner: model={model}, available={self._available}")
+        # Connexion persistante : client créé au démarrage pour éviter +200ms au premier appel
+        if self._available:
+            from openai import OpenAI
+            self._client = OpenAI(api_key=self.api_key, timeout=10.0)
+            logger.info(f"CloudLLMCleaner: model={model}, client prêt")
+        else:
+            self._client = None
+            logger.warning("OPENAI_API_KEY non configuree, CloudLLMCleaner indisponible")
 
     def set_circuit_breaker(self, circuit: "CircuitBreaker") -> None:
         """Attache un circuit breaker a ce cleaner.
@@ -141,10 +185,7 @@ class CloudLLMCleaner:
         self._circuit = circuit
 
     def _get_client(self):
-        """Retourne le client OpenAI (singleton)."""
-        if self._client is None:
-            from openai import OpenAI
-            self._client = OpenAI(api_key=self.api_key, timeout=10.0)
+        """Retourne le client OpenAI (connexion persistante initialisée au démarrage)."""
         return self._client
 
     @retry_with_backoff(
@@ -174,6 +215,63 @@ class CloudLLMCleaner:
             max_tokens=2048,
         )
         return response.choices[0].message.content.strip()
+
+    def clean_streaming(self, text: str, context_profile: str = "default") -> Iterator[str]:
+        """Nettoie le texte via OpenAI en mode streaming (tokens un par un).
+
+        Utilise stream=True pour recevoir chaque token dès qu'il est généré.
+        Permet d'afficher le texte nettoyé progressivement sans attendre la fin.
+
+        Args:
+            text: Texte brut à nettoyer.
+            context_profile: Profil contextuel ("code"|"casual"|"email"|"document"|"default").
+
+        Yields:
+            Tokens de texte nettoyé au fur et à mesure.
+        """
+        if not text or not text.strip():
+            return
+
+        # Profil "code" : skip LLM, retourner texte brut (sera nettoyé par regex en amont)
+        system_prompt = _get_system_prompt(context_profile)
+        if system_prompt is None:
+            yield text
+            return
+
+        if not self._available or self._client is None:
+            yield text  # fallback : retourner le texte brut
+            return
+
+        if self._circuit and not self._circuit.should_allow_request():
+            yield text  # circuit ouvert : fallback texte brut
+            return
+
+        try:
+            with self._client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Corrige cette transcription vocale :\n{text}"},
+                ],
+                temperature=0.0,
+                max_tokens=2048,
+                stream=True,
+            ) as stream:
+                for chunk in stream:
+                    delta = chunk.choices[0].delta.content
+                    if delta:
+                        yield delta
+            if self._circuit:
+                self._circuit.record_success()
+        except Exception as e:
+            logger.warning(f"OpenAI streaming échoué, fallback texte brut: {e}")
+            if self._circuit:
+                from src.utils.retry import _is_network_error
+                if _is_network_error(e):
+                    self._circuit.record_network_failure()
+                else:
+                    self._circuit.record_failure()
+            yield text  # fallback sur le texte brut en cas d'erreur
 
     def clean(self, text: str) -> str:
         """Nettoie le texte via OpenAI.
@@ -295,17 +393,16 @@ class CleaningPipeline:
         self._local_cleaner: Optional[LLMCleaner] = None
         self._cloud_circuit = CircuitBreaker(name="openai", failure_threshold=2, cooldown_seconds=30.0)
 
-        if mode == "quality":
-            if cleaning_provider in ("hybrid", "cloud"):
-                try:
-                    self._cloud_cleaner = CloudLLMCleaner(model=cloud_model or "gpt-4o-mini")
-                    self._cloud_cleaner.set_circuit_breaker(self._cloud_circuit)
-                    logger.info("CloudLLMCleaner initialisé")
-                except Exception as e:
-                    logger.warning(f"CloudLLMCleaner indisponible: {e}")
+        if cleaning_provider in ("hybrid", "cloud"):
+            try:
+                self._cloud_cleaner = CloudLLMCleaner(model=cloud_model or "gpt-4o-mini")
+                self._cloud_cleaner.set_circuit_breaker(self._cloud_circuit)
+                logger.info("CloudLLMCleaner initialisé")
+            except Exception as e:
+                logger.warning(f"CloudLLMCleaner indisponible: {e}")
 
-            if cleaning_provider in ("hybrid", "local"):
-                self._local_cleaner = LLMCleaner(model=llm_model)
+        if cleaning_provider in ("hybrid", "local"):
+            self._local_cleaner = LLMCleaner(model=llm_model)
 
     def clean(self, text: str) -> str:
         """Nettoie le texte avec cascade de fallback.
@@ -323,13 +420,10 @@ class CleaningPipeline:
         if self.mode == "raw":
             return text.strip()
 
-        # Mode verbatim : ponctuation/majuscules seulement, pas de reformulation
-        if self.mode == "verbatim":
-            return self._clean_verbatim(text)
-
+        # Mode auto (+ backward-compat verbatim/quality si config non migrée) : regex → LLM si dispo
         result = self.regex_cleaner.clean(text)
 
-        if self.mode != "quality":
+        if self.mode not in ("auto", "verbatim", "quality"):
             return result
 
         # Cloud d'abord
@@ -352,7 +446,7 @@ class CleaningPipeline:
 
         if self.on_fallback:
             self.on_fallback("Nettoyage : mode regex (LLM indisponible)")
-        return result
+        return self._clean_verbatim(result)
 
     @staticmethod
     def _clean_verbatim(text: str) -> str:

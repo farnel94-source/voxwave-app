@@ -46,7 +46,7 @@ class TestConfigValidator:
         assert config["hotkey"] == "F8"
         assert config["audio"]["sample_rate"] == 16000
         assert config["audio"]["feedback"]["enabled"] is True
-        assert config["cleaning"]["mode"] == "verbatim"
+        assert config["cleaning"]["mode"] == "auto"
 
     def test_user_override_preserved(self):
         config = ConfigValidator.validate_and_merge({"hotkey": "F9"})
@@ -78,7 +78,31 @@ class TestConfigValidator:
         config = ConfigValidator.validate_and_merge(
             {"cleaning": {"mode": "ultra"}}
         )
-        assert config["cleaning"]["mode"] == "verbatim"
+        assert config["cleaning"]["mode"] == "auto"
+
+    def test_verbatim_mode_migrated_to_auto(self):
+        config = ConfigValidator.validate_and_merge(
+            {"cleaning": {"mode": "verbatim"}}
+        )
+        assert config["cleaning"]["mode"] == "auto"
+
+    def test_quality_mode_migrated_to_auto(self):
+        config = ConfigValidator.validate_and_merge(
+            {"cleaning": {"mode": "quality"}}
+        )
+        assert config["cleaning"]["mode"] == "auto"
+
+    def test_raw_mode_accepted(self):
+        config = ConfigValidator.validate_and_merge(
+            {"cleaning": {"mode": "raw"}}
+        )
+        assert config["cleaning"]["mode"] == "raw"
+
+    def test_auto_mode_accepted(self):
+        config = ConfigValidator.validate_and_merge(
+            {"cleaning": {"mode": "auto"}}
+        )
+        assert config["cleaning"]["mode"] == "auto"
 
     def test_invalid_feedback_volume_falls_back(self):
         config = ConfigValidator.validate_and_merge(

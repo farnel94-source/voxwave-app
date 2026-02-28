@@ -39,7 +39,8 @@ voxtool/
 │   │   ├── regex_cleaner.py    # Nettoyage rapide regex (15 langues de filler words)
 │   │   └── llm_cleaner.py     # Nettoyage: mode raw/verbatim/quality — OpenAI cloud + Ollama local — circuit breaker
 │   ├── injection/
-│   │   └── keyboard.py         # Injection texte (paste/type) Windows+Linux, warning macOS
+│   │   ├── keyboard.py         # Injection texte (paste/type) Windows+Linux, warning macOS
+│   │   └── progressive_injector.py  # Injection en 2 temps : brut immédiat → nettoyé (Backspace×N + garde-fous)
 │   ├── hotkey/
 │   │   └── listener.py         # Ecoute raccourci clavier — combos (Ctrl+Shift+V, etc.)
 │   ├── licensing/
@@ -176,6 +177,33 @@ La langue est sauvegardee dans `config.yaml` → `whisper.language` et rechargee
 - Configurable via Tray → Parametres → capture combo → sauvegarde dans config.yaml
 - Validation dans `config/validator.py` via `_validate_hotkey()`
 
+## Injection progressive (progressive_injector.py)
+
+Pipeline en 2 temps pour la latence < 1s :
+1. `inject_raw(raw_text)` → texte brut via clipboard + Ctrl+V immédiatement (~100ms)
+2. `replace_with_clean(raw_text, generator)` → Backspace × N + Ctrl+V (texte nettoyé)
+
+### Stratégie Backspace × N
+- `Backspace` = touche simple sans modificateur → aucun problème de timing
+- Fonctionne dans VS Code, Terminal, Notepad, Word, toutes les apps Electron
+- `Shift+Left × N` échouait sur Electron (timing asynchrone Chromium)
+- `Ctrl+Z` échouait en terminal (doublon) et dans les apps Electron (comportement inattendu)
+- **PIÈGE WinUI3** : `keyboard` lib causait une race condition sur Win11 Notepad (WinUI3)
+  → utiliser **pynput uniquement** pour `_backspace_pynput` (cohérent avec `_do_pynput_paste`)
+- **350ms** de sleep avant Ctrl+V (WinUI3 traite `WM_CLIPBOARDUPDATE` en async — les 6 derniers
+  backspaces peuvent arriver après le paste si le buffer est trop court ; 150ms insuffisant)
+
+### Garde-fous anti-effacement accidentel
+Avant d'envoyer les Backspaces, 2 conditions vérifiées dans l'ordre :
+1. **Délai < 1.5s** depuis `inject_raw` (via `time.monotonic()`, immunisé NTP)
+2. **Aucune action utilisateur** (touche ou clic) — listeners pynput clavier + souris en arrière-plan
+
+Si une condition échoue → `_stop_user_watch()` + `return` (texte brut conservé, silent fallback).
+`_stop_user_watch()` est appelé dans **toutes** les branches (pas de thread actif qui traîne).
+
+### PIEGE : dossier Windows
+Toujours synchroniser vers `voice_text_latency`, PAS `voice_text1`.
+
 ## Shutdown gracieux
 - `_shutting_down` flag pour eviter double-shutdown
 - Signal handlers SIGINT/SIGTERM dans `run()` avant `exec()`
@@ -214,9 +242,13 @@ black src/ tests/
 - .claude/skills/text-cleaning.md → patterns nettoyage
 
 ## Synchronisation
-- **WSL** : `/home/farne/projets/voice_text` (dev principal)
-- **Windows** : `C:\projets\voice_text1` (test) — accessible via `/mnt/c/projets/voice_text1/`
-- Toujours synchroniser les fichiers modifies vers le dossier Windows apres chaque changement
+- **WSL** : `/home/farne/projets/voice_text` (dev principal, branche master)
+- **WSL worktree** : `/home/farne/projets/voice_text/.worktrees/feat-low-latency-pipeline` (branche feat/low-latency-pipeline)
+- **Windows stable** : `C:\projets\voice_text1` (test master) — accessible via `/mnt/c/projets/voice_text1/`
+- **Windows latency** : `C:\projets\voice_text_latency` (test feat/low-latency-pipeline) — accessible via `/mnt/c/projets/voice_text_latency/`
+- Toujours synchroniser les fichiers modifies vers le BON dossier Windows apres chaque changement :
+  - Changements sur master → `voice_text1`
+  - Changements sur feat/low-latency-pipeline → `voice_text_latency`
 
 ## Priorites
 1. Fonctionnel (ca marche)
