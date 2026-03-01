@@ -61,10 +61,14 @@ class TestLLMCleaner:
         assert cleaner.is_available() is False
 
     def test_clean_raises_when_unavailable(self):
+        from unittest.mock import patch
+        import requests as requests_lib
         from src.cleaning.llm_cleaner import LLMCleaner
-        cleaner = LLMCleaner(host="http://localhost:99999")
-        with pytest.raises(ConnectionError):
-            cleaner.clean("test")
+        from src.utils.exceptions import CleaningError
+        cleaner = LLMCleaner()
+        with patch("requests.post", side_effect=requests_lib.exceptions.ConnectionError("refused")):
+            with pytest.raises(CleaningError, match="Ollama indisponible"):
+                cleaner.clean("test")
 
     def test_clean_empty(self):
         from src.cleaning.llm_cleaner import LLMCleaner

@@ -329,7 +329,8 @@ class CloudLLMCleaner:
 class LLMCleaner:
     """Nettoyeur via Ollama."""
 
-    def __init__(self, model: str = "gemma3:4b", host: Optional[str] = None, timeout: int = 5) -> None:
+    def __init__(self, model: str = "gemma3:4b", host: Optional[str] = None, timeout: int = 30
+                 ) -> None:
         self.model = model
         self.host = host or os.getenv("OLLAMA_HOST", "http://localhost:11434")
         self.timeout = timeout
@@ -344,19 +345,36 @@ class LLMCleaner:
     def clean(self, text: str) -> str:
         if not text or not text.strip():
             return ""
-        if not self.is_available():
-            raise ConnectionError("Ollama indisponible")
         import requests
-        response = requests.post(
-            f"{self.host}/api/generate",
-            json={"model": self.model, "prompt": CLEANING_PROMPT.format(text=text), "stream": False},
-            timeout=(5, self.timeout),  # (connect_timeout, read_timeout)
-        )
-        response.raise_for_status()
-        data = response.json()
-        result = data.get("response")
+        try:
+            response = requests.post(
+                f"{self.host}/api/chat",
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": _SYSTEM_PROMPT},
+                        {"role": "user", "content": (
+                            f"Corrige cette transcription vocale :\n{text}"
+                        )},
+                    ],
+                    "stream": False,
+                    "options": {"temperature": 0},
+                },
+                timeout=(5, self.timeout),  # (connect_timeout, read_timeout)
+            )
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.Timeout as e:
+            raise CleaningError(f"Ollama timeout après {self.timeout}s: {e}") from e
+        except requests.exceptions.ConnectionError as e:
+            raise CleaningError(f"Ollama indisponible ({self.host}): {e}") from e
+        except Exception as e:
+            raise CleaningError(f"Ollama API échouée: {e}") from e
+        result = data.get("message", {}).get("content")
         if not result:
-            raise CleaningError(f"Réponse Ollama invalide: clé 'response' manquante dans {data}")
+            raise CleaningError(
+                f"Réponse Ollama invalide: clé 'message.content' manquante dans {data}"
+            )
 
         cleaned = result.strip()
 

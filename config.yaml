@@ -40,7 +40,7 @@ cleaning:
   provider: hybrid  # hybrid | local | cloud
   cloud_model: gpt-4o-mini
   llm_model: "gemma3:4b"
-  llm_timeout: 5
+  llm_timeout: 30
   filler_words:
     - euh
     - heu
