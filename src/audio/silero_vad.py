@@ -22,9 +22,10 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# URL du modèle Silero VAD ONNX (repo officiel snakers4)
+# URL du modèle Silero VAD ONNX (repo officiel snakers4, depuis v5)
 _MODEL_URL = (
-    "https://github.com/snakers4/silero-vad/raw/master/files/silero_vad.onnx"
+    "https://raw.githubusercontent.com/snakers4/silero-vad"
+    "/master/src/silero_vad/data/silero_vad.onnx"
 )
 _MODEL_CACHE_DIR = Path.home() / ".cache" / "voxtool"
 _MODEL_PATH = _MODEL_CACHE_DIR / "silero_vad.onnx"
