@@ -360,7 +360,7 @@ class LLMCleaner:
                     "stream": False,
                     "options": {"temperature": 0},
                 },
-                timeout=(5, self.timeout),  # (connect_timeout, read_timeout)
+                timeout=(1, self.timeout),  # (connect, read) — 1s connect suffit sur localhost
             )
             response.raise_for_status()
             data = response.json()

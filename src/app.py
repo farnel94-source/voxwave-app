@@ -697,7 +697,9 @@ class TheWave:
                 # Profil "code" : skip LLM, regex seulement
                 if app_profile == "code":
                     logger.info("[progressif] Profil 'code' → verbatim uniquement")
-                    clean_text = self.pipeline.clean(raw_text)
+                    # Profil code : regex uniquement, jamais Ollama (trop lent)
+                    _regex_result = self.pipeline.regex_cleaner.clean(raw_text)
+                    clean_text = self.pipeline._clean_verbatim(_regex_result)
                     if clean_text and clean_text.strip() and clean_text != raw_text:
                         self._prog_injector.replace_with_clean(raw_text, iter([clean_text]))
 
