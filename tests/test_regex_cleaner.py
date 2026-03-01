@@ -1,6 +1,6 @@
 """Tests pour RegexCleaner."""
 
-from src.cleaning.regex_cleaner import RegexCleaner
+from src.cleaning.regex_cleaner import DEFAULT_FILLER_WORDS, RegexCleaner, get_filler_words
 
 
 class TestRegexCleaner:
@@ -42,6 +42,22 @@ class TestRegexCleaner:
         text = "Ceci est un texte propre."
         result = self.cleaner.clean(text)
         assert result == text
+
+    def test_unknown_language_returns_empty_list(self):
+        """Langue inconnue → liste vide, pas les filler words français."""
+        result = get_filler_words("fi")  # finnois = langue non supportée
+        assert result == [], f"Attendu [], obtenu {result}"
+
+    def test_default_filler_words_is_empty(self):
+        """DEFAULT_FILLER_WORDS doit être une liste vide."""
+        assert DEFAULT_FILLER_WORDS == []
+
+    def test_unknown_language_does_not_remove_words(self):
+        """RegexCleaner avec langue inconnue ne doit rien supprimer."""
+        cleaner = RegexCleaner(language="fi")
+        text = "Minulla on koira"  # phrase finnoise
+        result = cleaner.clean(text)
+        assert "koira" in result
 
     def test_complex_case(self, raw_transcript, expected_clean):
         result = self.cleaner.clean(raw_transcript)

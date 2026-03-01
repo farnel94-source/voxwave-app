@@ -88,8 +88,8 @@ FILLER_WORDS_BY_LANG: Dict[str, List[str]] = {
     ],
 }
 
-# Fallback par défaut (français)
-DEFAULT_FILLER_WORDS: List[str] = FILLER_WORDS_BY_LANG["fr"]
+# Fallback par défaut : liste vide (langue inconnue → rien supprimer)
+DEFAULT_FILLER_WORDS: List[str] = []
 
 REPETITION_PATTERN = re.compile(r"\b(\w+)\s+\1\b", re.IGNORECASE)
 MULTI_SPACE = re.compile(r"\s{2,}")
