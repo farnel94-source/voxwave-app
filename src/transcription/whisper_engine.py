@@ -34,6 +34,7 @@ class WhisperEngine:
         self.compute_type = compute_type or self._detect_compute_type()
         self._model = None
         self._last_detected_language: Optional[str] = None
+        self._last_known_language: Optional[str] = None  # dernière langue avec confiance ≥ 0.7
         logger.info(f"WhisperEngine: model={model}, lang={language}, compute={self.compute_type}")
 
     @property
@@ -80,7 +81,18 @@ class WhisperEngine:
             condition_on_previous_text=True,
         )
         text = " ".join(seg.text for seg in segments).strip()
-        self._last_detected_language = getattr(info, "language", self.language)
+        detected = getattr(info, "language", self.language)
+        lang_prob = getattr(info, "language_probability", 1.0)
+        if self.language == "auto" and lang_prob < 0.7 and self._last_known_language:
+            logger.warning(
+                f"Langue '{detected}' détectée avec confiance {lang_prob:.2f} < 0.7, "
+                f"fallback → {self._last_known_language}"
+            )
+            self._last_detected_language = self._last_known_language
+        else:
+            self._last_detected_language = detected
+            if self.language == "auto" and detected and lang_prob >= 0.7:
+                self._last_known_language = detected
         if self._last_detected_language and self._last_detected_language != self.language:
             logger.info(f"Langue détectée: {self._last_detected_language} (config: {self.language})")
         elapsed = time.time() - start

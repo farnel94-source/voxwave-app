@@ -334,6 +334,11 @@ class LLMCleaner:
         self.model = model
         self.host = host or os.getenv("OLLAMA_HOST", "http://localhost:11434")
         self.timeout = timeout
+        self._circuit = None
+
+    def set_circuit_breaker(self, circuit) -> None:
+        """Attache un circuit breaker pour éviter les connexions répétées."""
+        self._circuit = circuit
 
     def is_available(self) -> bool:
         try:
@@ -345,6 +350,8 @@ class LLMCleaner:
     def clean(self, text: str) -> str:
         if not text or not text.strip():
             return ""
+        if self._circuit and not self._circuit.should_allow_request():
+            raise CleaningError("Ollama indisponible (circuit breaker ouvert)")
         import requests
         try:
             response = requests.post(
@@ -365,10 +372,16 @@ class LLMCleaner:
             response.raise_for_status()
             data = response.json()
         except requests.exceptions.Timeout as e:
+            if self._circuit:
+                self._circuit.record_network_failure()
             raise CleaningError(f"Ollama timeout après {self.timeout}s: {e}") from e
         except requests.exceptions.ConnectionError as e:
+            if self._circuit:
+                self._circuit.record_network_failure()
             raise CleaningError(f"Ollama indisponible ({self.host}): {e}") from e
         except Exception as e:
+            if self._circuit:
+                self._circuit.record_failure()
             raise CleaningError(f"Ollama API échouée: {e}") from e
         result = data.get("message", {}).get("content")
         if not result:
@@ -382,6 +395,8 @@ class LLMCleaner:
             logger.warning("Sortie LLM local rejetee, texte original conserve")
             return text
 
+        if self._circuit:
+            self._circuit.record_success()
         return cleaned
 
 
@@ -420,6 +435,7 @@ class CleaningPipeline:
         self._cloud_cleaner: Optional[CloudLLMCleaner] = None
         self._local_cleaner: Optional[LLMCleaner] = None
         self._cloud_circuit = CircuitBreaker(name="openai", failure_threshold=2, cooldown_seconds=30.0)
+        self._local_circuit = CircuitBreaker(name="ollama", failure_threshold=1, cooldown_seconds=60.0)
 
         if cleaning_provider in ("hybrid", "cloud"):
             try:
@@ -431,6 +447,7 @@ class CleaningPipeline:
 
         if cleaning_provider in ("hybrid", "local"):
             self._local_cleaner = LLMCleaner(model=llm_model)
+            self._local_cleaner.set_circuit_breaker(self._local_circuit)
 
     def clean(self, text: str) -> str:
         """Nettoie le texte avec cascade de fallback.
