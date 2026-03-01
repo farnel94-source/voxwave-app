@@ -487,7 +487,10 @@ class CleaningPipeline:
                     self.on_fallback("Nettoyage : mode local (cloud indisponible)")
                 return result
             except Exception as e:
-                logger.warning(f"LLM local echec, fallback regex: {e}")
+                if "circuit breaker" in str(e).lower():
+                    logger.debug(f"LLM local bypasse (circuit ouvert): {e}")
+                else:
+                    logger.warning(f"LLM local echec, fallback regex: {e}")
 
         if self.on_fallback:
             self.on_fallback("Nettoyage : mode regex (LLM indisponible)")
