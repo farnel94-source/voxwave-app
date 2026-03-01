@@ -21,6 +21,26 @@ from src.utils.retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
+# Hints de transcription par langue (améliore la précision Groq/Whisper)
+_GROQ_HINTS: dict[str, str] = {
+    "fr": "Transcription fidèle et exacte, mot à mot. Pas de sous-titres.",
+    "en": "Faithful word-for-word transcription. No subtitles.",
+    "de": "Wort-für-Wort-Transkription. Keine Untertitel.",
+    "es": "Transcripción fiel palabra por palabra. Sin subtítulos.",
+    "it": "Trascrizione fedele parola per parola. Nessun sottotitolo.",
+    "pt": "Transcrição fiel palavra por palavra. Sem legendas.",
+    "nl": "Woord-voor-woord transcriptie. Geen ondertitels.",
+    "ja": "一言一句忠実な文字起こし。字幕なし。",
+    "ko": "단어 그대로의 충실한 받아쓰기. 자막 없음.",
+    "zh": "逐字逐句忠实转录。无字幕。",
+    "ru": "Дословная транскрипция. Без субтитров.",
+    "ar": "نسخ أمين كلمة بكلمة. بدون ترجمة.",
+    "tr": "Kelimesi kelimesine sadık transkripsiyon. Altyazı yok.",
+    "pl": "Wierne słowo w słowo transkrypcja. Bez napisów.",
+    "sv": "Ordagrant transkription. Inga undertexter.",
+}
+_GROQ_HINTS_DEFAULT = "Faithful word-for-word transcription. No subtitles."
+
 
 class GroqWhisperEngine:
     """Moteur de transcription via Groq Cloud API."""
@@ -110,14 +130,17 @@ class GroqWhisperEngine:
         """
         wav_buf.seek(0)
         client = self._get_client()
-        return client.audio.transcriptions.create(
-            file=("audio.wav", wav_buf),
-            model=self.model,
-            language=self.language,
-            response_format="verbose_json",
-            temperature=0.0,
-            prompt="Transcription fidèle et exacte, mot à mot, d'une dictée vocale en français. Pas de sous-titres, pas de remerciements.",
-        )
+        kwargs: dict = {
+            "file": ("audio.wav", wav_buf),
+            "model": self.model,
+            "response_format": "verbose_json",
+            "temperature": 0.0,
+            "prompt": _GROQ_HINTS.get(self.language, _GROQ_HINTS_DEFAULT),
+        }
+        # En mode auto, ne pas passer language → Groq/Whisper détecte automatiquement
+        if self.language != "auto":
+            kwargs["language"] = self.language
+        return client.audio.transcriptions.create(**kwargs)
 
     def set_circuit_breaker(self, circuit: "CircuitBreaker") -> None:
         """Attache un circuit breaker a ce moteur.

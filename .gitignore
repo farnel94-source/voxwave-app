@@ -35,6 +35,10 @@ models/
 htmlcov/
 .pytest_cache/
 
+# Logs
+logs/
+*.log
+
 # Node / Claude Code config
 node_modules/
 bootstrap.js

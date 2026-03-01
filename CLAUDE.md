@@ -92,12 +92,13 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 
 ## GUI (PySide6 + QWebEngineView)
 - **Widget flottant** (`waveform_widget.py`) : fenetre frameless, always-on-top, draggable, 300x116px
-- **orb.html** : logo The Wave + pill expandable avec barres de frequences animees + timer + hover icons (settings/quit)
-  - **Idle** : logo seul (transparent, pas de pill)
-  - **Recording** : logo reste visible + pill s'ouvre a droite (barres + timer)
-  - **Processing** : logo + pill avec "Traitement..."
-  - **Error** : logo + pill avec "Erreur" en rouge + animation shake
-- **Barres de frequences** : 12 barres, 3px large, hauteur max 80px, animees par l'amplitude audio
+- **orb.html** : logo The Wave + pill expandable avec anneau reactif + timer + hover icons (settings/quit)
+  - **Idle** : logo seul avec animation de respiration subtile (glow blanc pulse 3.5s)
+  - **Recording** : logo + anneau reactif a l'amplitude + timer (pill s'ouvre a droite)
+  - **Processing** : logo + "Traitement" + dots animes (3 points qui rebondissent)
+  - **Error** : logo avec glow rouge + texte "Erreur" + animation shake
+  - **Transition processing → idle** : flash de succes vert (glow + bounce) avant retour idle
+- **Anneau reactif** : cercle positionne autour du logo, scale/opacite/couleur drives par amplitude Python (frame-par-frame via `requestAnimationFrame`, pas de CSS transition)
 - **Hover icons** : au survol du logo (idle uniquement), 2 boutons ronds apparaissent (settings + quit)
 - **Bridge Python ↔ JS** : QWebChannel (setState, updateAmplitude, updateStep, setErrorText, showPreview, on_quit_clicked)
 - **Tray icon** : menu avec icones unicode et separateurs (▶ Dictee / ⚙ Parametres / ❓ Aide / ✧ Licence / ⓘ A propos / ✕ Quitter). Clic gauche tray → ouvre directement les Parametres (via `_on_settings`)
@@ -148,6 +149,7 @@ Fenetre moderne dark theme 620x580 avec **sidebar navigation a gauche** (7 ongle
 - `_on_help()` ouvre les settings directement sur l'onglet Aide via `navigate_to_help()`
 - `on_quit` callback passe a `SettingsDialog`, `WaveformWidget` et `TrayIcon`
 - `_save_config_nested()` : charge YAML complet, modifie la cle nested, re-ecrit (supporte cleaning.mode, whisper.language, etc.)
+- `_rebuild_pipeline()` : recrée le `CleaningPipeline` complet avec la config courante — appele quand `cleaning.mode` ou `cleaning.provider` change en cours de session (garantit que les cleaners LLM sont bien re-initialises)
 - Onboarding sauvegarde aussi la langue choisie via `_save_config_nested("whisper", "language", ...)`
 - Notification tray "Parametres mis a jour" apres sauvegarde
 

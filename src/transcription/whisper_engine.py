@@ -69,17 +69,19 @@ class WhisperEngine:
         """Transcrit un buffer audio en texte."""
         self._load_model()
         start = time.time()
+        # En mode auto, passer language=None → faster-whisper détecte automatiquement
+        lang_param = None if self.language == "auto" else self.language
         segments, info = self._model.transcribe(
             audio,
             beam_size=5,
-            language=self.language,
+            language=lang_param,
             vad_filter=True,
             vad_parameters={"min_silence_duration_ms": 500},
             condition_on_previous_text=True,
         )
         text = " ".join(seg.text for seg in segments).strip()
         self._last_detected_language = getattr(info, "language", self.language)
-        if self._last_detected_language != self.language:
+        if self._last_detected_language and self._last_detected_language != self.language:
             logger.info(f"Langue détectée: {self._last_detected_language} (config: {self.language})")
         elapsed = time.time() - start
         duration = len(audio) / self.sample_rate

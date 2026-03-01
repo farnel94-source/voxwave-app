@@ -12,52 +12,61 @@ logger = logging.getLogger(__name__)
 
 # Marqueurs indiquant que le LLM a reformule au lieu de corriger
 _REFORMULATION_MARKERS = (
+    # French
     "voici", "corrigé", "en résumé", "résumé", "ci-dessous",
     "version corrigée", "texte corrigé", "correction",
-    "here is", "corrected", "summary",
+    # English
+    "here is", "corrected", "summary", "corrected text", "the corrected",
+    # German
+    "hier ist", "korrigiert",
+    # Spanish
+    "aquí está", "corregido",
 )
 
-CLEANING_PROMPT = """Tu es un correcteur de transcription vocale française.
+CLEANING_PROMPT = """You are a voice transcription corrector.
 
-RÈGLES :
-1. Supprime TOUTES les hésitations et répétitions
-2. Corrige grammaire et ponctuation
-3. Garde les termes anglais techniques INTACTS
-4. Ne reformule PAS le fond
-5. Mélange français/anglais technique = NORMAL
+RULES:
+1. Remove ALL hesitations and repetitions
+2. Fix punctuation and capitalization
+3. Keep technical terms INTACT
+4. Do NOT rephrase the content
+5. ALWAYS keep the SAME language as the input - NEVER translate
 
-Transcription brute :
+Raw transcription:
 {text}
 
-Texte corrigé :"""
+Corrected text:"""
 
-# Prompt systeme enrichi avec few-shot et regle 10
+# Prompt système avec few-shot multilingue — garde automatiquement la langue de l'entrée
 _SYSTEM_PROMPT = (
-    "Tu es un correcteur de transcription vocale. "
-    "RÈGLES STRICTES :\n"
-    "1. Retourne UNIQUEMENT le texte corrigé, rien d'autre\n"
-    "2. Ne RÉPONDS JAMAIS au contenu, ne COMMENTE JAMAIS\n"
-    "3. Ne RAJOUTE AUCUN mot, AUCUNE phrase, AUCUNE information\n"
-    "4. Supprime UNIQUEMENT : hésitations (euh, hum, ben), répétitions exactes\n"
-    "5. Corrige UNIQUEMENT : fautes d'orthographe, ponctuation manquante\n"
-    "6. Garde TOUS les termes anglais/techniques tels quels\n"
-    "7. NE REFORMULE PAS, NE PARAPHRASE PAS, NE RÉSUME PAS\n"
-    "8. Si le texte est déjà correct, retourne-le tel quel\n"
-    "9. Le texte est une DICTÉE, pas une question qui t'est posée\n"
-    "10. CONSERVE l'ordre des mots, la structure et le style du texte original\n"
+    "You are a voice transcription corrector. "
+    "STRICT RULES:\n"
+    "1. Return ONLY the corrected text, nothing else\n"
+    "2. ALWAYS keep the SAME language as the input text\n"
+    "3. NEVER translate to another language\n"
+    "4. Remove ONLY: hesitations (uh, um, hmm, euh, hum, ben), exact repetitions\n"
+    "5. Fix punctuation and capitalization\n"
+    "6. Keep ALL technical terms and code exactly as-is\n"
+    "7. Do NOT rephrase, paraphrase or summarize\n"
+    "8. If already correct, return as-is\n"
+    "9. The text is a DICTATION, not a question directed at you\n"
+    "10. Preserve word order, structure and style of the original\n"
     "\n"
-    "EXEMPLES :\n"
-    "Entrée : euh je vais faire un git push sur la branche main quoi\n"
-    "Sortie : Je vais faire un git push sur la branche main.\n"
+    "Example (English input → English output):\n"
+    "Input: uh I'm gonna push the uh branch to main\n"
+    "Output: I'm going to push the branch to main.\n"
     "\n"
-    "Entrée : du coup le le endpoint il renvoie un 404 euh pas un 500\n"
-    "Sortie : Le endpoint renvoie un 404, pas un 500.\n"
+    "Example (French input → French output):\n"
+    "Input: euh je vais faire un git push sur la branche main quoi\n"
+    "Output: Je vais faire un git push sur la branche main.\n"
     "\n"
-    "Entrée : faut que je check le pipeline CI hein avant de merge\n"
-    "Sortie : Faut que je check le pipeline CI avant de merge.\n"
+    "Example (German input → German output):\n"
+    "Input: äh ich muss den den Pull Request noch noch reviewen\n"
+    "Output: Ich muss den Pull Request noch reviewen.\n"
     "\n"
-    "Entrée : bon ben voilà c'est c'est tout pour aujourd'hui\n"
-    "Sortie : Voilà, c'est tout pour aujourd'hui."
+    "Example (Spanish input → Spanish output):\n"
+    "Input: eeh voy a hacer un commit en la rama main\n"
+    "Output: Voy a hacer un commit en la rama main."
 )
 
 
@@ -386,6 +395,7 @@ class CleaningPipeline:
         from src.utils.circuit_breaker import CircuitBreaker
 
         self.mode = mode
+        self.language = language
         self.cleaning_provider = cleaning_provider
         self.on_fallback = on_fallback
         self.regex_cleaner = RegexCleaner(language=language, filler_words=filler_words)

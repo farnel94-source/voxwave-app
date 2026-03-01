@@ -4,6 +4,8 @@ import logging
 import threading
 from typing import Optional
 
+from src.config.defaults import WHISPER_LANGUAGES
+
 import numpy as np
 import sounddevice as sd
 from PySide6.QtCore import Qt, QTimer, Signal, Slot, QObject
@@ -783,24 +785,8 @@ class WelcomeDialog(QDialog):
             "border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; "
             "selection-background-color: rgba(59,130,246,0.3); padding: 4px; }"
         )
-        languages = [
-            ("en", "English"),
-            ("fr", "Francais"),
-            ("es", "Espanol"),
-            ("de", "Deutsch"),
-            ("it", "Italiano"),
-            ("pt", "Portugues"),
-            ("nl", "Nederlands"),
-            ("ja", "Japanese"),
-            ("ko", "Korean"),
-            ("zh", "Chinese"),
-            ("ru", "Russian"),
-            ("ar", "Arabic"),
-            ("tr", "Turkish"),
-            ("pl", "Polish"),
-            ("sv", "Swedish"),
-        ]
-        for code, name in languages:
+        self._lang_combo.addItem("🌐 Auto-detect", "auto")
+        for code, name in WHISPER_LANGUAGES:
             self._lang_combo.addItem(f"{name} ({code})", code)
         self._lang_combo.setCurrentIndex(0)
         layout.addWidget(self._lang_combo, alignment=Qt.AlignmentFlag.AlignCenter)

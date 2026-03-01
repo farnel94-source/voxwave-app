@@ -3,6 +3,8 @@
 import logging
 from typing import Optional
 
+from src.config.defaults import WHISPER_LANGUAGES
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont, QKeyEvent, QPainter, QPen
 from PySide6.QtWidgets import (
@@ -1207,28 +1209,15 @@ class SettingsDialog(QDialog):
         # Langue de dictee
         layout.addWidget(self._field_label(t["label_dictation_lang"]))
         self._lang_combo = QComboBox()
-        languages = [
-            ("en", "English"),
-            ("fr", "Francais"),
-            ("es", "Espanol"),
-            ("de", "Deutsch"),
-            ("it", "Italiano"),
-            ("pt", "Portugues"),
-            ("nl", "Nederlands"),
-            ("ja", "Japanese"),
-            ("ko", "Korean"),
-            ("zh", "Chinese"),
-            ("ru", "Russian"),
-            ("ar", "Arabic"),
-            ("tr", "Turkish"),
-            ("pl", "Polish"),
-            ("sv", "Swedish"),
-        ]
-        current_lang_idx = 0
-        for i, (code, name) in enumerate(languages):
+        self._lang_combo.addItem("🌐 Auto-detect", "auto")
+        for code, name in WHISPER_LANGUAGES:
             self._lang_combo.addItem(f"{name} ({code})", code)
+        current_lang_idx = 0
+        all_lang_codes = ["auto"] + [c for c, _ in WHISPER_LANGUAGES]
+        for i, code in enumerate(all_lang_codes):
             if code == self._language:
                 current_lang_idx = i
+                break
         self._lang_combo.setCurrentIndex(current_lang_idx)
         layout.addWidget(self._lang_combo)
         lang_hint = QLabel(t["hint_dictation_lang"])

@@ -180,7 +180,7 @@ class TextInjector:
             self._inject_paste(text)
         else:
             self._inject_type(text)
-        logger.info(f"Injecte ({len(text)} chars)")
+        logger.info("Texte injecte (%d chars): %s", len(text), text)
 
     def _inject_paste(self, text: str) -> None:
         """Injecte via clipboard + paste selon la plateforme."""

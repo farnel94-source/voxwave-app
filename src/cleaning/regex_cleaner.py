@@ -128,7 +128,7 @@ def get_filler_words(language: str, custom_words: Optional[List[str]] = None) ->
     """
     if custom_words:
         return custom_words
-    return FILLER_WORDS_BY_LANG.get(language, DEFAULT_FILLER_WORDS)
+    return FILLER_WORDS_BY_LANG.get(language, [])
 
 
 class RegexCleaner:

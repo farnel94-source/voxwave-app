@@ -62,10 +62,16 @@ def _app_t(lang: str, key: str) -> str:
 
 
 def setup_logging(level: str = "INFO") -> None:
+    import os
+    os.makedirs("logs", exist_ok=True)
     logging.basicConfig(
         level=getattr(logging, level.upper()),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler("logs/app.log", encoding="utf-8"),
+        ]
     )
 
 
@@ -659,6 +665,7 @@ class TheWave:
             detected_lang = getattr(self.engine, "last_detected_language", None)
             if detected_lang:
                 self.pipeline.regex_cleaner.set_language(detected_lang)
+                self.pipeline.language = detected_lang
 
             # --- Étape 2 : Injection immédiate du texte brut ---
             if self.waveform:
@@ -762,6 +769,7 @@ class TheWave:
         detected_lang = getattr(self.engine, "last_detected_language", None)
         if detected_lang:
             self.pipeline.regex_cleaner.set_language(detected_lang)
+            self.pipeline.language = detected_lang
 
         if not raw_text.strip():
             logger.warning("Transcription vide")
@@ -899,6 +907,7 @@ class TheWave:
                 self.engine.language = new_lang
             if self.pipeline and hasattr(self.pipeline, "language"):
                 self.pipeline.language = new_lang
+                self.pipeline.regex_cleaner.set_language(new_lang)
             changes.append(f"Dictee : {new_lang}")
 
         # Device ID
