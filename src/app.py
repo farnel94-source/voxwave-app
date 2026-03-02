@@ -252,8 +252,12 @@ class TheWave:
         transcription_provider = self.config.get("transcription", {}).get("provider", "local")
         self.engine = self._create_transcription_engine(transcription_provider)
 
+        # Auto-détecter l'hôte Ollama au démarrage
+        detected_host = self._detect_ollama_host()
+        self.config.setdefault("cleaning", {})["ollama_host"] = detected_host
+
         # Choix du pipeline de nettoyage
-        cleaning_config = self.config.get("cleaning", {})
+        cleaning_config = self.config.get("cleaning", {})  # re-read after detection
         cleaning_provider = cleaning_config.get("provider", "local")
         cloud_model = cleaning_config.get("cloud_model", "gpt-4o-mini")
         filler_words = cleaning_config.get("filler_words")
@@ -264,6 +268,7 @@ class TheWave:
             cleaning_provider=cleaning_provider,
             language=self.config["whisper"]["language"],
             filler_words=filler_words,
+            ollama_host=cleaning_config.get("ollama_host", "http://localhost:11434"),
             on_fallback=self._on_fallback,
         )
 
@@ -344,6 +349,9 @@ class TheWave:
                 try:
                     available = self.pipeline._local_cleaner.is_available()
                     logger.info(f"Pre-warm: Ollama {'disponible' if available else 'indisponible'}")
+                    if not available:
+                        logger.warning("Pre-warm: Ollama indisponible, circuit breaker pre-ouvert")
+                        self.pipeline._local_circuit.force_open()
                 except Exception as e:
                     logger.warning(f"Pre-warm Ollama echec: {e}")
 
@@ -377,6 +385,31 @@ class TheWave:
         self._executor.submit(_prewarm_ollama)
         self._executor.submit(_check_cloud_connectivity)
 
+    def _detect_ollama_host(self) -> str:
+        """Scanne les ports courants d'Ollama et retourne le premier qui répond.
+
+        Ports testés : 11434 (défaut), 11435, 11433.
+        Timeout : 0.5s par port. Silencieux si aucun port ne répond.
+
+        Returns:
+            URL complète, ex: "http://localhost:11434"
+        """
+        import socket
+        for port in [11434, 11435, 11433]:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(0.5)
+                result = sock.connect_ex(("localhost", port))
+                sock.close()
+                if result == 0:
+                    host = f"http://localhost:{port}"
+                    if port != 11434:
+                        logger.info(f"Ollama détecté sur port non-standard : {host}")
+                    return host
+            except Exception:
+                pass
+        return self.config.get("cleaning", {}).get("ollama_host", "http://localhost:11434")
+
     def _rebuild_pipeline(self) -> None:
         """Recrée le CleaningPipeline avec la config courante.
 
@@ -393,6 +426,7 @@ class TheWave:
             cleaning_provider=cleaning_config.get("provider", "local"),
             language=self.config["whisper"]["language"],
             filler_words=cleaning_config.get("filler_words"),
+            ollama_host=cleaning_config.get("ollama_host", "http://localhost:11434"),
             on_fallback=self._on_fallback,
         )
         logger.info(f"Pipeline recréé : mode={cleaning_config['mode']}, provider={cleaning_config.get('provider', 'local')}")
@@ -651,7 +685,8 @@ class TheWave:
 
             t_groq = time.time()
             raw_text = self.engine.transcribe(audio)
-            logger.info(f"[progressif] Groq: {(time.time()-t_groq)*1000:.0f}ms → '{raw_text}'")
+            _trans_label = self.config.get("transcription", {}).get("provider", "local")
+            logger.info(f"[progressif] Transcription ({_trans_label}): {(time.time()-t_groq)*1000:.0f}ms → '{raw_text}'")
 
             if not raw_text or not raw_text.strip():
                 logger.warning("[progressif] Transcription vide, ignoré")
@@ -924,6 +959,7 @@ class TheWave:
         if new_trans != self.config.get("transcription", {}).get("provider"):
             self.config.setdefault("transcription", {})["provider"] = new_trans
             self._save_config_nested("transcription", "provider", new_trans)
+            self.engine = self._create_transcription_engine(new_trans)
             changes.append(f"Transcription : {new_trans}")
 
         # Cleaning provider
