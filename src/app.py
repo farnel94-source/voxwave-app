@@ -398,9 +398,11 @@ class TheWave:
         for port in [11434, 11435, 11433]:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(0.5)
-                result = sock.connect_ex(("localhost", port))
-                sock.close()
+                try:
+                    sock.settimeout(0.5)
+                    result = sock.connect_ex(("localhost", port))
+                finally:
+                    sock.close()
                 if result == 0:
                     host = f"http://localhost:{port}"
                     if port != 11434:
