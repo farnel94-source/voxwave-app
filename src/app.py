@@ -740,7 +740,9 @@ class TheWave:
                     if clean_text and clean_text.strip() and clean_text != raw_text:
                         self._prog_injector.replace_with_clean(raw_text, iter([clean_text]))
 
-                elif cloud_cleaner is not None and cloud_cleaner._available:
+                elif (cloud_cleaner is not None
+                      and cloud_cleaner._available
+                      and self.pipeline._cloud_circuit.should_allow_request()):
                     # Chemin rapide : OpenAI streaming contextuel (~300ms) + remplacement
                     if self.waveform:
                         self.waveform.update_step(_app_t(lang, "cleaning"))
@@ -754,7 +756,7 @@ class TheWave:
                     )
                 else:
                     # Fallback : nettoyage synchrone via pipeline (regex / Ollama)
-                    clean_text = self.pipeline.clean(raw_text)
+                    clean_text = self.pipeline.clean(raw_text, context_profile=app_profile)
                     if clean_text and clean_text.strip() and clean_text != raw_text:
                         self._prog_injector.replace_with_clean(raw_text, iter([clean_text]))
 

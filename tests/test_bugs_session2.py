@@ -82,7 +82,7 @@ class TestBug2_CodeProfileCallsOllama:
 
         call_count = 0
 
-        def mock_local_clean(text):
+        def mock_local_clean(text, **kwargs):
             nonlocal call_count
             call_count += 1
             raise Exception("Ollama down")

@@ -204,20 +204,22 @@ class CloudLLMCleaner:
         exceptions=(Exception,),
         network_retries=0,
     )
-    def _call_openai(self, text: str) -> str:
+    def _call_openai(self, text: str, context_profile: str = "default") -> str:
         """Appel API OpenAI avec retry automatique.
 
         Args:
             text: Texte brut a nettoyer.
+            context_profile: Profil contextuel pour le prompt système.
 
         Returns:
             Texte nettoye brut de l'API.
         """
         client = self._get_client()
+        system_prompt = _get_system_prompt(context_profile) or _SYSTEM_PROMPT
         response = client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Corrige cette transcription vocale :\n{text}"},
             ],
             temperature=0.0,
@@ -282,11 +284,12 @@ class CloudLLMCleaner:
                     self._circuit.record_failure()
             yield text  # fallback sur le texte brut en cas d'erreur
 
-    def clean(self, text: str) -> str:
+    def clean(self, text: str, context_profile: str = "default") -> str:
         """Nettoie le texte via OpenAI.
 
         Args:
             text: Texte brut à nettoyer.
+            context_profile: Profil contextuel pour le prompt système.
 
         Returns:
             Texte nettoyé (ou texte original si la validation echoue).
@@ -304,7 +307,7 @@ class CloudLLMCleaner:
             raise CleaningError("OpenAI indisponible (circuit breaker ouvert)")
 
         try:
-            result = self._call_openai(text)
+            result = self._call_openai(text, context_profile=context_profile)
         except CleaningError:
             raise
         except Exception as e:
@@ -347,19 +350,20 @@ class LLMCleaner:
         except Exception:
             return False
 
-    def clean(self, text: str) -> str:
+    def clean(self, text: str, context_profile: str = "default") -> str:
         if not text or not text.strip():
             return ""
         if self._circuit and not self._circuit.should_allow_request():
             raise CleaningError("Ollama indisponible (circuit breaker ouvert)")
         import requests
+        system_prompt = _get_system_prompt(context_profile) or _SYSTEM_PROMPT
         try:
             response = requests.post(
                 f"{self.host}/api/chat",
                 json={
                     "model": self.model,
                     "messages": [
-                        {"role": "system", "content": _SYSTEM_PROMPT},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": (
                             f"Corrige cette transcription vocale :\n{text}"
                         )},
@@ -454,11 +458,12 @@ class CleaningPipeline:
         if cleaning_provider == "regex":
             logger.info("CleaningPipeline en mode regex uniquement (pas de LLM)")
 
-    def clean(self, text: str) -> str:
+    def clean(self, text: str, context_profile: str = "default") -> str:
         """Nettoie le texte avec cascade de fallback.
 
         Args:
             text: Texte brut.
+            context_profile: Profil contextuel pour le prompt système LLM.
 
         Returns:
             Texte nettoyé.
@@ -479,7 +484,7 @@ class CleaningPipeline:
         # Cloud d'abord
         if self._cloud_cleaner is not None:
             try:
-                result = self._cloud_cleaner.clean(result)
+                result = self._cloud_cleaner.clean(result, context_profile=context_profile)
                 return result
             except Exception as e:
                 logger.warning(f"Cloud LLM echec, fallback: {e}")
@@ -487,7 +492,7 @@ class CleaningPipeline:
         # Local Ollama ensuite
         if self._local_cleaner is not None:
             try:
-                result = self._local_cleaner.clean(result)
+                result = self._local_cleaner.clean(result, context_profile=context_profile)
                 if self.on_fallback and self._cloud_cleaner is not None:
                     self.on_fallback("Nettoyage : mode local (cloud indisponible)")
                 return result
