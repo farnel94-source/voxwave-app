@@ -149,6 +149,7 @@ DEFAULT_CONFIG: dict = {
         "cloud_model": "gpt-4o-mini",
         "llm_model": "gemma3:4b",
         "llm_timeout": 5,
+        "ollama_host": "http://localhost:11434",
         "filler_words": [
             "euh", "heu", "hum", "ben", "bah", "genre",
             "du coup", "en fait", "tu vois", "quoi", "voilà",

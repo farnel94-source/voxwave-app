@@ -412,6 +412,7 @@ class CleaningPipeline:
         language: str = "fr",
         filler_words: Optional[list] = None,
         on_fallback: Optional[Callable[[str], None]] = None,
+        ollama_host: Optional[str] = None,
     ) -> None:
         """Initialise le pipeline de nettoyage.
 
@@ -423,6 +424,7 @@ class CleaningPipeline:
             language: Code langue ISO 639-1 (depuis config.yaml).
             filler_words: Liste de mots de remplissage (override config).
             on_fallback: Callback appele lors d'un fallback (message str).
+            ollama_host: URL de l'instance Ollama (ex: http://localhost:11435).
         """
         from src.cleaning.regex_cleaner import RegexCleaner
         from src.utils.circuit_breaker import CircuitBreaker
@@ -446,8 +448,11 @@ class CleaningPipeline:
                 logger.warning(f"CloudLLMCleaner indisponible: {e}")
 
         if cleaning_provider in ("hybrid", "local"):
-            self._local_cleaner = LLMCleaner(model=llm_model)
+            self._local_cleaner = LLMCleaner(model=llm_model, host=ollama_host)
             self._local_cleaner.set_circuit_breaker(self._local_circuit)
+
+        if cleaning_provider == "regex":
+            logger.info("CleaningPipeline en mode regex uniquement (pas de LLM)")
 
     def clean(self, text: str) -> str:
         """Nettoie le texte avec cascade de fallback.
@@ -489,10 +494,11 @@ class CleaningPipeline:
             except Exception as e:
                 if "circuit breaker" in str(e).lower():
                     logger.debug(f"LLM local bypasse (circuit ouvert): {e}")
+                    return self._clean_verbatim(result)
                 else:
                     logger.warning(f"LLM local echec, fallback regex: {e}")
 
-        if self.on_fallback:
+        if self.on_fallback and self.cleaning_provider != "regex":
             self.on_fallback("Nettoyage : mode regex (LLM indisponible)")
         return self._clean_verbatim(result)
 
