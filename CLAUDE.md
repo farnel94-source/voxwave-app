@@ -89,6 +89,7 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 - Sans cle API : flag `_available = False`, pas de crash (ValueError supprime)
 - Check connectivite au demarrage : ping Groq/OpenAI (timeout 3s), pre-ouverture circuit si injoignable
 - Notification tray lors d'un fallback : "Transcription : mode local (cloud indisponible)"
+- **`_detect_ollama_host()`** (app.py) : scanne les ports [11434, 11435, 11433] au demarrage (socket, timeout 0.5s) et retourne le premier qui repond. Stocke le resultat dans `config["cleaning"]["ollama_host"]`. PIEGE : toujours `try/finally: sock.close()` pour eviter un leak de socket.
 
 ## GUI (PySide6 + QWebEngineView)
 - **Widget flottant** (`waveform_widget.py`) : fenetre frameless, always-on-top, draggable, 300x116px
@@ -145,7 +146,7 @@ Fenetre moderne dark theme 620x580 avec **sidebar navigation a gauche** (7 ongle
 
 ### Integration app.py
 - Classe principale `TheWave` (anciennement `VoxTool`)
-- `_on_settings()` gere 6 parametres : hotkey, cleaning mode, langue, micro, transcription provider, cleaning provider
+- `_on_settings()` gere 7 parametres : hotkey, cleaning mode, langue, micro, transcription provider, cleaning provider, ollama_host
 - `_on_help()` ouvre les settings directement sur l'onglet Aide via `navigate_to_help()`
 - `on_quit` callback passe a `SettingsDialog`, `WaveformWidget` et `TrayIcon`
 - `_save_config_nested()` : charge YAML complet, modifie la cle nested, re-ecrit (supporte cleaning.mode, whisper.language, etc.)
