@@ -65,6 +65,8 @@ _SETTINGS_T = {
         "section_advanced": "ADVANCED",
         "label_trans_provider": "Transcription",
         "label_clean_provider": "Cleaning",
+        "label_ollama_host": "Ollama address",
+        "hint_ollama_host": "Change if Ollama runs on a different port",
         "section_help": "HELP",
         "help_shortcut_label": "Current shortcut:",
         "help_how_title": "How it works",
@@ -114,6 +116,8 @@ _SETTINGS_T = {
         "section_advanced": "AVANCE",
         "label_trans_provider": "Transcription",
         "label_clean_provider": "Nettoyage",
+        "label_ollama_host": "Adresse Ollama",
+        "hint_ollama_host": "Modifier si Ollama tourne sur un autre port",
         "section_help": "AIDE",
         "help_shortcut_label": "Raccourci actuel :",
         "help_how_title": "Comment ca marche",
@@ -157,6 +161,8 @@ _SETTINGS_T = {
         "section_advanced": "AVANZADO",
         "label_trans_provider": "Transcripcion",
         "label_clean_provider": "Limpieza",
+        "label_ollama_host": "Direccion Ollama",
+        "hint_ollama_host": "Cambiar si Ollama usa un puerto diferente",
         "section_help": "AYUDA",
         "help_shortcut_label": "Atajo actual:",
         "help_how_title": "Como funciona",
@@ -200,6 +206,8 @@ _SETTINGS_T = {
         "section_advanced": "ERWEITERT",
         "label_trans_provider": "Transkription",
         "label_clean_provider": "Bereinigung",
+        "label_ollama_host": "Ollama-Adresse",
+        "hint_ollama_host": "Andern wenn Ollama auf einem anderen Port lauft",
         "section_help": "HILFE",
         "help_shortcut_label": "Aktuelles Kurzel:",
         "help_how_title": "So funktioniert es",
@@ -243,6 +251,8 @@ _SETTINGS_T = {
         "section_advanced": "AVANZATE",
         "label_trans_provider": "Trascrizione",
         "label_clean_provider": "Pulizia",
+        "label_ollama_host": "Indirizzo Ollama",
+        "hint_ollama_host": "Modifica se Ollama usa una porta diversa",
         "section_help": "AIUTO",
         "help_shortcut_label": "Scorciatoia attuale:",
         "help_how_title": "Come funziona",
@@ -286,6 +296,8 @@ _SETTINGS_T = {
         "section_advanced": "AVANCADO",
         "label_trans_provider": "Transcricao",
         "label_clean_provider": "Limpeza",
+        "label_ollama_host": "Endereco Ollama",
+        "hint_ollama_host": "Alterar se Ollama usar uma porta diferente",
         "section_help": "AJUDA",
         "help_shortcut_label": "Atalho atual:",
         "help_how_title": "Como funciona",
@@ -329,6 +341,8 @@ _SETTINGS_T = {
         "section_advanced": "GEAVANCEERD",
         "label_trans_provider": "Transcriptie",
         "label_clean_provider": "Verwerking",
+        "label_ollama_host": "Ollama-adres",
+        "hint_ollama_host": "Wijzig als Ollama op een andere poort draait",
         "section_help": "HELP",
         "help_shortcut_label": "Huidige sneltoets:",
         "help_how_title": "Hoe het werkt",
@@ -372,6 +386,8 @@ _SETTINGS_T = {
         "section_advanced": "詳細設定",
         "label_trans_provider": "文字起こし",
         "label_clean_provider": "クリーニング",
+        "label_ollama_host": "Ollamaアドレス",
+        "hint_ollama_host": "Ollamaが別ポートで動く場合は変更",
         "section_help": "ヘルプ",
         "help_shortcut_label": "現在のショートカット:",
         "help_how_title": "使い方",
@@ -415,6 +431,8 @@ _SETTINGS_T = {
         "section_advanced": "고급",
         "label_trans_provider": "전사",
         "label_clean_provider": "정리",
+        "label_ollama_host": "Ollama 주소",
+        "hint_ollama_host": "Ollama가 다른 포트에서 실행될 경우 변경",
         "section_help": "도움말",
         "help_shortcut_label": "현재 단축키:",
         "help_how_title": "사용 방법",
@@ -458,6 +476,8 @@ _SETTINGS_T = {
         "section_advanced": "高级",
         "label_trans_provider": "转录",
         "label_clean_provider": "清理",
+        "label_ollama_host": "Ollama地址",
+        "hint_ollama_host": "如果Ollama使用其他端口请更改",
         "section_help": "帮助",
         "help_shortcut_label": "当前快捷键：",
         "help_how_title": "使用方法",
@@ -501,6 +521,8 @@ _SETTINGS_T = {
         "section_advanced": "DOPOLNITELNO",
         "label_trans_provider": "Transkriptsija",
         "label_clean_provider": "Obrabotka",
+        "label_ollama_host": "Adres Ollama",
+        "hint_ollama_host": "Izmenite esli Ollama rabotaet na drugom porte",
         "section_help": "POMOSH",
         "help_shortcut_label": "Tekushij jarlik:",
         "help_how_title": "Kak eto rabotaet",
@@ -544,6 +566,8 @@ _SETTINGS_T = {
         "section_advanced": "متقدم",
         "label_trans_provider": "النسخ",
         "label_clean_provider": "التنظيف",
+        "label_ollama_host": "عنوان Ollama",
+        "hint_ollama_host": "غير اذا كان Ollama يعمل على منفذ اخر",
         "section_help": "المساعدة",
         "help_shortcut_label": "الاختصار الحالي:",
         "help_how_title": "كيف يعمل",
@@ -587,6 +611,8 @@ _SETTINGS_T = {
         "section_advanced": "GELISMIS",
         "label_trans_provider": "Transkripsiyon",
         "label_clean_provider": "Temizleme",
+        "label_ollama_host": "Ollama adresi",
+        "hint_ollama_host": "Ollama baska bir portta calisiyorsa degistirin",
         "section_help": "YARDIM",
         "help_shortcut_label": "Mevcut kisayol:",
         "help_how_title": "Nasil calisir",
@@ -630,6 +656,8 @@ _SETTINGS_T = {
         "section_advanced": "ZAAWANSOWANE",
         "label_trans_provider": "Transkrypcja",
         "label_clean_provider": "Czyszczenie",
+        "label_ollama_host": "Adres Ollama",
+        "hint_ollama_host": "Zmien jesli Ollama dziala na innym porcie",
         "section_help": "POMOC",
         "help_shortcut_label": "Aktualny skrot:",
         "help_how_title": "Jak to dziala",
@@ -673,6 +701,8 @@ _SETTINGS_T = {
         "section_advanced": "AVANCERAT",
         "label_trans_provider": "Transkription",
         "label_clean_provider": "Rensning",
+        "label_ollama_host": "Ollama-adress",
+        "hint_ollama_host": "Andra om Ollama koer pa en annan port",
         "section_help": "HJALP",
         "help_shortcut_label": "Aktuellt kortkommando:",
         "help_how_title": "Hur det fungerar",
@@ -1017,6 +1047,7 @@ class SettingsDialog(QDialog):
         current_device_id: Optional[int] = None,
         current_transcription_provider: str = "hybrid",
         current_cleaning_provider: str = "hybrid",
+        current_ollama_host: str = "http://localhost:11434",
         current_activation_method: str = "both",
         current_auto_stop_enabled: bool = False,
         current_auto_stop_silence_duration: float = 2.0,
@@ -1033,6 +1064,7 @@ class SettingsDialog(QDialog):
         self._device_id = current_device_id
         self._transcription_provider = current_transcription_provider
         self._cleaning_provider = current_cleaning_provider
+        self._ollama_host = current_ollama_host
         self._activation_method = current_activation_method
         self._auto_stop_enabled = current_auto_stop_enabled
         self._auto_stop_silence_duration = current_auto_stop_silence_duration
@@ -1427,6 +1459,7 @@ class SettingsDialog(QDialog):
             ("hybrid", "Hybride (cloud + local)"),
             ("cloud", "Cloud uniquement (OpenAI)"),
             ("local", "Local uniquement (Ollama)"),
+            ("regex", "Regex uniquement (natif, sans IA)"),
         ]
         current_clean_idx = 0
         for i, (val, label) in enumerate(clean_options):
@@ -1440,6 +1473,29 @@ class SettingsDialog(QDialog):
         hint.setObjectName("hint")
         hint.setWordWrap(True)
         layout.addWidget(hint)
+
+        self._ollama_hint = QLabel('<a href="https://ollama.com/download">→ Télécharger Ollama</a>')
+        self._ollama_hint.setOpenExternalLinks(True)
+        self._ollama_hint.setVisible(self._cleaning_provider == "local")
+        self._clean_combo.currentIndexChanged.connect(self._update_ollama_hint)
+        layout.addWidget(self._ollama_hint)
+
+        layout.addSpacing(16)
+
+        # Adresse Ollama (champ texte)
+        layout.addWidget(self._field_label(t.get("label_ollama_host", "Ollama address")))
+        self._ollama_host_edit = QLineEdit(self._ollama_host)
+        self._ollama_host_edit.setPlaceholderText("http://localhost:11434")
+        self._ollama_host_edit.setStyleSheet(
+            "QLineEdit { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);"
+            " border-radius: 6px; padding: 6px 10px; color: white; font-size: 13px; }"
+            "QLineEdit:focus { border-color: rgba(255,255,255,0.35); }"
+        )
+        layout.addWidget(self._ollama_host_edit)
+        hint_host = QLabel(t.get("hint_ollama_host", "Change if Ollama runs on a different port"))
+        hint_host.setObjectName("hint")
+        hint_host.setWordWrap(True)
+        layout.addWidget(hint_host)
 
         layout.addStretch()
         return page
@@ -1609,6 +1665,10 @@ class SettingsDialog(QDialog):
     # Helpers
     # ================================================================
 
+    def _update_ollama_hint(self) -> None:
+        """Affiche le lien Ollama uniquement quand le provider 'local' est sélectionné."""
+        self._ollama_hint.setVisible(self._clean_combo.currentData() == "local")
+
     def _section_title(self, text: str) -> QLabel:
         lbl = QLabel(text)
         lbl.setObjectName("section-title")
@@ -1650,6 +1710,11 @@ class SettingsDialog(QDialog):
     @property
     def cleaning_provider(self) -> str:
         return self._clean_combo.currentData()
+
+    @property
+    def ollama_host(self) -> str:
+        """Adresse Ollama saisie par l'utilisateur."""
+        return self._ollama_host_edit.text().strip() or "http://localhost:11434"
 
     @property
     def activation_method(self) -> str:
