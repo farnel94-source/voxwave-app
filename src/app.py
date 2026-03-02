@@ -898,6 +898,7 @@ class TheWave:
             current_device_id=self.config.get("audio", {}).get("device_id"),
             current_transcription_provider=self.config.get("transcription", {}).get("provider", "hybrid"),
             current_cleaning_provider=cleaning_config.get("provider", "hybrid"),
+            current_ollama_host=cleaning_config.get("ollama_host", "http://localhost:11434"),
             current_activation_method=self.config.get("activation_method", "both"),
             current_auto_stop_enabled=self.config.get("audio", {}).get("auto_stop_enabled", False),
             current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
@@ -972,6 +973,14 @@ class TheWave:
             self._rebuild_pipeline()
             changes.append(f"Nettoyage : {new_clean}")
 
+        # Ollama host
+        new_ollama_host = dialog.ollama_host
+        if new_ollama_host != cleaning_config.get("ollama_host"):
+            self.config.setdefault("cleaning", {})["ollama_host"] = new_ollama_host
+            self._save_config_nested("cleaning", "ollama_host", new_ollama_host)
+            self._rebuild_pipeline()
+            changes.append(f"Ollama : {new_ollama_host}")
+
         # Activation method (hotkey / icon / both)
         new_activation = dialog.activation_method
         if new_activation != self.config.get("activation_method", "both"):
@@ -1035,6 +1044,7 @@ class TheWave:
             current_device_id=self.config.get("audio", {}).get("device_id"),
             current_transcription_provider=self.config.get("transcription", {}).get("provider", "hybrid"),
             current_cleaning_provider=cleaning_config.get("provider", "hybrid"),
+            current_ollama_host=cleaning_config.get("ollama_host", "http://localhost:11434"),
             current_activation_method=self.config.get("activation_method", "both"),
             current_auto_stop_enabled=self.config.get("audio", {}).get("auto_stop_enabled", False),
             current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
