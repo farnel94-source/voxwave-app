@@ -109,10 +109,26 @@ class ProgressiveInjector:
         """
         if not text:
             return
+        # Sauvegarder le clipboard avant d'écraser (restauré après le paste).
+        # Après restauration, replace_with_clean() sauvegarde le contenu original
+        # (et non raw_text) — les deux restaurations sont ainsi cohérentes.
+        saved_clipboard: str | None = None
+        try:
+            import pyperclip
+            saved_clipboard = pyperclip.paste()
+        except Exception:
+            pass
         if not self._inject_direct(text):
             self._injector.inject(text)
         # Buffer : s'assurer que l'app cible a traité le Ctrl+V
         time.sleep(0.1)
+        # Restaurer le clipboard original (le texte dicté est déjà dans l'app cible)
+        if saved_clipboard is not None:
+            try:
+                import pyperclip  # noqa: F811 — re-import sûr (module mis en cache)
+                pyperclip.copy(saved_clipboard)
+            except Exception:
+                pass
         logger.info(f"Texte brut injecté : {len(text)} chars")
         # Démarrer la surveillance et horodater pour les garde-fous de replace_with_clean
         self._inject_time = time.monotonic()
