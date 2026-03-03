@@ -78,7 +78,7 @@ class WhisperEngine:
             language=lang_param,
             vad_filter=True,
             vad_parameters={"min_silence_duration_ms": 500},
-            condition_on_previous_text=True,
+            condition_on_previous_text=False,
         )
         text = " ".join(seg.text for seg in segments).strip()
         detected = getattr(info, "language", self.language)
