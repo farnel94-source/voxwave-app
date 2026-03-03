@@ -79,10 +79,12 @@ class HotkeyListener:
         hotkey: str = "F8",
         on_start: Optional[Callable] = None,
         on_stop: Optional[Callable] = None,
+        on_busy: Optional[Callable] = None,
         debounce_delay: float = 0.5,
     ) -> None:
         self.on_start = on_start
         self.on_stop = on_stop
+        self.on_busy = on_busy
         self.debounce_delay = debounce_delay
         self._is_recording = False
         self._is_processing = False
@@ -128,6 +130,8 @@ class HotkeyListener:
 
             if self._is_processing:
                 logger.debug("Hotkey ignore (pipeline en cours)")
+                if self.on_busy:
+                    self.on_busy()
                 return
 
             if not self._is_recording:

@@ -55,6 +55,24 @@ _ERROR_T = {
     "ru": "Oshibka", "ar": "خطأ", "tr": "Hata", "pl": "Blad", "sv": "Fel",
 }
 
+_BUSY_T = {
+    "en": "Processing in progress, please wait...",
+    "fr": "Traitement en cours, veuillez patienter...",
+    "es": "Procesando, por favor espere...",
+    "de": "Verarbeitung läuft, bitte warten...",
+    "it": "Elaborazione in corso, attendere...",
+    "pt": "Processando, aguarde...",
+    "nl": "Bezig met verwerken, even geduld...",
+    "ja": "処理中です、お待ちください...",
+    "ko": "처리 중입니다, 잠시 기다려주세요...",
+    "zh": "正在处理，请稍候...",
+    "ru": "Obrabotka, podozhdite...",
+    "ar": "جارٍ المعالجة، يرجى الانتظار...",
+    "tr": "İşleniyor, lütfen bekleyin...",
+    "pl": "Przetwarzanie, proszę czekać...",
+    "sv": "Bearbetar, vänta...",
+}
+
 
 def _app_t(lang: str, key: str) -> str:
     d = _APP_STEP_T.get(lang, _APP_STEP_T["en"])
@@ -171,6 +189,28 @@ class _TaskbarWindow:
             QTimer.singleShot(300, lambda: force_taskbar_icon_win32(hwnd))
 
 
+class _HotkeyBridge:
+    """Dispatcher thread-safe pour les callbacks hotkey.
+
+    Le listener pynput tourne dans un thread arrière-plan. Ce bridge utilise
+    les Qt signals pour dispatcher les callbacks vers le thread Qt principal,
+    ce qui rend tous les appels GUI (tray, waveform) thread-safe.
+    """
+
+    def __init__(self) -> None:
+        from PySide6.QtCore import QObject, Signal
+
+        class _Bridge(QObject):
+            sig_start = Signal()
+            sig_stop = Signal()
+            sig_busy = Signal()
+
+        self._bridge = _Bridge()
+        self.sig_start = self._bridge.sig_start
+        self.sig_stop = self._bridge.sig_stop
+        self.sig_busy = self._bridge.sig_busy
+
+
 class TheWave:
     """Application principale The Wave."""
 
@@ -195,6 +235,7 @@ class TheWave:
         self._settings_dialog = None
         self._silero_vad = None
         self._prog_injector = None
+        self._hotkey_bridge = None
 
     def initialize(self) -> None:
         """Initialise tous les composants."""
@@ -286,10 +327,18 @@ class TheWave:
         from src.injection.progressive_injector import ProgressiveInjector
         self._prog_injector = ProgressiveInjector(self.injector)
 
+        # Bridge thread-safe : le listener pynput tourne dans un thread arrière-plan.
+        # Les signals Qt dispatchent _on_start/_on_stop vers le thread Qt principal.
+        self._hotkey_bridge = _HotkeyBridge()
+        self._hotkey_bridge.sig_start.connect(self._on_start)
+        self._hotkey_bridge.sig_stop.connect(self._on_stop)
+        self._hotkey_bridge.sig_busy.connect(self._on_hotkey_busy)
+
         self.listener = HotkeyListener(
             hotkey=self.config["hotkey"],
-            on_start=self._on_start,
-            on_stop=self._on_stop,
+            on_start=self._hotkey_bridge.sig_start.emit,
+            on_stop=self._hotkey_bridge.sig_stop.emit,
+            on_busy=self._hotkey_bridge.sig_busy.emit,
             debounce_delay=self.config.get("hotkey_debounce", 0.5),
         )
 
@@ -526,6 +575,14 @@ class TheWave:
         )
         self._processing_thread.start()
 
+    def _on_hotkey_busy(self) -> None:
+        """Feedback quand F8 est pressé pendant que le pipeline tourne."""
+        lang = self.config.get("language", "en")
+        msg = _BUSY_T.get(lang, _BUSY_T["en"])
+        logger.info(f"Hotkey ignoré (pipeline en cours) — feedback tray: {msg}")
+        if self.tray:
+            self.tray.show_notification("The Wave", msg)
+
     def _schedule_auto_stop(self) -> None:
         """Appelé depuis le thread audio — schedule _on_stop sur le thread Qt principal."""
         from PySide6.QtCore import QTimer
@@ -728,7 +785,8 @@ class TheWave:
             app_profile = getattr(self, "_current_app_profile", "default")
 
             if cleaning_mode == "raw":
-                pass  # Mode brut : pas de remplacement du tout
+                # Mode brut : pas de remplacement — stopper le watcher pour éviter le leak
+                self._prog_injector._stop_user_watch()
 
             else:  # Mode auto (+ compat verbatim/quality si config non migrée)
                 # Profil "code" : skip LLM, regex seulement
