@@ -31,12 +31,9 @@ _SETTINGS_T = {
     "en": {
         "title": "Settings",
         "nav_general": "General",
-        "nav_writing": "Writing",
         "nav_audio": "Audio",
-        "nav_advanced": "Advanced",
-        "nav_license": "License",
-        "nav_about": "About",
-        "nav_help": "Help",
+        "nav_writing": "Writing",
+        "nav_account": "Account",
         "label_hotkey": "Keyboard shortcut",
         "hint_hotkey": "Click then press your combo (e.g. F8, Ctrl+Shift+V)",
         "label_interface_lang": "Interface language",
@@ -82,12 +79,9 @@ _SETTINGS_T = {
     "fr": {
         "title": "Parametres",
         "nav_general": "General",
-        "nav_writing": "Ecriture",
         "nav_audio": "Audio",
-        "nav_advanced": "Avance",
-        "nav_license": "Licence",
-        "nav_about": "A propos",
-        "nav_help": "Aide",
+        "nav_writing": "Ecriture",
+        "nav_account": "Compte",
         "label_hotkey": "Raccourci clavier",
         "hint_hotkey": "Cliquez puis appuyez sur la combinaison souhaitee (ex: F8, Ctrl+Shift+V)",
         "label_interface_lang": "Langue de l'interface",
@@ -132,9 +126,8 @@ _SETTINGS_T = {
     },
     "es": {
         "title": "Configuracion",
-        "nav_general": "General", "nav_writing": "Escritura",
-        "nav_audio": "Audio", "nav_advanced": "Avanzado",
-        "nav_license": "Licencia", "nav_about": "Acerca de", "nav_help": "Ayuda",
+        "nav_general": "General", "nav_audio": "Audio",
+        "nav_writing": "Escritura", "nav_account": "Cuenta",
         "label_hotkey": "Atajo de teclado",
         "hint_hotkey": "Haga clic y presione la combinacion (ej: F8, Ctrl+Shift+V)",
         "label_interface_lang": "Idioma de la interfaz",
@@ -177,9 +170,8 @@ _SETTINGS_T = {
     },
     "de": {
         "title": "Einstellungen",
-        "nav_general": "Allgemein", "nav_writing": "Schreiben",
-        "nav_audio": "Audio", "nav_advanced": "Erweitert",
-        "nav_license": "Lizenz", "nav_about": "Uber", "nav_help": "Hilfe",
+        "nav_general": "Allgemein", "nav_audio": "Audio",
+        "nav_writing": "Schreiben", "nav_account": "Konto",
         "label_hotkey": "Tastenkurzel",
         "hint_hotkey": "Klicken und Kombination drucken (z.B. F8, Strg+Umschalt+V)",
         "label_interface_lang": "Oberflachensprache",
@@ -222,9 +214,8 @@ _SETTINGS_T = {
     },
     "it": {
         "title": "Impostazioni",
-        "nav_general": "Generale", "nav_writing": "Scrittura",
-        "nav_audio": "Audio", "nav_advanced": "Avanzate",
-        "nav_license": "Licenza", "nav_about": "Informazioni", "nav_help": "Aiuto",
+        "nav_general": "Generale", "nav_audio": "Audio",
+        "nav_writing": "Scrittura", "nav_account": "Account",
         "label_hotkey": "Scorciatoia tastiera",
         "hint_hotkey": "Clicca e premi la combinazione (es: F8, Ctrl+Shift+V)",
         "label_interface_lang": "Lingua interfaccia",
@@ -267,9 +258,8 @@ _SETTINGS_T = {
     },
     "pt": {
         "title": "Configuracoes",
-        "nav_general": "Geral", "nav_writing": "Escrita",
-        "nav_audio": "Audio", "nav_advanced": "Avancado",
-        "nav_license": "Licenca", "nav_about": "Sobre", "nav_help": "Ajuda",
+        "nav_general": "Geral", "nav_audio": "Audio",
+        "nav_writing": "Escrita", "nav_account": "Conta",
         "label_hotkey": "Atalho de teclado",
         "hint_hotkey": "Clique e pressione a combinacao (ex: F8, Ctrl+Shift+V)",
         "label_interface_lang": "Idioma da interface",
@@ -312,9 +302,8 @@ _SETTINGS_T = {
     },
     "nl": {
         "title": "Instellingen",
-        "nav_general": "Algemeen", "nav_writing": "Schrijven",
-        "nav_audio": "Audio", "nav_advanced": "Geavanceerd",
-        "nav_license": "Licentie", "nav_about": "Over", "nav_help": "Help",
+        "nav_general": "Algemeen", "nav_audio": "Audio",
+        "nav_writing": "Schrijven", "nav_account": "Account",
         "label_hotkey": "Sneltoets",
         "hint_hotkey": "Klik en druk op combinatie (bijv. F8, Ctrl+Shift+V)",
         "label_interface_lang": "Interfacetaal",
@@ -357,9 +346,8 @@ _SETTINGS_T = {
     },
     "ja": {
         "title": "設定",
-        "nav_general": "一般", "nav_writing": "書き方",
-        "nav_audio": "音声", "nav_advanced": "詳細",
-        "nav_license": "ライセンス", "nav_about": "概要", "nav_help": "ヘルプ",
+        "nav_general": "一般", "nav_audio": "音声",
+        "nav_writing": "書き方", "nav_account": "アカウント",
         "label_hotkey": "ショートカットキー",
         "hint_hotkey": "クリックしてキーを押す (例: F8, Ctrl+Shift+V)",
         "label_interface_lang": "表示言語",
@@ -402,9 +390,8 @@ _SETTINGS_T = {
     },
     "ko": {
         "title": "설정",
-        "nav_general": "일반", "nav_writing": "작성",
-        "nav_audio": "오디오", "nav_advanced": "고급",
-        "nav_license": "라이선스", "nav_about": "정보", "nav_help": "도움말",
+        "nav_general": "일반", "nav_audio": "오디오",
+        "nav_writing": "작성", "nav_account": "계정",
         "label_hotkey": "단축키",
         "hint_hotkey": "클릭 후 단축키 입력 (예: F8, Ctrl+Shift+V)",
         "label_interface_lang": "인터페이스 언어",
@@ -447,9 +434,8 @@ _SETTINGS_T = {
     },
     "zh": {
         "title": "设置",
-        "nav_general": "常规", "nav_writing": "写作",
-        "nav_audio": "音频", "nav_advanced": "高级",
-        "nav_license": "许可证", "nav_about": "关于", "nav_help": "帮助",
+        "nav_general": "常规", "nav_audio": "音频",
+        "nav_writing": "写作", "nav_account": "账户",
         "label_hotkey": "快捷键",
         "hint_hotkey": "点击后按下组合键 (例: F8, Ctrl+Shift+V)",
         "label_interface_lang": "界面语言",
@@ -492,9 +478,8 @@ _SETTINGS_T = {
     },
     "ru": {
         "title": "Nastrojki",
-        "nav_general": "Obshie", "nav_writing": "Pismo",
-        "nav_audio": "Audio", "nav_advanced": "Dopolnitelno",
-        "nav_license": "Licenzija", "nav_about": "O programme", "nav_help": "Pomosh",
+        "nav_general": "Obshie", "nav_audio": "Audio",
+        "nav_writing": "Pismo", "nav_account": "Akkaunt",
         "label_hotkey": "Gorjachaja klavisha",
         "hint_hotkey": "Nazhмite i vvedite kombinaciju (napr. F8, Ctrl+Shift+V)",
         "label_interface_lang": "Jazyk interfejsa",
@@ -537,9 +522,8 @@ _SETTINGS_T = {
     },
     "ar": {
         "title": "الإعدادات",
-        "nav_general": "عام", "nav_writing": "الكتابة",
-        "nav_audio": "الصوت", "nav_advanced": "متقدم",
-        "nav_license": "الترخيص", "nav_about": "حول", "nav_help": "مساعدة",
+        "nav_general": "عام", "nav_audio": "الصوت",
+        "nav_writing": "الكتابة", "nav_account": "الحساب",
         "label_hotkey": "اختصار لوحة المفاتيح",
         "hint_hotkey": "انقر ثم اضغط المفاتيح (مثال: F8, Ctrl+Shift+V)",
         "label_interface_lang": "لغة الواجهة",
@@ -582,9 +566,8 @@ _SETTINGS_T = {
     },
     "tr": {
         "title": "Ayarlar",
-        "nav_general": "Genel", "nav_writing": "Yazma",
-        "nav_audio": "Ses", "nav_advanced": "Gelismis",
-        "nav_license": "Lisans", "nav_about": "Hakkinda", "nav_help": "Yardim",
+        "nav_general": "Genel", "nav_audio": "Ses",
+        "nav_writing": "Yazma", "nav_account": "Hesap",
         "label_hotkey": "Klavye kisayolu",
         "hint_hotkey": "Tiklayip kombinasyonu girin (orn: F8, Ctrl+Shift+V)",
         "label_interface_lang": "Arayuz dili",
@@ -627,9 +610,8 @@ _SETTINGS_T = {
     },
     "pl": {
         "title": "Ustawienia",
-        "nav_general": "Ogolne", "nav_writing": "Pisanie",
-        "nav_audio": "Audio", "nav_advanced": "Zaawansowane",
-        "nav_license": "Licencja", "nav_about": "O programie", "nav_help": "Pomoc",
+        "nav_general": "Ogolne", "nav_audio": "Audio",
+        "nav_writing": "Pisanie", "nav_account": "Konto",
         "label_hotkey": "Skrot klawiszowy",
         "hint_hotkey": "Kliknij i nacisnij kombinacje (np. F8, Ctrl+Shift+V)",
         "label_interface_lang": "Jezyk interfejsu",
@@ -672,9 +654,8 @@ _SETTINGS_T = {
     },
     "sv": {
         "title": "Installningar",
-        "nav_general": "Allman", "nav_writing": "Skrivning",
-        "nav_audio": "Ljud", "nav_advanced": "Avancerat",
-        "nav_license": "Licens", "nav_about": "Om", "nav_help": "Hjalp",
+        "nav_general": "Allman", "nav_audio": "Ljud",
+        "nav_writing": "Skrivning", "nav_account": "Konto",
         "label_hotkey": "Kortkommando",
         "hint_hotkey": "Klicka och tryck kombinationen (t.ex. F8, Ctrl+Shift+V)",
         "label_interface_lang": "Grässnittssprak",
@@ -1104,16 +1085,13 @@ class SettingsDialog(QDialog):
         title.setStyleSheet("color: #ffffff; padding: 0 16px 12px 16px;")
         sidebar_layout.addWidget(title)
 
-        # Nav items
+        # Nav items (4 onglets)
         self._nav_items: list[_NavItem] = []
         nav_labels = [
             (_st(self._sys_lang, "nav_general"), "\u2699"),
-            (_st(self._sys_lang, "nav_writing"), "\u270e"),
             (_st(self._sys_lang, "nav_audio"), "\u266b"),
-            (_st(self._sys_lang, "nav_advanced"), "\u2699"),
-            (_st(self._sys_lang, "nav_license"), "\u2727"),
-            (_st(self._sys_lang, "nav_about"), "\u24d8"),
-            (_st(self._sys_lang, "nav_help"), "\u2753"),
+            (_st(self._sys_lang, "nav_writing"), "\u270e"),
+            (_st(self._sys_lang, "nav_account"), "\u2606"),
         ]
         for i, (label, icon) in enumerate(nav_labels):
             nav = _NavItem(label, icon)
@@ -1134,15 +1112,12 @@ class SettingsDialog(QDialog):
         self._content_stack = QVBoxLayout()
         self._content_stack.setContentsMargins(24, 20, 24, 20)
 
-        # Pages
+        # Pages (4 onglets : General, Audio, Ecriture, Compte)
         self._pages: list[QWidget] = []
         self._pages.append(self._build_page_general())
-        self._pages.append(self._build_page_writing())
         self._pages.append(self._build_page_audio())
-        self._pages.append(self._build_page_advanced())
-        self._pages.append(self._build_page_license())
-        self._pages.append(self._build_page_about())
-        self._pages.append(self._build_page_help())
+        self._pages.append(self._build_page_writing())
+        self._pages.append(self._build_page_account())
 
         # On utilise un stacked widget avec scroll pour chaque page
         from PySide6.QtWidgets import QStackedWidget
@@ -1289,7 +1264,7 @@ class SettingsDialog(QDialog):
         self._act_both_card.selected = (method == "both")
 
     # ================================================================
-    # Page Ecriture
+    # Page Ecriture (mode + providers + ollama)
     # ================================================================
 
     def _build_page_writing(self) -> QWidget:
@@ -1328,6 +1303,80 @@ class SettingsDialog(QDialog):
             self._tone_raw.selected = True
         else:
             self._tone_auto.selected = True
+
+        # -- Separateur visuel --
+        sep = QLabel()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet("background: #2a2a3e;")
+        layout.addWidget(sep)
+
+        layout.addSpacing(4)
+
+        # -- Section Avance (providers) integree --
+        layout.addWidget(self._section_title(t["section_advanced"]))
+
+        # Provider transcription
+        layout.addWidget(self._field_label(t["label_trans_provider"]))
+        self._trans_combo = QComboBox()
+        trans_options = [
+            ("hybrid", "Hybride (cloud + local)"),
+            ("cloud", "Cloud uniquement (Groq)"),
+            ("local", "Local uniquement (Whisper)"),
+        ]
+        current_trans_idx = 0
+        for i, (val, label) in enumerate(trans_options):
+            self._trans_combo.addItem(label, val)
+            if val == self._transcription_provider:
+                current_trans_idx = i
+        self._trans_combo.setCurrentIndex(current_trans_idx)
+        layout.addWidget(self._trans_combo)
+
+        layout.addSpacing(8)
+
+        # Provider nettoyage
+        layout.addWidget(self._field_label(t["label_clean_provider"]))
+        self._clean_combo = QComboBox()
+        clean_options = [
+            ("hybrid", "Hybride (cloud + local)"),
+            ("cloud", "Cloud uniquement (OpenAI)"),
+            ("local", "Local uniquement (Ollama)"),
+            ("regex", "Regex uniquement (natif, sans IA)"),
+        ]
+        current_clean_idx = 0
+        for i, (val, label) in enumerate(clean_options):
+            self._clean_combo.addItem(label, val)
+            if val == self._cleaning_provider:
+                current_clean_idx = i
+        self._clean_combo.setCurrentIndex(current_clean_idx)
+        layout.addWidget(self._clean_combo)
+
+        hint = QLabel("Hybride = essaie le cloud d'abord, bascule en local si indisponible")
+        hint.setObjectName("hint")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        self._ollama_hint = QLabel('<a href="https://ollama.com/download">\u2192 T\u00e9l\u00e9charger Ollama</a>')
+        self._ollama_hint.setOpenExternalLinks(True)
+        self._ollama_hint.setVisible(self._cleaning_provider == "local")
+        self._clean_combo.currentIndexChanged.connect(self._update_ollama_hint)
+        layout.addWidget(self._ollama_hint)
+
+        layout.addSpacing(8)
+
+        # Adresse Ollama
+        layout.addWidget(self._field_label(t.get("label_ollama_host", "Ollama address")))
+        self._ollama_host_edit = QLineEdit(self._ollama_host)
+        self._ollama_host_edit.setPlaceholderText("http://localhost:11434")
+        self._ollama_host_edit.setStyleSheet(
+            "QLineEdit { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);"
+            " border-radius: 6px; padding: 6px 10px; color: white; font-size: 13px; }"
+            "QLineEdit:focus { border-color: rgba(255,255,255,0.35); }"
+        )
+        layout.addWidget(self._ollama_host_edit)
+        hint_host = QLabel(t.get("hint_ollama_host", "Change if Ollama runs on a different port"))
+        hint_host.setObjectName("hint")
+        hint_host.setWordWrap(True)
+        layout.addWidget(hint_host)
 
         layout.addStretch()
         return page
@@ -1422,102 +1471,22 @@ class SettingsDialog(QDialog):
         self._auto_stop_duration_spin.setEnabled(checked)
 
     # ================================================================
-    # Page Avance
+    # Page Compte (licence + aide + a propos + quitter)
     # ================================================================
 
-    def _build_page_advanced(self) -> QWidget:
+    def _build_page_account(self) -> QWidget:
         t = _SETTINGS_T.get(self._sys_lang, _SETTINGS_T["en"])
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(16)
-
-        layout.addWidget(self._section_title(t["section_advanced"]))
-
-        # Provider transcription
-        layout.addWidget(self._field_label(t["label_trans_provider"]))
-        self._trans_combo = QComboBox()
-        trans_options = [
-            ("hybrid", "Hybride (cloud + local)"),
-            ("cloud", "Cloud uniquement (Groq)"),
-            ("local", "Local uniquement (Whisper)"),
-        ]
-        current_trans_idx = 0
-        for i, (val, label) in enumerate(trans_options):
-            self._trans_combo.addItem(label, val)
-            if val == self._transcription_provider:
-                current_trans_idx = i
-        self._trans_combo.setCurrentIndex(current_trans_idx)
-        layout.addWidget(self._trans_combo)
-
-        layout.addSpacing(8)
-
-        # Provider nettoyage
-        layout.addWidget(self._field_label(t["label_clean_provider"]))
-        self._clean_combo = QComboBox()
-        clean_options = [
-            ("hybrid", "Hybride (cloud + local)"),
-            ("cloud", "Cloud uniquement (OpenAI)"),
-            ("local", "Local uniquement (Ollama)"),
-            ("regex", "Regex uniquement (natif, sans IA)"),
-        ]
-        current_clean_idx = 0
-        for i, (val, label) in enumerate(clean_options):
-            self._clean_combo.addItem(label, val)
-            if val == self._cleaning_provider:
-                current_clean_idx = i
-        self._clean_combo.setCurrentIndex(current_clean_idx)
-        layout.addWidget(self._clean_combo)
-
-        hint = QLabel("Hybride = essaie le cloud d'abord, bascule en local si indisponible")
-        hint.setObjectName("hint")
-        hint.setWordWrap(True)
-        layout.addWidget(hint)
-
-        self._ollama_hint = QLabel('<a href="https://ollama.com/download">→ Télécharger Ollama</a>')
-        self._ollama_hint.setOpenExternalLinks(True)
-        self._ollama_hint.setVisible(self._cleaning_provider == "local")
-        self._clean_combo.currentIndexChanged.connect(self._update_ollama_hint)
-        layout.addWidget(self._ollama_hint)
-
-        layout.addSpacing(16)
-
-        # Adresse Ollama (champ texte)
-        layout.addWidget(self._field_label(t.get("label_ollama_host", "Ollama address")))
-        self._ollama_host_edit = QLineEdit(self._ollama_host)
-        self._ollama_host_edit.setPlaceholderText("http://localhost:11434")
-        self._ollama_host_edit.setStyleSheet(
-            "QLineEdit { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);"
-            " border-radius: 6px; padding: 6px 10px; color: white; font-size: 13px; }"
-            "QLineEdit:focus { border-color: rgba(255,255,255,0.35); }"
-        )
-        layout.addWidget(self._ollama_host_edit)
-        hint_host = QLabel(t.get("hint_ollama_host", "Change if Ollama runs on a different port"))
-        hint_host.setObjectName("hint")
-        hint_host.setWordWrap(True)
-        layout.addWidget(hint_host)
-
-        layout.addStretch()
-        return page
-
-    # ================================================================
-    # Page Licence
-    # ================================================================
-
-    def _build_page_license(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
+        # -- Section Licence --
         layout.addWidget(self._section_title("LICENCE"))
 
-        # Statut
         status_label = QLabel("Statut : Free tier")
         status_label.setStyleSheet("color: #60a5fa; font-size: 14px; font-weight: 600;")
         layout.addWidget(status_label)
-
-        layout.addSpacing(4)
 
         desc = QLabel(
             "Le free tier vous permet d'utiliser The Wave avec un nombre\n"
@@ -1528,9 +1497,6 @@ class SettingsDialog(QDialog):
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
-        layout.addSpacing(12)
-
-        # Bouton activer licence
         activate_btn = QPushButton("Activer une licence")
         activate_btn.setStyleSheet(
             "QPushButton { background-color: rgba(59,130,246,0.15); color: #3b82f6; "
@@ -1543,91 +1509,19 @@ class SettingsDialog(QDialog):
         activate_btn.clicked.connect(self._on_activate_license_clicked)
         layout.addWidget(activate_btn)
 
-        layout.addStretch()
-        return page
+        # -- Separateur --
+        sep1 = QLabel()
+        sep1.setFixedHeight(1)
+        sep1.setStyleSheet("background: #2a2a3e;")
+        layout.addWidget(sep1)
 
-    def _on_activate_license_clicked(self) -> None:
-        """Lance l'activation de licence."""
-        if self._on_activate_license:
-            self._on_activate_license()
-
-    # ================================================================
-    # Page A propos
-    # ================================================================
-
-    def _build_page_about(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
-
-        layout.addWidget(self._section_title("A PROPOS"))
-
-        # Nom + version
-        name_label = QLabel("The Wave")
-        name_font = QFont()
-        name_font.setPointSize(16)
-        name_font.setBold(True)
-        name_label.setFont(name_font)
-        layout.addWidget(name_label)
-
-        version_label = QLabel("Version 2.1")
-        version_label.setStyleSheet("color: #60a5fa; font-size: 14px; font-weight: 600;")
-        layout.addWidget(version_label)
-
-        layout.addSpacing(4)
-
-        desc = QLabel("Dictee vocale intelligente pour Windows et Linux.")
-        desc.setStyleSheet("color: rgba(255,255,255,0.5); font-size: 13px;")
-        layout.addWidget(desc)
-
-        layout.addSpacing(8)
-
-        # Stack technique
-        tech_title = QLabel("Technologies")
-        tech_title.setStyleSheet("color: rgba(255,255,255,0.8); font-size: 13px; font-weight: 600;")
-        layout.addWidget(tech_title)
-
-        tech_text = QLabel(
-            "Whisper (transcription) + GPT-4o-mini (nettoyage)\n"
-            "PySide6 (interface) + Groq API (cloud rapide)"
-        )
-        tech_text.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px;")
-        tech_text.setWordWrap(True)
-        layout.addWidget(tech_text)
-
-        layout.addStretch()
-
-        # Bouton Quitter (rouge)
-        quit_btn = QPushButton("Quitter The Wave")
-        quit_btn.setObjectName("quit-btn")
-        quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        quit_btn.clicked.connect(self._on_quit_clicked)
-        layout.addWidget(quit_btn)
-
-        return page
-
-    # ================================================================
-    # Page Aide
-    # ================================================================
-
-    def _build_page_help(self) -> QWidget:
-        t = _SETTINGS_T.get(self._sys_lang, _SETTINGS_T["en"])
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
-
+        # -- Section Aide --
         layout.addWidget(self._section_title(t["section_help"]))
 
-        # Raccourci actuel
         shortcut_label = QLabel(f"{t['help_shortcut_label']} {self._hotkey}")
         shortcut_label.setStyleSheet("color: #60a5fa; font-size: 14px; font-weight: 600;")
         layout.addWidget(shortcut_label)
 
-        layout.addSpacing(4)
-
-        # Comment ca marche
         how_title = QLabel(t["help_how_title"])
         how_title.setStyleSheet("color: rgba(255,255,255,0.8); font-size: 13px; font-weight: 600;")
         layout.addWidget(how_title)
@@ -1637,9 +1531,6 @@ class SettingsDialog(QDialog):
         how_text.setWordWrap(True)
         layout.addWidget(how_text)
 
-        layout.addSpacing(8)
-
-        # Signaler un probleme
         report_label = QLabel(t["help_report_title"])
         report_label.setStyleSheet("color: rgba(255,255,255,0.8); font-size: 13px; font-weight: 600;")
         layout.addWidget(report_label)
@@ -1648,8 +1539,40 @@ class SettingsDialog(QDialog):
         report_hint.setObjectName("hint")
         layout.addWidget(report_hint)
 
+        # -- Separateur --
+        sep2 = QLabel()
+        sep2.setFixedHeight(1)
+        sep2.setStyleSheet("background: #2a2a3e;")
+        layout.addWidget(sep2)
+
+        # -- Section A propos --
+        version_label = QLabel("The Wave v2.1")
+        version_label.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px;")
+        layout.addWidget(version_label)
+
+        tech_text = QLabel(
+            "Whisper (transcription) + GPT-4o-mini (nettoyage)\n"
+            "PySide6 (interface) + Groq API (cloud rapide)"
+        )
+        tech_text.setStyleSheet("color: rgba(255,255,255,0.3); font-size: 11px;")
+        tech_text.setWordWrap(True)
+        layout.addWidget(tech_text)
+
         layout.addStretch()
+
+        # Bouton Quitter (rouge, en bas)
+        quit_btn = QPushButton("Quitter The Wave")
+        quit_btn.setObjectName("quit-btn")
+        quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        quit_btn.clicked.connect(self._on_quit_clicked)
+        layout.addWidget(quit_btn)
+
         return page
+
+    def _on_activate_license_clicked(self) -> None:
+        """Lance l'activation de licence."""
+        if self._on_activate_license:
+            self._on_activate_license()
 
     def _on_quit_clicked(self) -> None:
         """Quitte l'application via le bouton Quitter."""
@@ -1658,8 +1581,8 @@ class SettingsDialog(QDialog):
             self._on_quit()
 
     def navigate_to_help(self) -> None:
-        """Ouvre directement sur l'onglet Aide (appele depuis tray)."""
-        self._navigate(6)
+        """Ouvre directement sur l'onglet Compte qui contient l'aide (appele depuis tray)."""
+        self._navigate(3)
 
     # ================================================================
     # Helpers
