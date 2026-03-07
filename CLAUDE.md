@@ -31,7 +31,7 @@ voxtool/
 │   │   ├── feedback.py         # Sons feedback (start/stop/complete/error)
 │   │   └── processor.py        # Traitement audio (chunking, validation duree)
 │   ├── transcription/
-│   │   ├── whisper_engine.py    # Moteur faster-whisper (local)
+│   │   ├── whisper_engine.py    # Moteur faster-whisper (local) — condition_on_previous_text=False (évite hallucinations)
 │   │   ├── groq_engine.py      # Moteur Groq API (cloud) — flag _available, circuit breaker
 │   │   ├── hybrid_engine.py    # Hybride: Groq → Whisper local, callback on_fallback
 │   │   └── hallucinations.py   # Detection hallucinations Whisper
@@ -148,6 +148,9 @@ Fenetre moderne dark theme 620x580 avec **sidebar navigation a gauche** (7 ongle
 - Classe principale `TheWave` (anciennement `VoxTool`)
 - `_on_settings()` gere 7 parametres : hotkey, cleaning mode, langue, micro, transcription provider, cleaning provider, ollama_host
 - `_on_help()` ouvre les settings directement sur l'onglet Aide via `navigate_to_help()`
+- **PIEGE `parent=`** : `SettingsDialog(parent=None)` — JAMAIS `parent=self._taskbar._win`. La fenetre taskbar est minimisee (opacity=0), Qt bloque `raise_()/activateWindow()` sur un child dont le parent est minimise. Le flag `Qt.WindowType.Tool` (dans `_setup_window`) gere le groupement taskbar sans parent.
+- `_focus_existing_dialog()` : ramene un dialog existant au premier plan (show + raise + activateWindow + `_force_foreground_win32` Win32 API + retries 50/150ms)
+- `_force_foreground_win32()` : AttachThreadInput + ShowWindow + BringWindowToTop + SetForegroundWindow + TOPMOST/NOTOPMOST
 - `on_quit` callback passe a `SettingsDialog`, `WaveformWidget` et `TrayIcon`
 - `_save_config_nested()` : charge YAML complet, modifie la cle nested, re-ecrit (supporte cleaning.mode, whisper.language, etc.)
 - `_rebuild_pipeline()` : recrée le `CleaningPipeline` complet avec la config courante — appele quand `cleaning.mode` ou `cleaning.provider` change en cours de session (garantit que les cleaners LLM sont bien re-initialises)
@@ -179,6 +182,11 @@ La langue est sauvegardee dans `config.yaml` → `whisper.language` et rechargee
 - Hot-reload via `update_hotkey(new_hotkey)` sans redemarrer l'app
 - Configurable via Tray → Parametres → capture combo → sauvegarde dans config.yaml
 - Validation dans `config/validator.py` via `_validate_hotkey()`
+- **Thread safety** : callbacks `on_start`/`on_stop`/`on_busy` transitent via `_HotkeyBridge`
+  (QObject avec signals) → dispatché vers le thread Qt principal. Ne jamais appeler directement
+  des méthodes Qt depuis le thread pynput.
+- **`on_busy` callback** : appelé quand hotkey pressé pendant `_is_processing = True` →
+  déclenche une notification tray traduite (`_BUSY_T` dans `app.py`)
 
 ## Injection progressive (progressive_injector.py)
 
@@ -203,6 +211,10 @@ Avant d'envoyer les Backspaces, 2 conditions vérifiées dans l'ordre :
 
 Si une condition échoue → `_stop_user_watch()` + `return` (texte brut conservé, silent fallback).
 `_stop_user_watch()` est appelé dans **toutes** les branches (pas de thread actif qui traîne).
+- **PIÈGE mode raw** : si `cleaning_mode == "raw"`, `replace_with_clean()` n'est jamais appelé →
+  appeler `self._prog_injector._stop_user_watch()` explicitement dans ce chemin.
+- **Clipboard** : `inject_raw()` sauvegarde le clipboard AVANT l'injection et le restaure APRÈS
+  (`saved_clipboard` variable locale) — l'utilisateur retrouve son Ctrl+C original intact.
 
 ### PIEGE : dossier Windows
 Toujours synchroniser vers `voice_text_latency`, PAS `voice_text1`.
