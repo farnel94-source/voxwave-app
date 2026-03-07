@@ -785,10 +785,11 @@ class WelcomeDialog(QDialog):
             "border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; "
             "selection-background-color: rgba(59,130,246,0.3); padding: 4px; }"
         )
-        self._lang_combo.addItem("🌐 Auto-detect", "auto")
         for code, name in WHISPER_LANGUAGES:
             self._lang_combo.addItem(f"{name} ({code})", code)
-        self._lang_combo.setCurrentIndex(0)
+        default_index = self._lang_combo.findData("en")
+        if default_index >= 0:
+            self._lang_combo.setCurrentIndex(default_index)
         layout.addWidget(self._lang_combo, alignment=Qt.AlignmentFlag.AlignCenter)
 
         hint = QLabel("You can change this anytime in Settings")
@@ -1172,6 +1173,8 @@ class WelcomeDialog(QDialog):
         self._demo_btn.setStyleSheet("background-color: #ef4444;")
         self._demo_status.setText(_t(lang, "demo_status_speak"))
         self._demo_text.setPlainText("")
+        if self._feedback:
+            self._feedback.play_start()
 
         try:
             self._demo_stream = sd.InputStream(
@@ -1194,6 +1197,8 @@ class WelcomeDialog(QDialog):
         self._demo_recording = False
         self._demo_btn.setText(_t(lang, "demo_btn_dictate"))
         self._demo_btn.setStyleSheet("")
+        if self._feedback:
+            self._feedback.play_stop()
 
         if self._demo_stream:
             try:
