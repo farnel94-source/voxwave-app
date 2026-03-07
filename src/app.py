@@ -211,6 +211,60 @@ class _HotkeyBridge:
         self.sig_busy = self._bridge.sig_busy
 
 
+def _force_foreground_win32(widget: "QWidget") -> None:
+    """Force une fenetre au premier plan sur Windows.
+
+    1. AttachThreadInput — attache notre thread a celui de la fenetre active
+       pour obtenir le droit d'appeler SetForegroundWindow
+    2. ShowWindow(SW_RESTORE) + BringWindowToTop + SetForegroundWindow
+       pour restaurer et forcer la fenetre en avant-plan
+    3. SetWindowPos TOPMOST → NOTOPMOST — filet de securite
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        hwnd = int(widget.winId())
+        user32 = ctypes.windll.user32
+
+        # 1) AttachThreadInput : voler le droit de focus
+        foreground_hwnd = user32.GetForegroundWindow()
+        foreground_tid = user32.GetWindowThreadProcessId(foreground_hwnd, None)
+        our_tid = user32.GetWindowThreadProcessId(hwnd, None)
+        attached = False
+        if foreground_tid != our_tid:
+            attached = bool(user32.AttachThreadInput(foreground_tid, our_tid, True))
+
+        # 2) Restaurer puis amener au premier plan
+        SW_RESTORE = 9
+        show_ret = user32.ShowWindow(hwnd, SW_RESTORE)
+        bring_ret = user32.BringWindowToTop(hwnd)
+        set_fg_ret = user32.SetForegroundWindow(hwnd)
+
+        # 3) TOPMOST → NOTOPMOST en filet de securite
+        SWP_NOMOVE = 0x0002
+        SWP_NOSIZE = 0x0001
+        SWP_SHOWWINDOW = 0x0040
+        flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW
+        user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, flags)   # HWND_TOPMOST
+        user32.SetWindowPos(hwnd, -2, 0, 0, 0, 0, flags)   # HWND_NOTOPMOST
+
+        logger.debug(
+            "win32 focus: hwnd=%s attached=%s ShowWindow=%s BringWindowToTop=%s SetForegroundWindow=%s",
+            hwnd,
+            attached,
+            show_ret,
+            bring_ret,
+            set_fg_ret,
+        )
+
+        # 4) Detacher les threads
+        if attached:
+            user32.AttachThreadInput(foreground_tid, our_tid, False)
+    except Exception as e:
+        logger.debug(f"win32 focus echec: {e}")
+
+
 class TheWave:
     """Application principale The Wave."""
 
@@ -937,17 +991,43 @@ class TheWave:
         except Exception as e:
             logger.error(f"Dialog licence echoue: {e}")
 
+    def _focus_existing_dialog(self, dialog: object, origin: str = "settings") -> None:
+        """Ramene un dialog existant au premier plan avec retries sous Windows."""
+        if dialog is None:
+            return
+
+        def _attempt(label: str) -> None:
+            try:
+                if hasattr(dialog, "isMinimized") and dialog.isMinimized():
+                    dialog.showNormal()
+                dialog.show()
+                dialog.raise_()
+                dialog.activateWindow()
+                _force_foreground_win32(dialog)
+                logger.debug(f"{origin}: focus attempt '{label}'")
+            except RuntimeError as e:
+                logger.debug(f"{origin}: focus ignore ({label}) - dialog ferme: {e}")
+            except Exception as e:
+                logger.debug(f"{origin}: focus echec ({label}): {e}")
+
+        _attempt("immediate")
+
+        if sys.platform == "win32":
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(50, lambda: _attempt("retry-50ms"))
+            QTimer.singleShot(150, lambda: _attempt("retry-150ms"))
+
     def _on_settings(self) -> None:
         """Ouvre le dialogue des parametres et applique les changements."""
         if self._shutting_down:
             return
-        from src.gui.settings_dialog import SettingsDialog
 
         # Guard singleton : si un dialog est deja ouvert, le mettre au premier plan
         if self._settings_dialog is not None:
-            self._settings_dialog.raise_()
-            self._settings_dialog.activateWindow()
+            self._focus_existing_dialog(self._settings_dialog, origin="settings-existing")
             return
+
+        from src.gui.settings_dialog import SettingsDialog
 
         cleaning_config = self.config.get("cleaning", {})
         dialog = SettingsDialog(
@@ -964,8 +1044,10 @@ class TheWave:
             current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
+            parent=None,
         )
         self._settings_dialog = dialog
+        self._focus_existing_dialog(dialog, origin="settings-new")
         dialog.exec()  # on lance toujours (fermeture avec X ou Save sauvegarde quand meme)
         self._settings_dialog = None
         changes = []
@@ -1087,13 +1169,13 @@ class TheWave:
         """Ouvre les parametres sur l'onglet Aide."""
         if self._shutting_down:
             return
-        from src.gui.settings_dialog import SettingsDialog
 
         # Guard singleton : si un dialog est deja ouvert, le mettre au premier plan
         if self._settings_dialog is not None:
-            self._settings_dialog.raise_()
-            self._settings_dialog.activateWindow()
+            self._focus_existing_dialog(self._settings_dialog, origin="help-existing")
             return
+
+        from src.gui.settings_dialog import SettingsDialog
 
         cleaning_config = self.config.get("cleaning", {})
         dialog = SettingsDialog(
@@ -1110,9 +1192,11 @@ class TheWave:
             current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
+            parent=None,
         )
         self._settings_dialog = dialog
         dialog.navigate_to_help()
+        self._focus_existing_dialog(dialog, origin="help-new")
         dialog.exec()
         self._settings_dialog = None
 
