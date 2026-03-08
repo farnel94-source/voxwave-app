@@ -110,6 +110,9 @@ body {
 /* === Aura canvas (derriere le SVG) === */
 #aura-canvas {
     position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     z-index: 1;
     pointer-events: none;
 }
@@ -475,6 +478,7 @@ function stopAuraAnimation() {
     }
     // Clear canvas pour economiser le CPU en idle
     auraCtx.clearRect(0, 0, AURA_SIZE, AURA_SIZE);
+    amplitude = 0.0;
     targetAmplitude = 0.0;
 }
 
