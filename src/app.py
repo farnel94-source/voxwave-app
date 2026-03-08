@@ -156,7 +156,10 @@ class _TaskbarWindow:
                     SC_RESTORE = 0xF120
                     if msg.message == WM_SYSCOMMAND and (msg.wParam & 0xFFF0) == SC_RESTORE:
                         print("[TaskbarWindow] SC_RESTORE intercepte -> ouverture Settings", flush=True)
-                        on_activate()
+                        # Differe d'un tick : nativeEvent retourne d'abord True,0 →
+                        # Windows met a jour son etat interne → GetForegroundWindow()
+                        # retourne la VRAIE fenetre active quand on_activate s'execute.
+                        QTimer.singleShot(0, on_activate)
                         return True, 0  # Consomme le message : fenetre reste minimisee
                 return super(_Anchor, self_).nativeEvent(event_type, message)
 
@@ -740,7 +743,8 @@ class TheWave:
                 if self.waveform:
                     self.waveform.show_idle()
                     if self.config.get("activation_method", "both") == "hotkey":
-                        self.waveform.sig_hide_widget.emit()
+                        # Signal thread-safe : le QTimer tourne dans le thread principal
+                        self.waveform.sig_hide_widget_delayed.emit()
                 if self.tray:
                     self.tray.set_state("idle")
 
@@ -901,7 +905,8 @@ class TheWave:
                 if self.waveform:
                     self.waveform.show_idle()
                     if self.config.get("activation_method", "both") == "hotkey":
-                        self.waveform.sig_hide_widget.emit()
+                        # Signal thread-safe : le QTimer tourne dans le thread principal
+                        self.waveform.sig_hide_widget_delayed.emit()
                 if self.tray:
                     self.tray.set_state("idle")
 
@@ -1044,7 +1049,7 @@ class TheWave:
             current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
-            parent=None,
+            parent=self._taskbar._win,
         )
         self._settings_dialog = dialog
         self._focus_existing_dialog(dialog, origin="settings-new")
@@ -1192,7 +1197,7 @@ class TheWave:
             current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
-            parent=None,
+            parent=self._taskbar._win,
         )
         self._settings_dialog = dialog
         dialog.navigate_to_help()

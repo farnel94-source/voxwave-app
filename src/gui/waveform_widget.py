@@ -143,6 +143,7 @@ class WaveformWidget(QWidget):
     sig_update_step = Signal(str)
     sig_show_preview = Signal(str)
     sig_hide_widget = Signal()
+    sig_hide_widget_delayed = Signal()
     sig_set_error_text = Signal(str)
 
     def __init__(
@@ -241,6 +242,7 @@ class WaveformWidget(QWidget):
         self.sig_update_step.connect(self._do_update_step)
         self.sig_show_preview.connect(self._do_show_preview)
         self.sig_hide_widget.connect(self.hide)
+        self.sig_hide_widget_delayed.connect(self._do_hide_delayed)
         self.sig_set_error_text.connect(self._do_set_error_text)
 
     # === Public API (thread-safe) ===
@@ -329,6 +331,10 @@ class WaveformWidget(QWidget):
         self._run_js(f"updateStep('{escaped}')")
 
     @Slot(str)
+    def _do_hide_delayed(self) -> None:
+        """Cache le widget après 900ms pour laisser le flash vert jouer (main thread)."""
+        QTimer.singleShot(900, self.hide)
+
     def _do_set_error_text(self, text: str) -> None:
         """Met a jour le texte d'erreur dans l'orb (main thread)."""
         escaped = text.replace("'", "\\'")
