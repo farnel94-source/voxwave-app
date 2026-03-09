@@ -10,10 +10,11 @@ from typing import Set
 
 # Hallucinations exactes (comparaison en lowercase, stripped)
 KNOWN_HALLUCINATIONS: Set[str] = {
-    "merci.", "merci !", "merci",
+    "merci.", "merci !",
     "sous-titrage", "sous-titres",
     "sous-titrage societe radio-canada",
     "sous-titrage société radio-canada",
+    "sous-titrage st", "sous-titrage stl",
     "merci d'avoir regarde", "merci d'avoir regarde !",
     "merci d'avoir regarde cette video",
     "merci d'avoir regarde cette video !",
@@ -21,18 +22,25 @@ KNOWN_HALLUCINATIONS: Set[str] = {
     "merci de votre attention.",
     "a bientot", "a bientot.",
     "au revoir", "au revoir.",
+    "bonjour.", "bonsoir.",
+    "salut.",
     "...", "\u2026",
     "bye", "bye.",
     "thank you", "thanks",
     "thank you for watching",
     "thanks for watching",
     "et oui.", "et oui", "et non",
+    "subtitles", "subtitle", "music", "musique",
+    "\u266a", "\U0001f3b5",
 }
 
 # Mots generiques courts (comparaison sans ponctuation finale)
 GENERIC_SHORT: Set[str] = {
     "oui", "non", "ok", "bon", "bien", "ah", "oh",
     "hmm", "hm", "ha", "voila", "voil\u00e0",
+    "bonjour", "bonsoir", "salut", "pardon", "merci",
+    "hello", "hey", "hi", "yeah", "yes", "no", "the", "so", "you",
+    "i", "it",
 }
 
 # Patterns que Whisper/Groq hallucine en fin de transcription
@@ -71,6 +79,11 @@ def is_hallucination(text: str) -> bool:
         stripped = text_lower.rstrip(".!? ")
         if stripped in GENERIC_SHORT:
             return True
+
+    # Même phrase répétée 3+ fois = hallucination
+    sentences = [s.strip() for s in re.split(r'[.!?]+', text_lower) if s.strip()]
+    if len(sentences) >= 3 and len(set(sentences)) == 1:
+        return True
 
     return False
 

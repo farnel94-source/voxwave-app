@@ -59,12 +59,17 @@ class TestAudioProcessorWebrtcvad:
         # Should be trimmed (shorter than original)
         assert len(result) <= len(audio)
 
-    def test_trim_silence_energy_preserves_speech(self, sample_audio):
-        """VAD energie ne doit pas supprimer tout le signal."""
+    def test_trim_silence_energy_preserves_speech(self):
+        """VAD energie ne doit pas supprimer tout le signal quand il y a de la parole."""
         processor = AudioProcessor()
         processor._vad = None
 
-        result = processor._trim_silence_energy(sample_audio)
+        # Silence + signal fort + silence (simule de la parole entourée de silence)
+        silence = np.zeros(16000, dtype=np.float32)
+        speech = np.random.randn(16000 * 2).astype(np.float32) * 0.5
+        audio = np.concatenate([silence, speech, silence])
+
+        result = processor._trim_silence_energy(audio)
         assert len(result) > 0
 
     def test_trim_silence_webrtcvad_falls_back_on_error(self):
@@ -74,7 +79,10 @@ class TestAudioProcessorWebrtcvad:
         mock_vad.is_speech.side_effect = RuntimeError("boom")
         processor._vad = mock_vad
 
-        audio = np.random.randn(16000 * 3).astype(np.float32) * 0.5
+        # Silence + signal fort + silence (pour que le VAD énergie détecte de la parole)
+        silence = np.zeros(16000, dtype=np.float32)
+        speech = np.random.randn(16000 * 2).astype(np.float32) * 0.5
+        audio = np.concatenate([silence, speech, silence])
         # Should not raise, should fall back
         result = processor.trim_silence(audio)
         assert len(result) > 0

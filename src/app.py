@@ -681,6 +681,12 @@ class TheWave:
             # Preparer (apres troncature)
             audio = self.processor.prepare_for_whisper(audio)
 
+            # Vérifier si de la parole a été détectée après le trim
+            post_duration = len(audio) / audio_config["sample_rate"]
+            if post_duration < min_duration:
+                logger.info(f"Aucune parole detectee apres trim ({post_duration:.2f}s), ignore")
+                return
+
             # Verifier la taille apres preparation (limite Groq API : 25MB WAV)
             audio_size_bytes = len(audio) * 2
             if audio_size_bytes > 24_000_000:
@@ -790,6 +796,12 @@ class TheWave:
 
             # --- Préparation audio ---
             audio = self.processor.prepare_for_whisper(audio)
+
+            # Vérifier si de la parole a été détectée après le trim
+            post_duration = len(audio) / audio_config["sample_rate"]
+            if post_duration < min_duration:
+                logger.info(f"[progressif] Aucune parole detectee apres trim ({post_duration:.2f}s), ignore")
+                return
 
             # Vérif taille WAV (limite Groq API : 25MB)
             if len(audio) * 2 > 24_000_000:
@@ -1049,7 +1061,7 @@ class TheWave:
             current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
-            parent=self._taskbar._win,
+            parent=None,
         )
         self._settings_dialog = dialog
         self._focus_existing_dialog(dialog, origin="settings-new")
@@ -1197,7 +1209,7 @@ class TheWave:
             current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
-            parent=self._taskbar._win,
+            parent=None,
         )
         self._settings_dialog = dialog
         dialog.navigate_to_help()

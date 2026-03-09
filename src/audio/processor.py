@@ -109,7 +109,8 @@ class AudioProcessor:
             speech_frames.append(is_speech)
 
         if not speech_frames or not any(speech_frames):
-            return audio
+            logger.info("Aucune parole detectee (webrtcvad), audio ignore")
+            return np.array([], dtype=np.float32)
 
         # Trouver début et fin de parole
         start_frame = 0
@@ -173,6 +174,11 @@ class AudioProcessor:
         noise_floor = sorted_energies[len(sorted_energies) // 4]
         threshold = max(noise_floor * 3, 0.001)
         logger.debug(f"VAD energie: noise_floor={noise_floor:.5f}, threshold={threshold:.5f}")
+
+        speech_detected = any(e > threshold for e in energies)
+        if not speech_detected:
+            logger.info("Aucune parole detectee (VAD energie), audio ignore")
+            return np.array([], dtype=np.float32)
 
         start_frame = 0
         end_frame = len(energies) - 1
@@ -318,6 +324,8 @@ class AudioProcessor:
         """Prépare l'audio : float32, trimé, normalisé doucement."""
         audio = audio.astype(np.float32)
         audio = self.trim_silence(audio)
+        if len(audio) == 0:
+            return audio
         audio = self.normalize(audio)
         logger.debug(f"Audio préparé: {len(audio)} samples, {len(audio)/self.sample_rate:.2f}s")
         return audio
