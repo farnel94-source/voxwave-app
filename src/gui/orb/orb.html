@@ -160,6 +160,7 @@ body {
     text-align: center;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.5px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 /* === Processing state === */
@@ -177,6 +178,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 120px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .voice-input.processing .processing-text {
@@ -197,6 +199,7 @@ body {
     background: rgba(255, 255, 255, 0.7);
     display: inline-block;
     animation: dot-bounce 1.4s ease-in-out infinite;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.4);
 }
 .processing-dots span:nth-child(2) { animation-delay: 0.2s; }
 .processing-dots span:nth-child(3) { animation-delay: 0.4s; }
@@ -229,6 +232,7 @@ body {
     text-align: left;
     font-weight: 600;
     letter-spacing: 0.2px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .voice-input.error .error-text {
@@ -517,24 +521,33 @@ function animateAura() {
     auraCtx.arc(cx, cy, AURA_SIZE / 2, 0, Math.PI * 2);
     auraCtx.clip();
 
+    // === 0. Shadow layer (contraste sur fond clair) ===
+    const shadowRadius = CORE_BASE_RADIUS + 30 + clampedIntensity * 35;
+    const shadowGrad = auraCtx.createRadialGradient(cx, cy, CORE_BASE_RADIUS * 0.5, cx, cy, shadowRadius);
+    shadowGrad.addColorStop(0, 'rgba(0, 0, 0, ' + (0.1 + clampedIntensity * 0.15).toFixed(3) + ')');
+    shadowGrad.addColorStop(0.6, 'rgba(0, 0, 0, ' + (0.05 + clampedIntensity * 0.08).toFixed(3) + ')');
+    shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    auraCtx.fillStyle = shadowGrad;
+    auraCtx.fillRect(0, 0, AURA_SIZE, AURA_SIZE);
+
     // === 1. Outer Aura (respire avec Math.sin, même sans voix) ===
     const breathe = Math.sin(time * 2) * 0.5 + 0.5;
-    const auraDynamicRadius = CORE_BASE_RADIUS + 25 + breathe * 8 + clampedIntensity * 18;
+    const auraDynamicRadius = CORE_BASE_RADIUS + 20 + breathe * 6 + clampedIntensity * 30;
 
     const auraGradient = auraCtx.createRadialGradient(cx, cy, CORE_BASE_RADIUS, cx, cy, auraDynamicRadius);
-    auraGradient.addColorStop(0, 'rgba(99, 102, 241, ' + (0.1 + clampedIntensity * 0.2).toFixed(3) + ')');
-    auraGradient.addColorStop(0.5, 'rgba(59, 130, 246, ' + (0.05 + clampedIntensity * 0.1).toFixed(3) + ')');
+    auraGradient.addColorStop(0, 'rgba(99, 102, 241, ' + (0.08 + clampedIntensity * 0.45).toFixed(3) + ')');
+    auraGradient.addColorStop(0.5, 'rgba(59, 130, 246, ' + (0.04 + clampedIntensity * 0.25).toFixed(3) + ')');
     auraGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
     auraCtx.fillStyle = auraGradient;
     auraCtx.fillRect(0, 0, AURA_SIZE, AURA_SIZE);
 
     // === 2. Core Glow (intense, proche du centre) ===
-    const coreDynamicRadius = CORE_BASE_RADIUS + clampedIntensity * 25;
+    const coreDynamicRadius = CORE_BASE_RADIUS + clampedIntensity * 35;
 
     const coreGradient = auraCtx.createRadialGradient(cx, cy, 0, cx, cy, coreDynamicRadius);
-    coreGradient.addColorStop(0, 'rgba(34, 211, 238, ' + (0.6 + clampedIntensity * 0.4).toFixed(3) + ')');
-    coreGradient.addColorStop(0.6, 'rgba(59, 130, 246, ' + (0.3 + clampedIntensity * 0.3).toFixed(3) + ')');
+    coreGradient.addColorStop(0, 'rgba(34, 211, 238, ' + (0.4 + clampedIntensity * 0.6).toFixed(3) + ')');
+    coreGradient.addColorStop(0.6, 'rgba(59, 130, 246, ' + (0.15 + clampedIntensity * 0.5).toFixed(3) + ')');
     coreGradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
 
     auraCtx.fillStyle = coreGradient;
@@ -543,13 +556,13 @@ function animateAura() {
     // === 3. Energy Particles (15 points scintillants) ===
     for (var i = 0; i < NUM_PARTICLES; i++) {
         var angle = (i / NUM_PARTICLES) * Math.PI * 2 + time * 0.5 + (i * 132.5);
-        var distance = CORE_BASE_RADIUS + (Math.sin(time * 3 + i * 54) * 6) + (clampedIntensity * 35);
+        var distance = CORE_BASE_RADIUS + (Math.sin(time * 3 + i * 54) * 6) + (clampedIntensity * 40);
         var px = cx + Math.cos(angle) * distance;
         var py = cy + Math.sin(angle) * distance;
 
         // Taille et opacité liées à l'intensité
-        var particleSize = 1.5 + clampedIntensity * 0.5;
-        var particleAlpha = 0.3 + clampedIntensity * 0.5 + Math.sin(time * 4 + i * 27) * 0.15;
+        var particleSize = 1.5 + clampedIntensity * 1.5;
+        var particleAlpha = 0.2 + clampedIntensity * 0.7 + Math.sin(time * 4 + i * 27) * 0.15;
         particleAlpha = Math.max(0, Math.min(1, particleAlpha));
 
         auraCtx.beginPath();
@@ -557,6 +570,13 @@ function animateAura() {
         auraCtx.fillStyle = 'rgba(147, 197, 253, ' + particleAlpha.toFixed(3) + ')';
         auraCtx.fill();
     }
+
+    // === 4. Edge ring (définit le bord sur fond clair) ===
+    auraCtx.beginPath();
+    auraCtx.arc(cx, cy, auraDynamicRadius - 1, 0, Math.PI * 2);
+    auraCtx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+    auraCtx.lineWidth = 1.5;
+    auraCtx.stroke();
 
     auraCtx.restore();
 
