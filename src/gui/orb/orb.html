@@ -54,19 +54,18 @@ body {
     box-shadow: none;
 }
 
-/* === Logo SVG === */
+/* === Logo === */
 .logo-icon {
     width: 100px;
     height: 100px;
+    object-fit: contain;
     cursor: pointer;
     transition: transform 0.2s ease, filter 0.3s ease;
     /* Idle: respiration subtile via animation */
     animation: breathe 3.5s ease-in-out infinite;
-    position: relative;
-    z-index: 2;
 }
 
-/* Respiration idle — glow blanc ultra-subtil */
+/* Respiration à l'idle — glow blanc ultra-subtil */
 @keyframes breathe {
     0%, 100% {
         filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.1))
@@ -107,16 +106,6 @@ body {
     flex-shrink: 0;
 }
 
-/* === Aura canvas (derriere le SVG) === */
-#aura-canvas {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1;
-    pointer-events: none;
-}
-
 /* === Expandable area (timer) — expansion horizontale === */
 .expand-area {
     display: flex;
@@ -127,7 +116,7 @@ body {
     max-width: 0;
     opacity: 0;
     margin-left: 0;
-    /* Spring fluide */
+    /* Spring fluide à l'expansion (axe horizontal) */
     transition:
         max-width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
         opacity 0.3s ease,
@@ -150,7 +139,7 @@ body {
     letter-spacing: 0.5px;
 }
 
-/* === Processing state — dots animes === */
+/* === Processing state — dots animés === */
 .voice-input.processing {
     pointer-events: none;
 }
@@ -171,7 +160,7 @@ body {
     display: block;
 }
 
-/* Dots animes */
+/* Dots animés quand le texte est "Traitement..." */
 .processing-dots {
     display: inline-flex;
     gap: 3px;
@@ -195,7 +184,7 @@ body {
     40% { transform: translateY(-4px); opacity: 1; }
 }
 
-/* === Flash de succes (transition processing -> idle) === */
+/* === Flash de succès (transition processing → idle) === */
 .logo-icon.success {
     animation: success-bounce 0.5s ease-out forwards !important;
     filter: drop-shadow(0 0 18px rgba(74, 222, 128, 0.9))
@@ -207,6 +196,18 @@ body {
     40%  { transform: scale(1.12); }
     70%  { transform: scale(0.97); }
     100% { transform: scale(1); }
+}
+
+/* === Anneau réactif à la voix === */
+.ring {
+    position: absolute;
+    width: 108px;
+    height: 108px;
+    border-radius: 50%;
+    border: 2px solid rgba(96, 165, 250, 0);
+    opacity: 0;
+    pointer-events: none;
+    /* Pas de transition CSS : animé frame-par-frame par JS */
 }
 
 /* === Error state === */
@@ -252,25 +253,8 @@ body {
 
 <div class="voice-input" id="voice-input">
     <div class="icon-area" id="icon-area">
-        <canvas id="aura-canvas"></canvas>
-        <!-- Logo SVG inline — 3 ondes stylisees "The Wave" -->
-        <svg class="logo-icon" id="logo-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <linearGradient id="wave-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#60A5FA" />
-                    <stop offset="50%" stop-color="#818CF8" />
-                    <stop offset="100%" stop-color="#A78BFA" />
-                </linearGradient>
-            </defs>
-            <!-- Cercle de fond subtil -->
-            <circle cx="50" cy="50" r="46" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-            <!-- Onde 1 (gauche) -->
-            <path d="M 22 58 Q 30 38, 38 50 Q 46 62, 50 50" stroke="url(#wave-grad)" stroke-width="3.5" stroke-linecap="round" fill="none" opacity="0.6"/>
-            <!-- Onde 2 (centre — la plus grande) -->
-            <path d="M 30 58 Q 40 28, 50 50 Q 60 72, 70 42" stroke="url(#wave-grad)" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.9"/>
-            <!-- Onde 3 (droite) -->
-            <path d="M 50 50 Q 54 38, 62 50 Q 70 62, 78 42" stroke="url(#wave-grad)" stroke-width="3.5" stroke-linecap="round" fill="none" opacity="0.6"/>
-        </svg>
+        <img class="logo-icon" id="logo-icon" src="logo.png" alt="The Wave" />
+        <div class="ring" id="ring"></div>
     </div>
 
     <div class="expand-area" id="expand-area">
@@ -292,7 +276,7 @@ let currentState = 'idle';
 let bridge = null;
 let timerSeconds = 0;
 let timerInterval = null;
-let auraAnimId = null;
+let ringAnimId = null;
 let targetAmplitude = 0.0;
 let amplitude = 0.0;
 
@@ -302,17 +286,7 @@ const expandArea     = document.getElementById('expand-area');
 const timerEl        = document.getElementById('timer');
 const processingText = document.getElementById('processing-text');
 const processingDots = document.getElementById('processing-dots');
-const auraCanvas     = document.getElementById('aura-canvas');
-const auraCtx        = auraCanvas.getContext('2d');
-
-// === Setup canvas HD (devicePixelRatio) ===
-const AURA_SIZE = 140; // CSS pixels — depasse du logo (100px) pour le halo
-const dpr = window.devicePixelRatio || 1;
-auraCanvas.width = AURA_SIZE * dpr;
-auraCanvas.height = AURA_SIZE * dpr;
-auraCanvas.style.width = AURA_SIZE + 'px';
-auraCanvas.style.height = AURA_SIZE + 'px';
-auraCtx.scale(dpr, dpr);
+const ring           = document.getElementById('ring');
 
 // === QWebChannel Bridge ===
 if (typeof QWebChannel !== 'undefined') {
@@ -321,19 +295,19 @@ if (typeof QWebChannel !== 'undefined') {
     });
 }
 
-// === Appele depuis Python pour mettre a jour l'amplitude ===
+// === Appelé depuis Python pour mettre à jour l'amplitude ===
 function updateAmplitude(value) {
     targetAmplitude = Math.min(1.0, Math.max(0.0, value));
 }
 
-// === Gestion des etats ===
+// === Gestion des états ===
 function applyIdleState() {
     logoIcon.style.display = '';
     expandArea.classList.remove('visible');
     voiceInput.classList.remove('active', 'processing', 'error');
     processingDots.style.display = '';
     stopTimer();
-    stopAuraAnimation();
+    stopRingAnimation();
     targetAmplitude = 0.0;
 }
 
@@ -348,7 +322,7 @@ function doSuccessFlash(callback) {
 function setState(state) {
     var prevState = currentState;
 
-    // Interception : succes = idle depuis processing
+    // Interception : succès = idle depuis processing
     if (state === 'idle' && prevState === 'processing') {
         doSuccessFlash(function() {
             currentState = 'idle';
@@ -369,17 +343,18 @@ function setState(state) {
         voiceInput.classList.remove('processing', 'error');
         processingDots.style.display = '';
         startTimer();
-        startAuraAnimation();
+        startRingAnimation();
 
     } else if (state === 'processing') {
         logoIcon.style.display = '';
         expandArea.classList.remove('visible');
         voiceInput.classList.add('active', 'processing');
         voiceInput.classList.remove('error');
+        // Réaffiche le texte par défaut avec les dots
         processingText.childNodes[0].textContent = 'Traitement';
         processingDots.style.display = '';
         stopTimer();
-        stopAuraAnimation();
+        stopRingAnimation();
         targetAmplitude = 0.0;
 
     } else if (state === 'error') {
@@ -389,12 +364,12 @@ function setState(state) {
         voiceInput.classList.remove('processing');
         processingDots.style.display = 'none';
         stopTimer();
-        stopAuraAnimation();
+        stopRingAnimation();
         targetAmplitude = 0.0;
     }
 }
 
-// === Click droit sur le logo -> Settings ===
+// === Click droit sur le logo → Settings ===
 logoIcon.addEventListener('contextmenu', function(e) {
     e.preventDefault();
     if (bridge && bridge.on_settings_clicked) {
@@ -465,85 +440,69 @@ function stopTimer() {
     timerEl.textContent = '00:00';
 }
 
-// === Aura canvas reactive a la voix ===
-function startAuraAnimation() {
-    if (auraAnimId) return;
-    animateAura();
+// === Anneau réactif à la voix (amplitude reçue depuis Python) ===
+function startRingAnimation() {
+    if (ringAnimId) return;
+    animateRing();
 }
 
-function stopAuraAnimation() {
-    if (auraAnimId) {
-        cancelAnimationFrame(auraAnimId);
-        auraAnimId = null;
+function stopRingAnimation() {
+    if (ringAnimId) {
+        cancelAnimationFrame(ringAnimId);
+        ringAnimId = null;
     }
-    // Clear canvas pour economiser le CPU en idle
-    auraCtx.clearRect(0, 0, AURA_SIZE, AURA_SIZE);
-    amplitude = 0.0;
+    ring.style.opacity = '0';
+    ring.style.transform = 'scale(1)';
+    ring.style.boxShadow = 'none';
     targetAmplitude = 0.0;
 }
 
-function animateAura() {
-    // Lissage de l'amplitude (spring-like)
+function animateRing() {
     amplitude += (targetAmplitude - amplitude) * 0.12;
 
     const time = performance.now() / 1000;
-    // Pulsation de base lente meme sans voix
+    // Pulsation de base lente même sans voix
     const basePulse = Math.sin(time * 1.5) * 0.5 + 0.5;
 
-    const cx = AURA_SIZE / 2;
-    const cy = AURA_SIZE / 2;
+    // Scale : de 1.0 (collé au logo) à ~1.35 (voix forte)
+    const scale = 1.0 + basePulse * 0.06 + amplitude * 0.28;
 
-    // Rayon de l'aura: 30px au repos, jusqu'a 65px en voix forte
-    const innerRadius = 20 + basePulse * 3;
-    const outerRadius = 35 + basePulse * 8 + amplitude * 30;
-
-    // Opacite globale: subtile au repos, forte quand on parle
-    const globalAlpha = 0.15 + basePulse * 0.1 + amplitude * 0.55;
+    // Opacité : subtile au repos, forte quand on parle
+    const opacity = 0.2 + basePulse * 0.15 + amplitude * 0.55;
 
     // Couleur bleue qui s'intensifie avec l'amplitude
     const intensity = basePulse * 0.2 + amplitude * 0.8;
-    const r = Math.round(96  + intensity * 40);   // bleu -> violet leger
-    const g = Math.round(165 - intensity * 30);   // desature un peu
+    const r = Math.round(59  + intensity * 37);   // 59 → 96
+    const g = Math.round(130 + intensity * 35);   // 130 → 165
     const b = 250;
 
-    // Clear
-    auraCtx.clearRect(0, 0, AURA_SIZE, AURA_SIZE);
+    // Glow bleu autour de l'anneau
+    const glowSize    = (4  + amplitude * 14).toFixed(0);
+    const glowOpacity = (0.15 + amplitude * 0.5).toFixed(2);
 
-    // Gradient radial : centre lumineux -> bord transparent
-    const grad = auraCtx.createRadialGradient(cx, cy, innerRadius, cx, cy, outerRadius);
-    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${globalAlpha.toFixed(2)})`);
-    grad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${(globalAlpha * 0.5).toFixed(2)})`);
-    grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+    ring.style.transform   = `scale(${scale.toFixed(3)})`;
+    ring.style.opacity     = opacity.toFixed(3);
+    ring.style.borderColor = `rgb(${r},${g},${b})`;
+    ring.style.boxShadow   = `0 0 ${glowSize}px rgba(${r},${g},${b},${glowOpacity})`;
 
-    auraCtx.fillStyle = grad;
-    auraCtx.fillRect(0, 0, AURA_SIZE, AURA_SIZE);
-
-    // Deuxieme couche: halo plus large et plus doux (profondeur)
-    if (amplitude > 0.1) {
-        const outerGlow = outerRadius + amplitude * 15;
-        const grad2 = auraCtx.createRadialGradient(cx, cy, outerRadius * 0.8, cx, cy, outerGlow);
-        grad2.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${(amplitude * 0.15).toFixed(2)})`);
-        grad2.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-        auraCtx.fillStyle = grad2;
-        auraCtx.fillRect(0, 0, AURA_SIZE, AURA_SIZE);
-    }
-
-    auraAnimId = requestAnimationFrame(animateAura);
+    ringAnimId = requestAnimationFrame(animateRing);
 }
 
-// === Appele depuis Python pour le texte de l'etape en cours ===
+// === Appelé depuis Python pour le texte de l'étape en cours ===
 function updateStep(text) {
+    // Remplace le texte mais garde les dots
     processingText.childNodes[0].textContent = text;
     processingDots.style.display = '';
 }
 
-// === Appele depuis Python pour le texte d'erreur ===
+// === Appelé depuis Python pour le texte d'erreur ===
 function setErrorText(text) {
     document.getElementById('error-text').textContent = text;
 }
 
-// === Appele depuis Python pour afficher un apercu de transcription ===
+// === Appelé depuis Python pour afficher un aperçu de transcription ===
 function showPreview(text) {
+    // Affiche le texte sans les dots (c'est du contenu, pas du "traitement")
     processingText.childNodes[0].textContent = text;
     processingDots.style.display = 'none';
 }
