@@ -1,68 +1,59 @@
-# VoxTool Configuration
 hotkey: F8
 language: fr
 model: base
 injection: paste
-
 audio:
   sample_rate: 16000
   channels: 1
   chunk_size: 512
   silence_threshold: 0.01
   min_speech_duration: 0.5
-  min_audio_duration: 0.5   # secondes — en dessous, audio ignoré (anti-hallucination)
-  max_audio_duration: 120.0  # secondes — au-dessus, audio tronqué
-  vad_aggressiveness: 2    # 0-3, agressivité webrtcvad (0=moins, 3=plus)
-  chunking_threshold: 30.0  # secondes — au-dessus, audio découpé en chunks
-  device_id: null  # null = micro par défaut
+  min_audio_duration: 0.5
+  max_audio_duration: 120.0
+  vad_aggressiveness: 2
+  chunking_threshold: 30.0
+  device_id: null
   auto_stop_enabled: false
-  auto_stop_silence_duration: 2.0  # secondes de silence avant arrêt auto
+  auto_stop_silence_duration: 2.0
   feedback:
     enabled: true
     volume: 0.5
-
-hotkey_debounce: 0.5  # secondes entre deux appuis F8
-
+hotkey_debounce: 0.5
 transcription:
-  provider: hybrid  # hybrid | local | cloud
-
+  provider: hybrid
 whisper:
   model: base
   beam_size: 5
   vad_filter: true
   language: fr
-
 groq:
   model: whisper-large-v3-turbo
-
 cleaning:
-  mode: verbatim  # verbatim | quality
-  provider: hybrid  # hybrid | local | cloud
+  mode: verbatim
+  provider: hybrid
   cloud_model: gpt-4o-mini
-  llm_model: "gemma3:4b"
+  llm_model: gemma3:4b
   llm_timeout: 30
   filler_words:
-    - euh
-    - heu
-    - hum
-    - ben
-    - bah
-    - genre
-    - du coup
-    - en fait
-    - tu vois
-    - quoi
-    - voilà
-    - comment dire
-
+  - euh
+  - heu
+  - hum
+  - ben
+  - bah
+  - genre
+  - du coup
+  - en fait
+  - tu vois
+  - quoi
+  - voilà
+  - comment dire
+  ollama_host: http://localhost:11434
 performance:
-  persistent_connections: true  # Client HTTP créé au démarrage (évite +200ms)
-  auto_stop_silence_ms: 900     # Silence consécutif (ms) pour déclencher auto-stop
-  mode: both                    # "push_to_talk" | "auto_stop" | "both"
-
+  persistent_connections: true
+  auto_stop_silence_ms: 900
+  mode: both
 gui:
   show_transcription_preview: true
-
 licensing:
   provider: lemonsqueezy
   free_limit: 1000
