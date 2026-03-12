@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import WaveLogo from "./wave-logo";
 
 const navLinks = [
   { label: "Features", href: "#features" },
@@ -21,7 +22,8 @@ export default function Navbar() {
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         {/* Logo */}
-        <a href="#" className="text-xl font-bold text-text-primary">
+        <a href="#" className="flex items-center gap-2 text-xl font-bold text-text-primary">
+          <WaveLogo size={28} />
           VoxWave
         </a>
 
