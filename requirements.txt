@@ -29,6 +29,9 @@ python-dotenv>=1.0.0
 # Licensing
 cryptography>=41.0.0
 
+# Auto-update
+packaging>=21.0
+
 # Dev
 pytest>=7.4.0
 pytest-cov>=4.1.0

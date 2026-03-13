@@ -1,9 +1,9 @@
-"""The Wave — Point d'entree principal.
+"""VoxWave — Point d'entree principal.
 
 Usage:
-    python -m voxtool
-    python -m voxtool --model small
-    python -m voxtool --test
+    python -m voxwave
+    python -m voxwave --model small
+    python -m voxwave --test
 """
 
 import logging
@@ -73,6 +73,24 @@ _BUSY_T = {
     "sv": "Bearbetar, vänta...",
 }
 
+_UPDATE_NOTIF_T = {
+    "en": "VoxWave v{version} is available! Click the tray menu to download.",
+    "fr": "VoxWave v{version} est disponible ! Cliquez dans le menu tray pour telecharger.",
+    "es": "VoxWave v{version} esta disponible! Haga clic en el menu de bandeja para descargar.",
+    "de": "VoxWave v{version} ist verfugbar! Klicken Sie im Tray-Menu zum Herunterladen.",
+    "it": "VoxWave v{version} e disponibile! Clicca nel menu tray per scaricare.",
+    "pt": "VoxWave v{version} esta disponivel! Clique no menu da bandeja para baixar.",
+    "nl": "VoxWave v{version} is beschikbaar! Klik in het tray-menu om te downloaden.",
+    "ja": "VoxWave v{version} が利用可能です！トレイメニューからダウンロードしてください。",
+    "ko": "VoxWave v{version} 사용 가능! 트레이 메뉴에서 다운로드하세요.",
+    "zh": "VoxWave v{version} 可用！点击托盘菜单下载。",
+    "ru": "VoxWave v{version} dostupna! Nazhmite v tray-menu dlja zagruzki.",
+    "ar": "VoxWave v{version} متاح! انقر على قائمة العلبة للتنزيل.",
+    "tr": "VoxWave v{version} mevcut! Indirmek icin tepsi menusune tiklayin.",
+    "pl": "VoxWave v{version} jest dostepny! Kliknij w menu zasobnika, aby pobrac.",
+    "sv": "VoxWave v{version} ar tillganglig! Klicka i tray-menyn for att ladda ner.",
+}
+
 
 def _app_t(lang: str, key: str) -> str:
     d = _APP_STEP_T.get(lang, _APP_STEP_T["en"])
@@ -126,7 +144,7 @@ class _TaskbarWindow:
     """Fenetre fantome pour donner a l'app une presence dans la barre des taches Windows.
 
     Affichee comme minimisee (invisible) mais visible dans la barre des taches avec
-    le logo The Wave. Clic sur l'icone -> ouvre les Parametres.
+    le logo VoxWave. Clic sur l'icone -> ouvre les Parametres.
     """
 
     def __init__(self, on_activate, app_icon) -> None:
@@ -177,7 +195,7 @@ class _TaskbarWindow:
                 self_.showMinimized()
 
         self._win = _Anchor()
-        self._win.setWindowTitle("The Wave")
+        self._win.setWindowTitle("VoxWave")
         self._win.setWindowIcon(app_icon)
         self._win.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self._win.setWindowOpacity(0.0)
@@ -212,6 +230,29 @@ class _HotkeyBridge:
         self.sig_start = self._bridge.sig_start
         self.sig_stop = self._bridge.sig_stop
         self.sig_busy = self._bridge.sig_busy
+
+
+class _PipelineBridge:
+    """Dispatcher thread-safe pour les appels tray depuis les threads pipeline.
+
+    Les méthodes _process_audio et _process_audio_progressive tournent dans
+    des threads secondaires. Ce bridge utilise les Qt signals pour dispatcher
+    les appels tray.set_state() et tray.show_notification() vers le thread
+    Qt principal (obligatoire pour les opérations GUI Qt).
+    """
+
+    def __init__(self) -> None:
+        from PySide6.QtCore import QObject, Signal
+
+        class _Bridge(QObject):
+            sig_tray_set_state = Signal(str)
+            sig_tray_notify = Signal(str, str)
+            sig_update_available = Signal(str, str)
+
+        self._bridge = _Bridge()
+        self.sig_tray_set_state = self._bridge.sig_tray_set_state
+        self.sig_tray_notify = self._bridge.sig_tray_notify
+        self.sig_update_available = self._bridge.sig_update_available
 
 
 def _force_foreground_win32(widget: "QWidget") -> None:
@@ -268,8 +309,8 @@ def _force_foreground_win32(widget: "QWidget") -> None:
         logger.debug(f"win32 focus echec: {e}")
 
 
-class TheWave:
-    """Application principale The Wave."""
+class VoxWave:
+    """Application principale VoxWave."""
 
     def __init__(self, config: dict) -> None:
         self.config = config
@@ -303,7 +344,7 @@ class TheWave:
         from src.injection.keyboard import TextInjector
         from src.hotkey.listener import HotkeyListener
 
-        logger.info("Initialisation The Wave...")
+        logger.info("Initialisation VoxWave...")
 
         # Audio feedback
         feedback_config = self.config.get("audio", {}).get("feedback", {})
@@ -391,6 +432,12 @@ class TheWave:
         self._hotkey_bridge.sig_stop.connect(self._on_stop)
         self._hotkey_bridge.sig_busy.connect(self._on_hotkey_busy)
 
+        # Bridge thread-safe pour les appels tray depuis les threads pipeline.
+        self._pipeline_bridge = _PipelineBridge()
+        self._pipeline_bridge.sig_tray_set_state.connect(self._on_tray_set_state)
+        self._pipeline_bridge.sig_tray_notify.connect(self._on_tray_notify)
+        self._pipeline_bridge.sig_update_available.connect(self._on_update_available)
+
         self.listener = HotkeyListener(
             hotkey=self.config["hotkey"],
             on_start=self._hotkey_bridge.sig_start.emit,
@@ -437,7 +484,7 @@ class TheWave:
 
         # Pre-warm en background : charger Whisper + verifier Ollama
         self._prewarm_engines()
-        logger.info("The Wave pret !")
+        logger.info("VoxWave pret !")
 
     def _prewarm_engines(self) -> None:
         """Pre-charge les moteurs en background pour reduire la latence du premier appel."""
@@ -487,9 +534,24 @@ class TheWave:
                     logger.warning("Pre-warm: OpenAI API injoignable, circuit breaker pre-ouvert")
                     self.pipeline._cloud_circuit.force_open()
 
+        def _check_update() -> None:
+            try:
+                from src import __version__
+                from src.utils.updater import check_for_update
+
+                result = check_for_update(__version__)
+                if result:
+                    logger.info(f"Mise a jour disponible: v{result.version}")
+                    self._pipeline_bridge.sig_update_available.emit(
+                        result.version, result.download_url
+                    )
+            except Exception as e:
+                logger.debug(f"Check update echec: {e}")
+
         self._executor.submit(_prewarm_whisper)
         self._executor.submit(_prewarm_ollama)
         self._executor.submit(_check_cloud_connectivity)
+        self._executor.submit(_check_update)
 
     def _detect_ollama_host(self) -> str:
         """Scanne les ports courants d'Ollama et retourne le premier qui répond.
@@ -638,7 +700,27 @@ class TheWave:
         msg = _BUSY_T.get(lang, _BUSY_T["en"])
         logger.info(f"Hotkey ignoré (pipeline en cours) — feedback tray: {msg}")
         if self.tray:
-            self.tray.show_notification("The Wave", msg)
+            self.tray.show_notification("VoxWave", msg)
+
+    def _on_tray_set_state(self, state: str) -> None:
+        """Slot thread principal : change l'état du tray (appelé via signal)."""
+        if self.tray:
+            self.tray.set_state(state)
+
+    def _on_tray_notify(self, title: str, message: str) -> None:
+        """Slot thread principal : affiche une notification tray (appelé via signal)."""
+        if self.tray:
+            self.tray.show_notification(title, message)
+
+    def _on_update_available(self, version: str, download_url: str) -> None:
+        """Slot thread principal : ajoute l'action update dans le tray + notification."""
+        if self.tray:
+            self.tray.add_update_action(version, download_url)
+            lang = self.config.get("language", "en")
+            msg = _UPDATE_NOTIF_T.get(lang, _UPDATE_NOTIF_T["en"]).format(
+                version=version
+            )
+            self.tray.show_notification("VoxWave", msg)
 
     def _schedule_auto_stop(self) -> None:
         """Appelé depuis le thread audio — schedule _on_stop sur le thread Qt principal."""
@@ -660,7 +742,7 @@ class TheWave:
                 msg = "Free tier epuise. Activez une licence pour continuer."
                 logger.warning(msg)
                 if self.tray:
-                    self.tray.show_notification("The Wave — Licence", msg)
+                    self.tray.show_notification("VoxWave — Licence", msg)
                 return
 
             audio_config = self.config["audio"]
@@ -726,9 +808,9 @@ class TheWave:
         except Exception as e:
             had_error = True
             self.feedback.play_error()
-            if self.tray:
-                self.tray.set_state("error")
-                self.tray.show_notification("The Wave — Erreur", str(e))
+            # Thread-safe : dispatcher vers le thread Qt principal via signal
+            self._pipeline_bridge.sig_tray_set_state.emit("error")
+            self._pipeline_bridge.sig_tray_notify.emit("VoxWave — Erreur", str(e))
             if self.waveform:
                 _err_lang = self.config.get("language", "en")
                 self.waveform.set_error_text(_ERROR_T.get(_err_lang, "Error"))
@@ -751,8 +833,8 @@ class TheWave:
                     if self.config.get("activation_method", "both") == "hotkey":
                         # Signal thread-safe : le QTimer tourne dans le thread principal
                         self.waveform.sig_hide_widget_delayed.emit()
-                if self.tray:
-                    self.tray.set_state("idle")
+                # Thread-safe : dispatcher vers le thread Qt principal via signal
+                self._pipeline_bridge.sig_tray_set_state.emit("idle")
 
     def _process_audio_progressive(self, audio) -> None:
         """Pipeline progressif : injection brut < 800ms, puis remplacement nettoyé ~1.1s.
@@ -776,7 +858,7 @@ class TheWave:
                 msg = "Free tier épuisé. Activez une licence pour continuer."
                 logger.warning(msg)
                 if self.tray:
-                    self.tray.show_notification("The Wave — Licence", msg)
+                    self.tray.show_notification("VoxWave — Licence", msg)
                 return
 
             # --- Validation durée audio ---
@@ -894,9 +976,9 @@ class TheWave:
         except Exception as e:
             had_error = True
             self.feedback.play_error()
-            if self.tray:
-                self.tray.set_state("error")
-                self.tray.show_notification("The Wave — Erreur", str(e))
+            # Thread-safe : dispatcher vers le thread Qt principal via signal
+            self._pipeline_bridge.sig_tray_set_state.emit("error")
+            self._pipeline_bridge.sig_tray_notify.emit("VoxWave — Erreur", str(e))
             if self.waveform:
                 _err_lang = self.config.get("language", "en")
                 self.waveform.set_error_text(_ERROR_T.get(_err_lang, "Error"))
@@ -919,8 +1001,8 @@ class TheWave:
                     if self.config.get("activation_method", "both") == "hotkey":
                         # Signal thread-safe : le QTimer tourne dans le thread principal
                         self.waveform.sig_hide_widget_delayed.emit()
-                if self.tray:
-                    self.tray.set_state("idle")
+                # Thread-safe : dispatcher vers le thread Qt principal via signal
+                self._pipeline_bridge.sig_tray_set_state.emit("idle")
 
     def _transcribe_and_clean(self, audio) -> Optional[str]:
         """Transcrit et nettoie un segment audio.
@@ -993,18 +1075,18 @@ class TheWave:
         try:
             from PySide6.QtWidgets import QInputDialog
             text, ok = QInputDialog.getText(
-                None, "The Wave — Activer licence",
+                None, "VoxWave — Activer licence",
                 "Entrez votre cle de licence :"
             )
             if ok and text.strip():
                 try:
                     self.license_validator.activate_license(text.strip())
                     if self.tray:
-                        self.tray.show_notification("The Wave", "Licence activee avec succes !")
+                        self.tray.show_notification("VoxWave", "Licence activee avec succes !")
                 except Exception as e:
                     logger.error(f"Activation echouee: {e}")
                     if self.tray:
-                        self.tray.show_notification("The Wave — Erreur", f"Activation echouee : {e}")
+                        self.tray.show_notification("VoxWave — Erreur", f"Activation echouee : {e}")
         except Exception as e:
             logger.error(f"Dialog licence echoue: {e}")
 
@@ -1067,6 +1149,55 @@ class TheWave:
         self._focus_existing_dialog(dialog, origin="settings-new")
         dialog.exec()  # on lance toujours (fermeture avec X ou Save sauvegarde quand meme)
         self._settings_dialog = None
+        self._apply_dialog_changes(dialog, cleaning_config)
+
+    def _on_help(self) -> None:
+        """Ouvre les parametres sur l'onglet Aide."""
+        if self._shutting_down:
+            return
+
+        # Guard singleton : si un dialog est deja ouvert, le mettre au premier plan
+        if self._settings_dialog is not None:
+            self._focus_existing_dialog(self._settings_dialog, origin="help-existing")
+            return
+
+        from src.gui.settings_dialog import SettingsDialog
+
+        cleaning_config = self.config.get("cleaning", {})
+        dialog = SettingsDialog(
+            current_hotkey=self.config["hotkey"],
+            current_cleaning_mode=cleaning_config.get("mode", "verbatim"),
+            current_language=self.config.get("whisper", {}).get("language", "en"),
+            current_system_language=self.config.get("language", "en"),
+            current_device_id=self.config.get("audio", {}).get("device_id"),
+            current_transcription_provider=self.config.get("transcription", {}).get("provider", "hybrid"),
+            current_cleaning_provider=cleaning_config.get("provider", "hybrid"),
+            current_ollama_host=cleaning_config.get("ollama_host", "http://localhost:11434"),
+            current_activation_method=self.config.get("activation_method", "both"),
+            current_auto_stop_enabled=self.config.get("audio", {}).get("auto_stop_enabled", False),
+            current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
+            on_quit=self._shutdown,
+            on_activate_license=self._activate_license_dialog,
+            parent=None,
+        )
+        self._settings_dialog = dialog
+        dialog.navigate_to_help()
+        self._focus_existing_dialog(dialog, origin="help-new")
+        dialog.exec()
+        self._settings_dialog = None
+        # Appliquer les changements éventuels (l'utilisateur peut naviguer
+        # vers d'autres onglets depuis l'onglet Aide)
+        self._apply_dialog_changes(dialog, cleaning_config)
+
+    def _apply_dialog_changes(self, dialog, cleaning_config: dict) -> None:
+        """Applique les changements du SettingsDialog à la config et aux composants.
+
+        Appelé par _on_settings et _on_help après dialog.exec().
+
+        Args:
+            dialog: Instance de SettingsDialog fermé.
+            cleaning_config: Snapshot de self.config["cleaning"] pris avant exec().
+        """
         changes = []
 
         # Hotkey
@@ -1179,43 +1310,8 @@ class TheWave:
             changes.append(f"Silence : {new_auto_stop_dur}s")
 
         if changes and self.tray:
-            self.tray.show_notification("The Wave", "Parametres mis a jour")
+            self.tray.show_notification("VoxWave", "Parametres mis a jour")
         logger.info(f"Settings: {', '.join(changes) if changes else 'aucun changement'}")
-
-    def _on_help(self) -> None:
-        """Ouvre les parametres sur l'onglet Aide."""
-        if self._shutting_down:
-            return
-
-        # Guard singleton : si un dialog est deja ouvert, le mettre au premier plan
-        if self._settings_dialog is not None:
-            self._focus_existing_dialog(self._settings_dialog, origin="help-existing")
-            return
-
-        from src.gui.settings_dialog import SettingsDialog
-
-        cleaning_config = self.config.get("cleaning", {})
-        dialog = SettingsDialog(
-            current_hotkey=self.config["hotkey"],
-            current_cleaning_mode=cleaning_config.get("mode", "verbatim"),
-            current_language=self.config.get("whisper", {}).get("language", "en"),
-            current_system_language=self.config.get("language", "en"),
-            current_device_id=self.config.get("audio", {}).get("device_id"),
-            current_transcription_provider=self.config.get("transcription", {}).get("provider", "hybrid"),
-            current_cleaning_provider=cleaning_config.get("provider", "hybrid"),
-            current_ollama_host=cleaning_config.get("ollama_host", "http://localhost:11434"),
-            current_activation_method=self.config.get("activation_method", "both"),
-            current_auto_stop_enabled=self.config.get("audio", {}).get("auto_stop_enabled", False),
-            current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
-            on_quit=self._shutdown,
-            on_activate_license=self._activate_license_dialog,
-            parent=None,
-        )
-        self._settings_dialog = dialog
-        dialog.navigate_to_help()
-        self._focus_existing_dialog(dialog, origin="help-new")
-        dialog.exec()
-        self._settings_dialog = None
 
     def _save_config(self, key: str, value: object) -> None:
         """Sauvegarde un champ dans config.yaml en preservant le reste.
@@ -1287,14 +1383,14 @@ class TheWave:
         """
         logger.info(f"Fallback: {message}")
         if self.tray:
-            self.tray.show_notification("The Wave", message)
+            self.tray.show_notification("VoxWave", message)
 
     def _shutdown(self) -> None:
         """Arrete proprement tous les composants (idempotent)."""
         if self._shutting_down:
             return
         self._shutting_down = True
-        logger.info("Arret The Wave...")
+        logger.info("Arret VoxWave...")
         if self.listener:
             self.listener.stop()
         if self._processing_thread and self._processing_thread.is_alive():
@@ -1317,10 +1413,10 @@ class TheWave:
 
     def run(self) -> None:
         """Lance l'application avec boucle Qt."""
-        # The Wave cible Windows et Linux uniquement
+        # VoxWave cible Windows et Linux uniquement
         if sys.platform == "darwin":
-            logger.error("The Wave n'est pas supporte sur macOS. Utilisez Windows ou Linux.")
-            print("The Wave n'est pas supporte sur macOS.")
+            logger.error("VoxWave n'est pas supporte sur macOS. Utilisez Windows ou Linux.")
+            print("VoxWave n'est pas supporte sur macOS.")
             print("Plateformes supportees : Windows, Linux.")
             sys.exit(1)
 
@@ -1334,7 +1430,7 @@ class TheWave:
         self._qt_app.setWindowIcon(_app_icon)
         if sys.platform == "win32":
             import ctypes
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("com.thewave.app")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("com.voxwave.app")
         self._taskbar = _TaskbarWindow(on_activate=self._on_settings, app_icon=_app_icon)
         self.initialize()
 
@@ -1392,7 +1488,7 @@ class TheWave:
         self._signal_timer.timeout.connect(lambda: None)
         self._signal_timer.start(500)
 
-        logger.info(f"The Wave actif ! Hotkey: {self.config['hotkey']} — Fermez le tray pour quitter.")
+        logger.info(f"VoxWave actif ! Hotkey: {self.config['hotkey']} — Fermez le tray pour quitter.")
         self._qt_app.exec()
 
 
@@ -1430,8 +1526,8 @@ def test_microphone(config: dict) -> None:
 @click.option("--config", "config_path", default="config.yaml", help="Chemin config")
 @click.option("--log-level", default=None, help="Niveau de log")
 def main(model, test, list_devices, config_path, log_level):
-    """The Wave — Dictee vocale intelligente."""
-    effective_log_level = log_level or os.getenv("VOXTOOL_LOG_LEVEL", "INFO")
+    """VoxWave — Dictee vocale intelligente."""
+    effective_log_level = log_level or os.getenv("VOXWAVE_LOG_LEVEL", "INFO")
     setup_logging(effective_log_level)
     config = load_config(config_path)
 
@@ -1447,7 +1543,7 @@ def main(model, test, list_devices, config_path, log_level):
         test_microphone(config)
         return
 
-    app = TheWave(config)
+    app = VoxWave(config)
     app.run()
 
 

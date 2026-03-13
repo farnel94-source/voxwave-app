@@ -1,7 +1,8 @@
-"""System tray icon pour The Wave avec QSystemTrayIcon (PySide6)."""
+"""System tray icon pour VoxWave avec QSystemTrayIcon (PySide6)."""
 
 import logging
 import threading
+import webbrowser
 from typing import Callable, Optional
 
 from PySide6.QtGui import QAction
@@ -20,7 +21,8 @@ _TRAY_T = {
         "license": "\u2727  Activate license",
         "about": "\u24d8  About",
         "quit": "\u2715  Quit",
-        "tooltip": "The Wave \u2014 Voice dictation",
+        "tooltip": "VoxWave \u2014 Voice dictation",
+        "update": "\u2b06  Update available (v{version})",
     },
     "fr": {
         "start": "\u25b6  Demarrer la dictee",
@@ -30,7 +32,8 @@ _TRAY_T = {
         "license": "\u2727  Activer licence",
         "about": "\u24d8  A propos",
         "quit": "\u2715  Quitter",
-        "tooltip": "The Wave \u2014 Dictee vocale",
+        "tooltip": "VoxWave \u2014 Dictee vocale",
+        "update": "\u2b06  Mise a jour disponible (v{version})",
     },
     "es": {
         "start": "\u25b6  Iniciar dictado",
@@ -40,7 +43,8 @@ _TRAY_T = {
         "license": "\u2727  Activar licencia",
         "about": "\u24d8  Acerca de",
         "quit": "\u2715  Salir",
-        "tooltip": "The Wave \u2014 Dictado por voz",
+        "tooltip": "VoxWave \u2014 Dictado por voz",
+        "update": "\u2b06  Actualizacion disponible (v{version})",
     },
     "de": {
         "start": "\u25b6  Diktat starten",
@@ -50,7 +54,8 @@ _TRAY_T = {
         "license": "\u2727  Lizenz aktivieren",
         "about": "\u24d8  Uber",
         "quit": "\u2715  Beenden",
-        "tooltip": "The Wave \u2014 Sprachdiktat",
+        "tooltip": "VoxWave \u2014 Sprachdiktat",
+        "update": "\u2b06  Update verfugbar (v{version})",
     },
     "it": {
         "start": "\u25b6  Avvia dettatura",
@@ -60,7 +65,8 @@ _TRAY_T = {
         "license": "\u2727  Attiva licenza",
         "about": "\u24d8  Informazioni",
         "quit": "\u2715  Esci",
-        "tooltip": "The Wave \u2014 Dettatura vocale",
+        "tooltip": "VoxWave \u2014 Dettatura vocale",
+        "update": "\u2b06  Aggiornamento disponibile (v{version})",
     },
     "pt": {
         "start": "\u25b6  Iniciar ditado",
@@ -70,61 +76,71 @@ _TRAY_T = {
         "license": "\u2727  Ativar licenca",
         "about": "\u24d8  Sobre",
         "quit": "\u2715  Sair",
-        "tooltip": "The Wave \u2014 Ditado por voz",
+        "tooltip": "VoxWave \u2014 Ditado por voz",
+        "update": "\u2b06  Atualizacao disponivel (v{version})",
     },
     "nl": {
         "start": "▶  Dicteren starten", "stop": "■  Dicteren stoppen",
         "settings": "⚙  Instellingen", "help": "❓  Help",
         "license": "✧  Licentie activeren", "about": "ⓘ  Over",
-        "quit": "✕  Afsluiten", "tooltip": "The Wave — Spraakdictaat",
+        "quit": "✕  Afsluiten", "tooltip": "VoxWave — Spraakdictaat",
+        "update": "⬆  Update beschikbaar (v{version})",
     },
     "ja": {
         "start": "▶  ディクテーション開始", "stop": "■  ディクテーション停止",
         "settings": "⚙  設定", "help": "❓  ヘルプ",
         "license": "✧  ライセンスを有効化", "about": "ⓘ  概要",
-        "quit": "✕  終了", "tooltip": "The Wave — 音声ディクテーション",
+        "quit": "✕  終了", "tooltip": "VoxWave — 音声ディクテーション",
+        "update": "⬆  アップデートあり (v{version})",
     },
     "ko": {
         "start": "▶  받아쓰기 시작", "stop": "■  받아쓰기 중지",
         "settings": "⚙  설정", "help": "❓  도움말",
         "license": "✧  라이선스 활성화", "about": "ⓘ  정보",
-        "quit": "✕  종료", "tooltip": "The Wave — 음성 받아쓰기",
+        "quit": "✕  종료", "tooltip": "VoxWave — 음성 받아쓰기",
+        "update": "⬆  업데이트 가능 (v{version})",
     },
     "zh": {
         "start": "▶  开始听写", "stop": "■  停止听写",
         "settings": "⚙  设置", "help": "❓  帮助",
         "license": "✧  激活许可证", "about": "ⓘ  关于",
-        "quit": "✕  退出", "tooltip": "The Wave — 语音听写",
+        "quit": "✕  退出", "tooltip": "VoxWave — 语音听写",
+        "update": "⬆  有更新 (v{version})",
     },
     "ru": {
         "start": "▶  Nachat diktovku", "stop": "■  Ostanovit diktovku",
         "settings": "⚙  Nastrojki", "help": "❓  Pomosh",
         "license": "✧  Aktivirovat licenziju", "about": "ⓘ  O programme",
-        "quit": "✕  Vyjti", "tooltip": "The Wave — Golosovaja diktovka",
+        "quit": "✕  Vyjti", "tooltip": "VoxWave — Golosovaja diktovka",
+        "update": "⬆  Dostupno obnovlenie (v{version})",
     },
     "ar": {
         "start": "▶  بدء الإملاء", "stop": "■  إيقاف الإملاء",
         "settings": "⚙  الإعدادات", "help": "❓  مساعدة",
         "license": "✧  تفعيل الترخيص", "about": "ⓘ  حول",
-        "quit": "✕  خروج", "tooltip": "The Wave — الإملاء الصوتي",
+        "quit": "✕  خروج", "tooltip": "VoxWave — الإملاء الصوتي",
+        "update": "⬆  تحديث متاح (v{version})",
     },
     "tr": {
         "start": "▶  Dikteyi baslat", "stop": "■  Dikteyi durdur",
         "settings": "⚙  Ayarlar", "help": "❓  Yardim",
         "license": "✧  Lisansi etkinlestir", "about": "ⓘ  Hakkinda",
-        "quit": "✕  Cikis", "tooltip": "The Wave — Sesli dikte",
+        "quit": "✕  Cikis", "tooltip": "VoxWave — Sesli dikte",
+        "update": "⬆  Guncelleme mevcut (v{version})",
     },
     "pl": {
         "start": "▶  Rozpocznij dyktowanie", "stop": "■  Zatrzymaj dyktowanie",
         "settings": "⚙  Ustawienia", "help": "❓  Pomoc",
         "license": "✧  Aktywuj licencje", "about": "ⓘ  O programie",
-        "quit": "✕  Wyjdz", "tooltip": "The Wave — Dyktowanie glosowe",
+        "quit": "✕  Wyjdz", "tooltip": "VoxWave — Dyktowanie glosowe",
+        "update": "⬆  Aktualizacja dostepna (v{version})",
     },
     "sv": {
         "start": "▶  Starta diktering", "stop": "■  Stoppa diktering",
         "settings": "⚙  Installningar", "help": "❓  Hjalp",
         "license": "✧  Aktivera licens", "about": "ⓘ  Om",
-        "quit": "✕  Avsluta", "tooltip": "The Wave — Rostdiktering",
+        "quit": "✕  Avsluta", "tooltip": "VoxWave — Rostdiktering",
+        "update": "⬆  Uppdatering tillganglig (v{version})",
     },
 }
 
@@ -179,6 +195,8 @@ class TrayIcon:
         self._license_action: Optional[QAction] = None
         self._about_action: Optional[QAction] = None
         self._quit_action: Optional[QAction] = None
+        self._update_action: Optional[QAction] = None
+        self._update_version: Optional[str] = None
 
     def _create_menu(self) -> QMenu:
         """Cree le menu contextuel du tray."""
@@ -263,8 +281,8 @@ class TrayIcon:
             self.on_help()
 
     def _on_about(self) -> None:
-        """Affiche les infos sur The Wave."""
-        self.show_notification("The Wave", "The Wave v2.1 — Dictee vocale intelligente")
+        """Affiche les infos sur VoxWave."""
+        self.show_notification("VoxWave", "VoxWave v2.1 — Dictee vocale intelligente")
 
     def _on_quit_click(self) -> None:
         """Quitte l'application."""
@@ -283,6 +301,35 @@ class TrayIcon:
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             if self.on_tray_clicked:
                 self.on_tray_clicked()
+
+    def add_update_action(self, version: str, download_url: str) -> None:
+        """Ajoute une action 'Mise à jour disponible' dans le menu tray.
+
+        Insérée juste avant le séparateur Quitter. Si déjà présente, met à jour le texte.
+
+        Args:
+            version: Nouvelle version disponible (ex: "1.2.0").
+            download_url: URL directe vers le fichier à télécharger.
+        """
+        if not self._menu:
+            return
+
+        self._update_version = version
+        text = _tt(self._language, "update").format(version=version)
+
+        if self._update_action:
+            self._update_action.setText(text)
+            return
+
+        self._update_action = QAction(text, self._menu)
+        self._update_action.triggered.connect(
+            lambda: webbrowser.open(download_url)
+        )
+
+        # Insérer avant la dernière action (Quitter)
+        if self._quit_action:
+            self._menu.insertAction(self._quit_action, self._update_action)
+            self._menu.insertSeparator(self._quit_action)
 
     def set_state(self, state: IconState) -> None:
         """Change l'etat visuel de l'icone.
@@ -342,6 +389,10 @@ class TrayIcon:
             self._about_action.setText(_tt(lang, "about"))
         if self._quit_action:
             self._quit_action.setText(_tt(lang, "quit"))
+        if self._update_action and self._update_version:
+            self._update_action.setText(
+                _tt(lang, "update").format(version=self._update_version)
+            )
         if self._tray:
             self._tray.setToolTip(_tt(lang, "tooltip"))
 
