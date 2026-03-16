@@ -15,7 +15,7 @@ from typing import Optional
 
 import numpy as np
 
-from src.transcription.hallucinations import strip_hallucination_tails
+from src.transcription.hallucinations import is_hallucination, strip_hallucination_tails
 from src.utils.exceptions import TranscriptionError
 from src.utils.retry import retry_with_backoff
 
@@ -205,8 +205,15 @@ class GroqWhisperEngine:
                 if no_speech > 0.7:
                     logger.warning("Probable silence détecté par Whisper, texte peu fiable")
                     return ""
-                if avg_logprob < -1.0:
-                    logger.warning(f"Confiance très basse ({avg_logprob:.2f}), texte peu fiable")
+                if avg_logprob < -0.7:
+                    if is_hallucination(text):
+                        logger.warning(
+                            f"Confiance basse ({avg_logprob:.2f}) + hallucination détectée, rejeté: '{text}'"
+                        )
+                        return ""
+                    logger.info(
+                        f"Confiance basse ({avg_logprob:.2f}) mais texte conservé (no_speech={no_speech:.2f})"
+                    )
 
         # Extraire la langue détectée
         detected_lang = None

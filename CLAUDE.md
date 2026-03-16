@@ -1,7 +1,7 @@
 # CLAUDE.md — Instructions pour Claude Code
 
 ## Projet
-**The Wave** (anciennement VoxTool) : Outil de dictee vocale desktop (Windows + Linux).
+**VoxWave** : Outil de dictee vocale desktop (Windows + Linux).
 Parle → Transcrit (Whisper) → Nettoie (regex + LLM) → Colle le texte propre.
 
 ## Stack
@@ -21,10 +21,10 @@ Parle → Transcrit (Whisper) → Nettoie (regex + LLM) → Colle le texte propr
 
 ## Structure
 ```
-voxtool/
+voxwave/
 ├── src/
 │   ├── __init__.py
-│   ├── app.py                  # Point d'entree (classe TheWave), shutdown gracieux, check macOS, sauvegarde config
+│   ├── app.py                  # Point d'entree (classe VoxWave), shutdown gracieux, check macOS, sauvegarde config
 │   ├── audio/
 │   │   ├── capture.py          # Capture micro + VAD
 │   │   ├── device_manager.py   # Liste et validation des peripheriques audio
@@ -32,7 +32,7 @@ voxtool/
 │   │   └── processor.py        # Traitement audio (chunking, validation duree)
 │   ├── transcription/
 │   │   ├── whisper_engine.py    # Moteur faster-whisper (local) — condition_on_previous_text=False (évite hallucinations)
-│   │   ├── groq_engine.py      # Moteur Groq API (cloud) — flag _available, circuit breaker
+│   │   ├── groq_engine.py      # Moteur Groq API (cloud) — flag _available, circuit breaker, rejet avg_logprob+hallucination combiné
 │   │   ├── hybrid_engine.py    # Hybride: Groq → Whisper local, callback on_fallback
 │   │   └── hallucinations.py   # Detection hallucinations Whisper
 │   ├── cleaning/
@@ -48,7 +48,7 @@ voxtool/
 │   ├── gui/
 │   │   ├── orb/
 │   │   │   ├── orb.html        # Widget Voice Input HTML/CSS/JS (barres animees + hover icons settings/quit)
-│   │   │   └── logo.png        # Logo The Wave
+│   │   │   └── logo.png        # Logo VoxWave
 │   │   ├── waveform_widget.py  # QWebEngineView frameless, always-on-top, draggable + hover icons
 │   │   ├── tray_icon.py        # Icone system tray PySide6 (QSystemTrayIcon) + icones unicode
 │   │   ├── settings_dialog.py  # Parametres modernes (sidebar navigation, 5 sections dont Aide)
@@ -64,7 +64,7 @@ voxtool/
 │       └── retry.py            # Logique de retry
 ├── tests/
 ├── marketing/
-│   └── AUDIT_VOXTOOL.md        # Audit concurrentiel complet
+│   └── AUDIT_VOXWAVE.md        # Audit concurrentiel complet
 ├── config.yaml
 ├── requirements.txt
 └── setup.py
@@ -89,22 +89,30 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 - Sans cle API : flag `_available = False`, pas de crash (ValueError supprime)
 - Check connectivite au demarrage : ping Groq/OpenAI (timeout 3s), pre-ouverture circuit si injoignable
 - Notification tray lors d'un fallback : "Transcription : mode local (cloud indisponible)"
+- **Rejet Groq** : `avg_logprob < -0.7` seul = warning (texte conservé). `avg_logprob < -0.7` + `is_hallucination()` = rejeté. Ne JAMAIS rejeter sur un seul signal.
+- **Trim audio** : `prepare_for_whisper()` utilise `pad_ms=500` (pas 300) pour garder les fins de phrase à voix décroissante.
 - **`_detect_ollama_host()`** (app.py) : scanne les ports [11434, 11435, 11433] au demarrage (socket, timeout 0.5s) et retourne le premier qui repond. Stocke le resultat dans `config["cleaning"]["ollama_host"]`. PIEGE : toujours `try/finally: sock.close()` pour eviter un leak de socket.
 
 ## GUI (PySide6 + QWebEngineView)
 - **Widget flottant** (`waveform_widget.py`) : fenetre frameless, always-on-top, draggable, 300x116px
-- **orb.html** : logo The Wave + pill expandable avec anneau reactif + timer + hover icons (settings/quit)
+- **orb.html** : logo VoxWave + pill expandable avec anneau reactif + timer + hover icons (settings/quit)
   - **Idle** : logo seul avec animation de respiration subtile (glow blanc pulse 3.5s)
   - **Recording** : logo + anneau reactif a l'amplitude + timer (pill s'ouvre a droite)
   - **Processing** : logo + "Traitement" + dots animes (3 points qui rebondissent)
   - **Error** : logo avec glow rouge + texte "Erreur" + animation shake
   - **Transition processing → idle** : flash de succes vert (glow + bounce) avant retour idle
 - **Anneau reactif** : cercle positionne autour du logo, scale/opacite/couleur drives par amplitude Python (frame-par-frame via `requestAnimationFrame`, pas de CSS transition)
+- **Visibilite fond clair** (canvas aura dans `animateAura()`) :
+  - **Shadow layer** (couche 0) : gradient radial noir sous l'aura, opacite dynamique (0.10 → 0.25 selon intensite)
+  - **Edge ring** (couche 4) : anneau fin `rgba(0,0,0,0.15)` au bord de l'aura (strokeStyle, lineWidth 1.5)
+  - **Boost dynamique** : multiplicateurs d'opacite augmentes pour que la voix cree un contraste fort (outer aura ×2.2, core glow ×1.4, particules ×3 en taille)
+  - **Text shadows CSS** : `text-shadow: 0 1px 3px rgba(0,0,0,0.5)` sur `.timer`, `.processing-text`, `.error-text` + `box-shadow` sur `.processing-dots span`
+  - **PIEGE** : `backdrop-filter` ne fonctionne PAS sur QWebEngineView avec fenetre transparente — ne pas retenter
 - **Hover icons** : au survol du logo (idle uniquement), 2 boutons ronds apparaissent (settings + quit)
 - **Bridge Python ↔ JS** : QWebChannel (setState, updateAmplitude, updateStep, setErrorText, showPreview, on_quit_clicked)
 - **Tray icon** : menu avec icones unicode et separateurs (▶ Dictee / ⚙ Parametres / ❓ Aide / ✧ Licence / ⓘ A propos / ✕ Quitter). Clic gauche tray → ouvre directement les Parametres (via `_on_settings`)
-- **Barre des taches Windows** : `_TaskbarWindow` (dans `app.py`) — fenetre fantome minimisee (opacity=0, WA_ShowWithoutActivating) qui donne a l'app une presence permanente dans la barre des taches avec le logo The Wave.
-  - Necessite `SetCurrentProcessExplicitAppUserModelID("com.thewave.app")` (via `ctypes`) appele avant la creation de la fenetre
+- **Barre des taches Windows** : `_TaskbarWindow` (dans `app.py`) — fenetre fantome minimisee (opacity=0, WA_ShowWithoutActivating) qui donne a l'app une presence permanente dans la barre des taches avec le logo VoxWave.
+  - Necessite `SetCurrentProcessExplicitAppUserModelID("com.voxwave.app")` (via `ctypes`) appele avant la creation de la fenetre
   - **Clic sur l'icone** : intercepte via `nativeEvent` + `WM_SYSCOMMAND SC_RESTORE` (0x0112 / 0xF120). Message consomme (`return True, 0`) pour empecher le flash. Appele EXACTEMENT une fois par clic. Sur Linux : fallback via `changeEvent`.
   - **Logo** : `force_taskbar_icon_win32(hwnd)` dans `icons.py` — sauvegarde logo en ICO temporaire, envoie `WM_SETICON` via `LoadImageW` + `SendMessageW`. Appele avec `QTimer.singleShot(300ms)` apres demarrage event loop (l'Explorateur Windows cree le bouton taskbar de maniere asynchrone).
   - **PIEGE** : ne jamais appeler `force_taskbar_icon_win32` immediatement dans `__init__` — l'Explorateur n'a pas encore cree le bouton, l'icone est ignoree.
@@ -118,7 +126,7 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 ## Onboarding v2.1 (welcome_dialog.py) — Inspire Wispr Flow
 8 pages avec indicateur de progression (dots + messages encourageants) :
 1. **Bienvenue** : logo + bullets + bouton Commencer
-2. **Pourquoi The Wave ?** : 4 cartes multi-select (motivations), Suivant bloque sans selection
+2. **Pourquoi VoxWave ?** : 4 cartes multi-select (motivations), Suivant bloque sans selection
 3. **Raccourci clavier** : HotkeyCapture, no-skip 3s (Suivant desactive temporairement)
 4. **Langue** : QComboBox (15 langues), sauvegardee dans config
 5. **Test micro** : test 3s avec barre de volume + bip audio (play_start/play_stop via AudioFeedback)
@@ -145,7 +153,7 @@ Fenetre moderne dark theme 620x580 avec **sidebar navigation a gauche** (7 ongle
 - `HotkeyCapture` : QLineEdit read-only qui capture les combos de touches
 
 ### Integration app.py
-- Classe principale `TheWave` (anciennement `VoxTool`)
+- Classe principale `VoxWave`
 - `_on_settings()` gere 7 parametres : hotkey, cleaning mode, langue, micro, transcription provider, cleaning provider, ollama_host
 - `_on_help()` ouvre les settings directement sur l'onglet Aide via `navigate_to_help()`
 - **PIEGE `parent=`** : `SettingsDialog(parent=None)` — JAMAIS `parent=self._taskbar._win`. La fenetre taskbar est minimisee (opacity=0), Qt bloque `raise_()/activateWindow()` sur un child dont le parent est minimise. Le flag `Qt.WindowType.Tool` (dans `_setup_window`) gere le groupement taskbar sans parent.
@@ -191,7 +199,7 @@ La langue est sauvegardee dans `config.yaml` → `whisper.language` et rechargee
 ## Injection progressive (progressive_injector.py)
 
 Pipeline en 2 temps pour la latence < 1s :
-1. `inject_raw(raw_text)` → texte brut via clipboard + Ctrl+V immédiatement (~100ms)
+1. `inject_raw(raw_text)` → texte brut via clipboard (retry 3x + vérification) + Ctrl+V immédiatement (~200ms)
 2. `replace_with_clean(raw_text, generator)` → Backspace × N + Ctrl+V (texte nettoyé)
 
 ### Stratégie Backspace × N
@@ -215,6 +223,9 @@ Si une condition échoue → `_stop_user_watch()` + `return` (texte brut conserv
   appeler `self._prog_injector._stop_user_watch()` explicitement dans ce chemin.
 - **Clipboard** : `inject_raw()` sauvegarde le clipboard AVANT l'injection et le restaure APRÈS
   (`saved_clipboard` variable locale) — l'utilisateur retrouve son Ctrl+C original intact.
+- **Clipboard retry** : `_inject_direct()` tente 3 fois `pyperclip.copy()` + vérifie `pyperclip.paste() == text`
+  avant d'envoyer Ctrl+V. Si le clipboard est verrouillé par un autre process → fallback `_injector.inject()`.
+- **200ms buffer** : délai avant restauration du clipboard (100ms insuffisant pour apps Electron/WinUI3).
 
 ### PIEGE : dossier Windows
 Toujours synchroniser vers `voice_text_latency`, PAS `voice_text1`.
@@ -237,9 +248,9 @@ Toujours synchroniser vers `voice_text_latency`, PAS `voice_text1`.
 ## Commandes
 ```bash
 pip install -r requirements.txt
-python -m voxtool
-python -m voxtool --model small
-python -m voxtool --test
+python -m voxwave
+python -m voxwave --model small
+python -m voxwave --test
 pytest tests/ -v
 black src/ tests/
 ```

@@ -323,7 +323,7 @@ class AudioProcessor:
     def prepare_for_whisper(self, audio: np.ndarray) -> np.ndarray:
         """Prépare l'audio : float32, trimé, normalisé doucement."""
         audio = audio.astype(np.float32)
-        audio = self.trim_silence(audio)
+        audio = self.trim_silence(audio, pad_ms=500)
         if len(audio) == 0:
             return audio
         audio = self.normalize(audio)

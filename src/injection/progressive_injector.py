@@ -82,7 +82,22 @@ class ProgressiveInjector:
             try:
                 import pyperclip
                 from pynput.keyboard import Controller, Key
-                pyperclip.copy(text)
+                # Retry clipboard copy (un autre process peut verrouiller le clipboard)
+                clipboard_ok = False
+                for attempt in range(3):
+                    try:
+                        pyperclip.copy(text)
+                        # Vérifier que le clipboard contient bien notre texte
+                        if pyperclip.paste() == text:
+                            clipboard_ok = True
+                            break
+                    except Exception:
+                        pass
+                    if attempt < 2:  # pas de sleep sur la dernière tentative
+                        time.sleep(0.05)
+                if not clipboard_ok:
+                    logger.warning("Clipboard non fiable après 3 tentatives, fallback inject()")
+                    return False
                 time.sleep(0.05)  # laisser le clipboard se stabiliser
                 ctrl = Controller()
                 ctrl.press(Key.ctrl)
@@ -121,7 +136,8 @@ class ProgressiveInjector:
         if not self._inject_direct(text):
             self._injector.inject(text)
         # Buffer : s'assurer que l'app cible a traité le Ctrl+V
-        time.sleep(0.1)
+        # 200ms : certaines apps (Electron, WinUI3) sont lentes à traiter le paste
+        time.sleep(0.2)
         # Restaurer le clipboard original (le texte dicté est déjà dans l'app cible)
         if saved_clipboard is not None:
             try:
