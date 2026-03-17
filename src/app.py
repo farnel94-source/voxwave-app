@@ -177,9 +177,17 @@ class _TaskbarWindow:
     le logo VoxWave. Clic sur l'icone -> ouvre les Parametres.
     """
 
-    def __init__(self, on_activate, app_icon) -> None:
+    def __init__(self, on_activate, app_icon, on_taskbar_created=None) -> None:
         from PySide6.QtCore import QEvent, Qt, QTimer
         from PySide6.QtWidgets import QWidget
+
+        # Enregistrer le message Windows broadcast "TaskbarCreated"
+        # (envoye par Explorer quand il redemarre)
+        taskbar_created_msg = None
+        if sys.platform == "win32" and on_taskbar_created:
+            import ctypes
+            taskbar_created_msg = ctypes.windll.user32.RegisterWindowMessageW("TaskbarCreated")
+            logger.debug("TaskbarCreated message enregistre: %s", taskbar_created_msg)
 
         class _Anchor(QWidget):
             def nativeEvent(self_, event_type, message):  # noqa: N805
@@ -187,6 +195,7 @@ class _TaskbarWindow:
 
                 Consume le message pour empecher la fenetre de se restaurer (pas de flash).
                 Appele exactement une fois par clic utilisateur.
+                Ecoute aussi TaskbarCreated pour recreer le tray icon apres restart Explorer.
                 """
                 if event_type == b"windows_generic_MSG":
                     import ctypes
@@ -200,6 +209,13 @@ class _TaskbarWindow:
                         ]
 
                     msg = _MSG.from_address(int(message))
+
+                    # TaskbarCreated : Explorer a redemarre, recreer le tray icon
+                    if taskbar_created_msg and msg.message == taskbar_created_msg:
+                        logger.info("TaskbarCreated recu — Explorer a redemarre")
+                        QTimer.singleShot(500, on_taskbar_created)
+                        # Ne pas consumer — laisser Qt traiter aussi
+
                     WM_SYSCOMMAND = 0x0112
                     SC_RESTORE = 0xF120
                     if msg.message == WM_SYSCOMMAND and (msg.wParam & 0xFFF0) == SC_RESTORE:
@@ -511,6 +527,13 @@ class VoxWave:
             language=self.config.get("language", "en"),
         )
         self.tray.setup()
+
+        # Health-check tray icon sur Linux (le panel peut crasher)
+        if sys.platform != "win32":
+            from PySide6.QtCore import QTimer
+            self._tray_health_timer = QTimer()
+            self._tray_health_timer.timeout.connect(self._check_tray_health)
+            self._tray_health_timer.start(30_000)  # 30s
 
         # Pre-warm en background : charger Whisper + verifier Ollama
         self._prewarm_engines()
@@ -1417,6 +1440,23 @@ class VoxWave:
         if self.tray:
             self.tray.show_notification("VoxWave", message)
 
+    def _on_taskbar_created(self) -> None:
+        """Appele quand Explorer redemarre — recree le tray icon."""
+        if self.tray:
+            self.tray.reshow()
+        # Re-forcer l'icone taskbar aussi
+        if hasattr(self, '_taskbar') and sys.platform == "win32":
+            from PySide6.QtCore import QTimer
+            from src.gui.icons import force_taskbar_icon_win32
+            hwnd = int(self._taskbar._win.winId())
+            QTimer.singleShot(300, lambda: force_taskbar_icon_win32(hwnd))
+
+    def _check_tray_health(self) -> None:
+        """Verifie que le tray icon est visible (Linux)."""
+        if self.tray and self.tray._tray and not self.tray._tray.isVisible():
+            logger.warning("Tray icon invisible — tentative reshow")
+            self.tray.reshow()
+
     def _shutdown(self) -> None:
         """Arrete proprement tous les composants (idempotent)."""
         if self._shutting_down:
@@ -1436,6 +1476,12 @@ class VoxWave:
             self.waveform.show_idle()
         # Shutdown executor
         self._executor.shutdown(wait=False)
+        # Stopper le health-check tray (Linux)
+        if hasattr(self, '_tray_health_timer'):
+            self._tray_health_timer.stop()
+        # Stopper le tray icon proprement
+        if self.tray:
+            self.tray.stop()
         # Cacher la fenetre taskbar pour stopper les SC_RESTORE apres shutdown
         if hasattr(self, '_taskbar'):
             self._taskbar._win.hide()
@@ -1463,7 +1509,11 @@ class VoxWave:
         if sys.platform == "win32":
             import ctypes
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("com.voxwave.app")
-        self._taskbar = _TaskbarWindow(on_activate=self._on_settings, app_icon=_app_icon)
+        self._taskbar = _TaskbarWindow(
+            on_activate=self._on_settings,
+            app_icon=_app_icon,
+            on_taskbar_created=self._on_taskbar_created,
+        )
         self.initialize()
 
         # Welcome screen au premier lancement

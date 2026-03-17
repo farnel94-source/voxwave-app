@@ -404,6 +404,25 @@ class TrayIcon:
         """Lance le tray icon (pour compatibilite — appelle setup)."""
         self.setup()
 
+    def reshow(self) -> None:
+        """Recree le tray icon (apres restart Explorer ou panel Linux).
+
+        Qt garde un handle Windows interne invalide apres Explorer restart
+        (QTBUG-29160). Seule la recreation force un nouveau slot dans la
+        notification area.
+        """
+        if self._tray:
+            self._tray.hide()
+            self._tray.deleteLater()
+        self._tray = QSystemTrayIcon()
+        self._tray.setIcon(create_qicon(self._state))
+        self._tray.setToolTip(_tt(self._language, "tooltip"))
+        if self._menu:
+            self._tray.setContextMenu(self._menu)
+        self._tray.activated.connect(self._on_tray_activated)
+        self._tray.show()
+        logger.info("System tray recree (reshow)")
+
     def stop(self) -> None:
         """Arrete le tray icon."""
         if self._tray:

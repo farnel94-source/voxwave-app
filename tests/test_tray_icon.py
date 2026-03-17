@@ -4,6 +4,7 @@ import sys
 from unittest.mock import patch, MagicMock
 
 import pytest
+from PIL import ImageChops
 
 from src.gui.icons import create_icon, STATE_COLORS
 
@@ -39,6 +40,31 @@ class TestIcons:
     def test_create_icon_custom_size(self):
         img = create_icon("idle", size=128)
         assert img.size == (128, 128)
+
+    def test_create_icon_idle_has_large_visual_coverage(self):
+        """Evite une icone visuellement minuscule (marge transparente trop grande)."""
+        size = 64
+        img = create_icon("idle", size=size)
+        alpha = img.split()[-1]
+        bbox = alpha.getbbox()
+        assert bbox is not None
+        width = bbox[2] - bbox[0]
+        height = bbox[3] - bbox[1]
+        assert width > int(size * 0.70)
+        assert height > int(size * 0.70)
+
+    @pytest.mark.parametrize("state", ["recording", "processing", "error"])
+    def test_create_icon_state_has_badge_in_bottom_right(self, state):
+        """Les etats non-idle doivent ajouter un badge visible en bas a droite."""
+        size = 64
+        idle = create_icon("idle", size=size)
+        with_badge = create_icon(state, size=size)
+        diff = ImageChops.difference(idle, with_badge)
+        bbox = diff.getbbox()
+        assert bbox is not None
+        # Le badge doit apparaitre dans la moitie basse-droite de l'icone
+        assert bbox[0] >= size // 2
+        assert bbox[1] >= size // 2
 
     def test_state_colors_all_present(self):
         for state in ("idle", "recording", "processing", "error"):
@@ -122,3 +148,40 @@ class TestTrayIcon:
         tray = TrayIcon()
         menu = tray._create_menu()
         assert menu is not None
+
+    def test_reshow_recreates_tray(self, qapp):
+        """setup() puis reshow() doit creer un nouvel objet QSystemTrayIcon."""
+        from src.gui.tray_icon import TrayIcon
+        tray = TrayIcon()
+        tray.setup()
+        old_tray = tray._tray
+        assert old_tray is not None
+        tray.reshow()
+        assert tray._tray is not None
+        assert tray._tray is not old_tray
+
+    def test_reshow_preserves_state(self, qapp):
+        """reshow() doit conserver l'etat visuel (ex: recording)."""
+        from src.gui.tray_icon import TrayIcon
+        tray = TrayIcon()
+        tray.setup()
+        tray.set_state("recording")
+        tray.reshow()
+        assert tray._state == "recording"
+
+    def test_reshow_without_setup(self):
+        """reshow() sans setup() prealable ne doit pas crash."""
+        from src.gui.tray_icon import TrayIcon
+        tray = TrayIcon()
+        # _tray est None, reshow() doit quand meme fonctionner
+        tray.reshow()
+        assert tray._tray is not None
+
+    def test_stop_cleanup(self, qapp):
+        """stop() doit mettre _tray a None et cacher l'icone."""
+        from src.gui.tray_icon import TrayIcon
+        tray = TrayIcon()
+        tray.setup()
+        assert tray._tray is not None
+        tray.stop()
+        assert tray._tray is None
