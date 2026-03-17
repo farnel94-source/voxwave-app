@@ -9,7 +9,7 @@ audio:
   silence_threshold: 0.01
   min_speech_duration: 0.5
   min_audio_duration: 0.5
-  max_audio_duration: 120.0
+  max_audio_duration: 300.0
   vad_aggressiveness: 2
   chunking_threshold: 30.0
   device_id: null
@@ -34,6 +34,7 @@ cleaning:
   cloud_model: gpt-4o-mini
   llm_model: gemma3:4b
   llm_timeout: 30
+  ollama_host: http://localhost:11434
   filler_words:
   - euh
   - heu
@@ -47,7 +48,6 @@ cleaning:
   - quoi
   - voilà
   - comment dire
-  ollama_host: http://localhost:11434
 performance:
   persistent_connections: true
   auto_stop_silence_ms: 900

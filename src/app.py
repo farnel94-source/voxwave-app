@@ -21,13 +21,27 @@ if sys.platform == "win32":
     sys.stderr.reconfigure(encoding="utf-8")
 
 import click
+import sentry_sdk
 import yaml
 from dotenv import load_dotenv
 
-from src.transcription.hallucinations import is_hallucination
+from src.transcription.hallucinations import is_hallucination, strip_hallucination_tails
 from src.utils.window_detector import get_active_exe, get_app_profile
 
 load_dotenv()
+
+# --- Sentry : crash reporting automatique ---
+# Envoie les erreurs non-catchées à Sentry pour qu'on voie les bugs
+# des utilisateurs sans qu'ils aient besoin de faire quoi que ce soit.
+# Le DSN est dans .env — si absent, Sentry est simplement désactivé (pas de crash).
+from src import __version__
+
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN", ""),
+    release=f"voxwave@{__version__}",
+    traces_sample_rate=0.1,  # 10% des transactions pour le monitoring de perf
+    environment="production",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,18 +111,34 @@ def _app_t(lang: str, key: str) -> str:
     return d.get(key, _APP_STEP_T["en"][key])
 
 
+def _get_log_dir() -> str:
+    """Retourne le dossier de logs (~/.voxwave/logs/)."""
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA", os.path.expanduser("~"))
+        return os.path.join(base, "VoxWave", "logs")
+    return os.path.join(os.path.expanduser("~"), ".voxwave", "logs")
+
+
 def setup_logging(level: str = "INFO") -> None:
-    import os
-    os.makedirs("logs", exist_ok=True)
+    from logging.handlers import RotatingFileHandler
+
+    log_dir = _get_log_dir()
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, "voxwave.log")
+
     logging.basicConfig(
         level=getattr(logging, level.upper()),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%H:%M:%S",
+        datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler("logs/app.log", encoding="utf-8"),
+            # 5 Mo max par fichier, garde les 3 derniers (= 15 Mo max total)
+            RotatingFileHandler(
+                log_file, maxBytes=5_000_000, backupCount=3, encoding="utf-8"
+            ),
         ]
     )
+    logging.getLogger(__name__).info(f"Logs: {log_file}")
 
 
 def load_config(config_path: str = "config.yaml") -> dict:
@@ -896,6 +926,7 @@ class VoxWave:
 
             t_groq = time.time()
             raw_text = self.engine.transcribe(audio)
+            raw_text = strip_hallucination_tails(raw_text)
             _trans_label = self.config.get("transcription", {}).get("provider", "local")
             logger.info(f"[progressif] Transcription ({_trans_label}): {(time.time()-t_groq)*1000:.0f}ms → '{raw_text}'")
 
@@ -1015,6 +1046,7 @@ class VoxWave:
         """
         # Transcrire
         raw_text = self.engine.transcribe(audio)
+        raw_text = strip_hallucination_tails(raw_text)
         logger.info(f"Brut: {raw_text}")
 
         # Adapter les filler words a la langue detectee

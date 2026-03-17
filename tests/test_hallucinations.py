@@ -84,6 +84,31 @@ class TestStripHallucinationTails:
         result = strip_hallucination_tails("Du texte. SOUS-TITRAGE FR")
         assert result == "Du texte."
 
+    def test_strip_no_subtitles(self):
+        text = "Salut, pour un de mes projets. No subtitles."
+        result = strip_hallucination_tails(text)
+        assert result == "Salut, pour un de mes projets."
+
+    def test_strip_no_subtitles_without_period(self):
+        text = "Hello world. No subtitles"
+        result = strip_hallucination_tails(text)
+        assert result == "Hello world."
+
+    def test_strip_pas_de_sous_titres(self):
+        text = "Bonjour le monde. Pas de sous-titres."
+        result = strip_hallucination_tails(text)
+        assert result == "Bonjour le monde."
+
+    def test_strip_keine_untertitel(self):
+        text = "Hallo Welt. Keine Untertitel."
+        result = strip_hallucination_tails(text)
+        assert result == "Hallo Welt."
+
+    def test_strip_sin_subtitulos(self):
+        text = "Hola mundo. Sin subtítulos."
+        result = strip_hallucination_tails(text)
+        assert result == "Hola mundo."
+
 
 class TestSetsConsistency:
     """Tests de coherence des ensembles."""

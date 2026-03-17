@@ -1,4 +1,4 @@
-"""Valeurs par défaut de la configuration The Wave."""
+"""Valeurs par défaut de la configuration VoxWave."""
 
 # 99 langues supportées par Whisper, triées alphabétiquement par nom natif.
 # Source : openai/whisper tokenizer.py
@@ -119,7 +119,7 @@ DEFAULT_CONFIG: dict = {
         "silence_threshold": 0.01,
         "min_speech_duration": 0.5,
         "min_audio_duration": 0.5,
-        "max_audio_duration": 120.0,
+        "max_audio_duration": 300.0,
         "vad_aggressiveness": 2,
         "chunking_threshold": 30.0,
         "device_id": None,

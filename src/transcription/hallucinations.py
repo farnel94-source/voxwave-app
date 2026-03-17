@@ -30,7 +30,8 @@ KNOWN_HALLUCINATIONS: Set[str] = {
     "thank you for watching",
     "thanks for watching",
     "et oui.", "et oui", "et non",
-    "subtitles", "subtitle", "music", "musique",
+    "subtitles", "subtitle", "subtitles.", "no subtitles", "no subtitles.",
+    "music", "musique",
     "\u266a", "\U0001f3b5",
 }
 
@@ -55,6 +56,13 @@ HALLUCINATION_TAILS: re.Pattern = re.compile(
     r"|Thank you for watching[^\n]*"
     r"|Please subscribe[^\n]*"
     r"|N'oubliez pas de vous abonner[^\n]*"
+    r"|No subtitles[^\n]*"
+    r"|Pas de sous-titres[^\n]*"
+    r"|Keine Untertitel[^\n]*"
+    r"|Sin subt\u00edtulos[^\n]*"
+    r"|Nessun sottotitolo[^\n]*"
+    r"|Sem legendas[^\n]*"
+    r"|Geen ondertitels[^\n]*"
     r"|\.{3,}"
     r")\s*$",
     re.IGNORECASE,
