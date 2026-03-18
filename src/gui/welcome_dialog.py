@@ -1,4 +1,4 @@
-"""Welcome screen d'onboarding The Wave v2.1 (inspire de Wispr Flow)."""
+"""Welcome screen d'onboarding VoxWave v2.1 (inspire de Wispr Flow)."""
 
 import logging
 import threading
@@ -9,7 +9,7 @@ from src.config.defaults import WHISPER_LANGUAGES
 import numpy as np
 import sounddevice as sd
 from PySide6.QtCore import Qt, QTimer, Signal, Slot, QObject
-from PySide6.QtGui import QFont, QPixmap, QPainter, QColor, QPen
+from PySide6.QtGui import QFont, QPixmap, QPainter, QColor, QPen, QIcon
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -23,12 +23,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from src.gui.icons import create_qicon
 from src.gui.settings_dialog import HotkeyCapture
-from src.utils.platform import resource_path
 
 logger = logging.getLogger(__name__)
 
-_TOTAL_PAGES = 8
+_TOTAL_PAGES = 9
 
 # ====================================================================
 # Traductions (en + fr, fallback anglais pour les autres)
@@ -40,6 +40,7 @@ _TRANSLATIONS = {
         "step_messages": [
             "Let's go!",
             "What language?",
+            "Which language do you speak?",
             "Good question...",
             "Almost ready!",
             "Let's check the sound...",
@@ -49,17 +50,22 @@ _TRANSLATIONS = {
         ],
         "step_x_of_y": "Step {current} of {total}",
         # Page 0 - Welcome
-        "welcome_title": "Welcome to The Wave",
+        "welcome_title": "Welcome to VoxWave",
         "welcome_subtitle": "Smart voice dictation — Speak, we write.",
         "welcome_bullet_1": "Press a shortcut, dictate, text appears",
         "welcome_bullet_2": "Automatic AI cleanup",
         "welcome_bullet_3": "Works in all your applications",
         "welcome_btn": "Get Started",
-        # Page 1 - Language (always English)
+        # Page 1 - Language interface (always English)
         "lang_title": "Choose your language",
-        "lang_subtitle": "This sets the language for the app interface and dictation.",
+        "lang_subtitle": "This sets the language for the app interface.",
         "lang_hint": "You can change this anytime in Settings",
-        # Page 2 - Motivation
+        # Page 2 - Dictation language
+        "dictation_lang_title": "Dictation language",
+        "dictation_lang_subtitle": "Which language will you dictate in?",
+        "dictation_lang_auto": "Auto-detect (recommended)",
+        "dictation_lang_hint": "Auto-detect works great for most users. Pick a specific language only if needed.",
+        # Page 3 - Motivation
         "motivation_title": "What brings you here?",
         "motivation_subtitle": "Select all that apply",
         "motiv_1_title": "I'm tired of typing all day",
@@ -70,11 +76,11 @@ _TRANSLATIONS = {
         "motiv_3_desc": "Speaking is more natural",
         "motiv_4_title": "I want to dictate in all my apps",
         "motiv_4_desc": "Slack, Gmail, Word, everywhere",
-        # Page 3 - Hotkey
+        # Page 4 - Hotkey
         "hotkey_title": "Keyboard shortcut",
         "hotkey_desc": "Choose your shortcut to start/stop dictation.\nPress once to speak, once to stop.",
         "hotkey_hint": "Click in the field then press the desired key combination\n(e.g. F8, Ctrl+Shift+V, Alt+R)",
-        # Page 4 - Mic
+        # Page 5 - Mic
         "mic_title": "Microphone test",
         "mic_desc": "Let's check that your microphone works.",
         "mic_btn_test": "Test microphone",
@@ -82,7 +88,7 @@ _TRANSLATIONS = {
         "mic_ok": "Microphone works!",
         "mic_fail": "No sound detected. Check your microphone.",
         "mic_error": "Cannot open microphone.",
-        # Page 5 - Demo
+        # Page 6 - Demo
         "demo_title": "Try it now!",
         "demo_subtitle": "Click Dictate, speak, and see the result",
         "demo_placeholder": "Your text will appear here...",
@@ -95,7 +101,7 @@ _TRANSLATIONS = {
         "demo_status_error": "Error — try again or skip",
         "demo_status_no_engine": "Engine not available — skip to next step",
         "demo_status_no_audio": "No audio captured",
-        # Page 6 - Tone
+        # Page 7 - Tone
         "tone_title": "How do you want to write?",
         "tone_subtitle": "Choose the cleanup style for your dictations",
         "tone_raw_title": "Raw",
@@ -104,7 +110,7 @@ _TRANSLATIONS = {
         "tone_auto_title": "Auto",
         "tone_auto_desc": "Detects the application and adapts automatically",
         "tone_auto_example": '  "I think we should meet tomorrow"',
-        # Page 7 - Ready
+        # Page 8 - Ready
         "ready_title": "All set!",
         "ready_subtitle": "You're ready to dictate 4x faster",
         "ready_mode_label": "Writing mode: {mode}",
@@ -122,6 +128,7 @@ _TRANSLATIONS = {
         "step_messages": [
             "C'est parti !",
             "Quelle langue ?",
+            "Quelle langue parlez-vous ?",
             "Bonne question...",
             "Presque pret !",
             "Verifions le son...",
@@ -130,15 +137,19 @@ _TRANSLATIONS = {
             "Felicitations !",
         ],
         "step_x_of_y": "Etape {current} sur {total}",
-        "welcome_title": "Bienvenue sur The Wave",
+        "welcome_title": "Bienvenue sur VoxWave",
         "welcome_subtitle": "Dictee vocale intelligente — Parle, on ecrit.",
         "welcome_bullet_1": "Appuyez sur un raccourci, dictez, le texte apparait",
         "welcome_bullet_2": "Nettoyage automatique par IA",
         "welcome_bullet_3": "Fonctionne dans toutes vos applications",
         "welcome_btn": "Commencer",
         "lang_title": "Choose your language",
-        "lang_subtitle": "This sets the language for the app interface and dictation.",
+        "lang_subtitle": "This sets the language for the app interface.",
         "lang_hint": "You can change this anytime in Settings",
+        "dictation_lang_title": "Langue de dictee",
+        "dictation_lang_subtitle": "Dans quelle langue allez-vous dicter ?",
+        "dictation_lang_auto": "Detection automatique (recommande)",
+        "dictation_lang_hint": "La detection automatique fonctionne bien pour la plupart des utilisateurs. Choisissez une langue specifique seulement si necessaire.",
         "motivation_title": "Qu'est-ce qui vous amene ici ?",
         "motivation_subtitle": "Selectionnez tout ce qui vous correspond",
         "motiv_1_title": "J'en ai marre de taper toute la journee",
@@ -533,6 +544,7 @@ class WelcomeDialog(QDialog):
         self._feedback = feedback
         self._cleaning_mode = "auto"
         self._language = "en"
+        self._dictation_language = "auto"
 
         # Micro test state
         self._mic_stream: Optional[sd.InputStream] = None
@@ -557,7 +569,7 @@ class WelcomeDialog(QDialog):
         self._build_ui()
 
     def _setup_window(self) -> None:
-        self.setWindowTitle("The Wave")
+        self.setWindowTitle("VoxWave")
         self.setFixedSize(550, 500)
         self.setStyleSheet(_STYLESHEET)
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowCloseButtonHint)
@@ -578,14 +590,15 @@ class WelcomeDialog(QDialog):
         self._stack = QStackedWidget()
         layout.addWidget(self._stack)
 
-        self._stack.addWidget(self._build_page_welcome())      # 0
-        self._stack.addWidget(self._build_page_language())      # 1
-        self._stack.addWidget(self._build_page_motivation())    # 2
-        self._stack.addWidget(self._build_page_hotkey())        # 3
-        self._stack.addWidget(self._build_page_mic())           # 4
-        self._stack.addWidget(self._build_page_demo())          # 5
-        self._stack.addWidget(self._build_page_tone())          # 6
-        self._stack.addWidget(self._build_page_ready())         # 7
+        self._stack.addWidget(self._build_page_welcome())              # 0
+        self._stack.addWidget(self._build_page_language())              # 1
+        self._stack.addWidget(self._build_page_dictation_language())    # 2
+        self._stack.addWidget(self._build_page_motivation())            # 3
+        self._stack.addWidget(self._build_page_hotkey())                # 4
+        self._stack.addWidget(self._build_page_mic())                   # 5
+        self._stack.addWidget(self._build_page_demo())                  # 6
+        self._stack.addWidget(self._build_page_tone())                  # 7
+        self._stack.addWidget(self._build_page_ready())                 # 8
 
         self._stack.setCurrentIndex(0)
         self._stack.currentChanged.connect(self._on_page_changed)
@@ -604,12 +617,12 @@ class WelcomeDialog(QDialog):
         if 0 <= index < len(step_messages):
             self._encourage_label.setText(step_messages[index])
 
-        if index == 5:
+        if index == 6:
             self._on_demo_page_entered()
-        if index == 3:
+        if index == 4:
             self._hotkey_next_btn.setEnabled(False)
             QTimer.singleShot(3000, lambda: self._hotkey_next_btn.setEnabled(True))
-        if index == 7:
+        if index == 8:
             self._hotkey_reminder.setText(f"{self._hotkey}")
             display_mode = self._cleaning_mode if self._cleaning_mode in ("raw", "auto") else "auto"
             mode_key = f"mode_{display_mode}"
@@ -659,21 +672,28 @@ class WelcomeDialog(QDialog):
         prev_text = _t(lang, "btn_previous")
         next_text = _t(lang, "btn_next")
         skip_text = _t(lang, "btn_skip")
-        for btn in [self._hotkey_prev_btn, self._mic_prev_btn, self._demo_prev_btn, self._tone_prev_btn]:
+        for btn in [self._dict_lang_prev_btn, self._hotkey_prev_btn, self._mic_prev_btn, self._demo_prev_btn, self._tone_prev_btn]:
             btn.setText(prev_text)
-        for btn in [self._hotkey_fwd_btn, self._mic_next_btn, self._demo_next_btn, self._tone_next_btn]:
+        for btn in [self._dict_lang_next_btn, self._hotkey_fwd_btn, self._mic_next_btn, self._demo_next_btn, self._tone_next_btn]:
             btn.setText(next_text)
         self._demo_skip_btn.setText(skip_text)
 
-        # Update mic lang label
-        _lang_names = {
-            "en": "English", "fr": "Francais", "es": "Espanol",
-            "de": "Deutsch", "it": "Italiano", "pt": "Portugues",
-            "nl": "Nederlands", "ja": "Japanese", "ko": "Korean",
-            "zh": "Chinese", "ru": "Russian", "ar": "Arabic",
-            "tr": "Turkish", "pl": "Polish", "sv": "Swedish",
-        }
-        lang_display = _lang_names.get(lang, lang)
+        # Update dictation language combo auto-detect label
+        self._dict_lang_combo.setItemText(0, _t(lang, "dictation_lang_auto"))
+
+        # Update mic lang label with dictation language
+        dict_lang = self._dictation_language
+        if dict_lang == "auto":
+            lang_display = _t(lang, "dictation_lang_auto")
+        else:
+            _lang_names = {
+                "en": "English", "fr": "Francais", "es": "Espanol",
+                "de": "Deutsch", "it": "Italiano", "pt": "Portugues",
+                "nl": "Nederlands", "ja": "Japanese", "ko": "Korean",
+                "zh": "Chinese", "ru": "Russian", "ar": "Arabic",
+                "tr": "Turkish", "pl": "Polish", "sv": "Swedish",
+            }
+            lang_display = _lang_names.get(dict_lang, dict_lang)
         self._mic_lang_label.setText(f"\U0001f399 Dictation language: {lang_display}")
 
         # Force repaint progress dots
@@ -701,15 +721,14 @@ class WelcomeDialog(QDialog):
         layout.setContentsMargins(40, 20, 40, 30)
         layout.setSpacing(12)
 
-        import os
         logo_label = QLabel()
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo_path = resource_path(os.path.join("src", "gui", "orb", "logo.png"))
-        pixmap = QPixmap(logo_path)
-        if not pixmap.isNull():
-            logo_label.setPixmap(
-                pixmap.scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            )
+        qicon = create_qicon("idle", size=96)
+        pixmap = qicon.pixmap(
+            96, 96, QIcon.Mode.Normal, QIcon.State.Off
+        )
+        if pixmap and not pixmap.isNull():
+            logo_label.setPixmap(pixmap)
         layout.addWidget(logo_label)
 
         title = self._reg("welcome_title", QLabel(""))
@@ -764,7 +783,7 @@ class WelcomeDialog(QDialog):
         title.setFont(title_font)
         layout.addWidget(title)
 
-        desc = QLabel("This sets the language for the app interface and dictation.")
+        desc = QLabel("This sets the language for the app interface.")
         desc.setObjectName("subtitle")
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc.setWordWrap(True)
@@ -772,8 +791,7 @@ class WelcomeDialog(QDialog):
 
         layout.addSpacing(20)
 
-        self._lang_combo = QComboBox()
-        self._lang_combo.setStyleSheet(
+        _COMBO_STYLE = (
             "QComboBox { background-color: rgba(255,255,255,0.08); color: #ffffff; "
             "border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 10px 14px; "
             "font-size: 14px; min-width: 250px; }"
@@ -785,7 +803,16 @@ class WelcomeDialog(QDialog):
             "border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; "
             "selection-background-color: rgba(59,130,246,0.3); padding: 4px; }"
         )
-        for code, name in WHISPER_LANGUAGES:
+        self._lang_combo = QComboBox()
+        self._lang_combo.setStyleSheet(_COMBO_STYLE)
+        interface_languages = [
+            ("en", "English"), ("fr", "Francais"), ("es", "Espanol"),
+            ("de", "Deutsch"), ("it", "Italiano"), ("pt", "Portugues"),
+            ("nl", "Nederlands"), ("ja", "Japanese"), ("ko", "Korean"),
+            ("zh", "Chinese"), ("ru", "Russian"), ("ar", "Arabic"),
+            ("tr", "Turkish"), ("pl", "Polish"), ("sv", "Swedish"),
+        ]
+        for code, name in interface_languages:
             self._lang_combo.addItem(f"{name} ({code})", code)
         default_index = self._lang_combo.findData("en")
         if default_index >= 0:
@@ -810,19 +837,96 @@ class WelcomeDialog(QDialog):
 
         btn_next = QPushButton("Next")
         btn_next.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_next.clicked.connect(self._go_to_motivation_from_language)
+        btn_next.clicked.connect(self._go_to_dictation_from_language)
         nav.addWidget(btn_next)
 
         layout.addLayout(nav)
         return page
 
-    def _go_to_motivation_from_language(self) -> None:
+    def _go_to_dictation_from_language(self) -> None:
         self._language = self._lang_combo.currentData()
         self._apply_language(self._language)
+        # Pre-select interface language in dictation combo if available
+        idx = self._dict_lang_combo.findData(self._language)
+        if idx >= 0:
+            self._dict_lang_combo.setCurrentIndex(idx)
         self._go_to(2)
 
     # ================================================================
-    # Page 2 : Motivation
+    # Page 2 : Dictation language
+    # ================================================================
+
+    def _build_page_dictation_language(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(40, 20, 40, 30)
+        layout.setSpacing(16)
+
+        title = self._reg("dictation_lang_title", QLabel(""))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_font = QFont()
+        title_font.setPointSize(18)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        layout.addWidget(title)
+
+        desc = self._reg("dictation_lang_subtitle", QLabel(""))
+        desc.setObjectName("subtitle")
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        layout.addSpacing(20)
+
+        _COMBO_STYLE = (
+            "QComboBox { background-color: rgba(255,255,255,0.08); color: #ffffff; "
+            "border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 10px 14px; "
+            "font-size: 14px; min-width: 250px; }"
+            "QComboBox:hover { border-color: rgba(255,255,255,0.4); }"
+            "QComboBox::drop-down { border: none; width: 24px; }"
+            "QComboBox::down-arrow { image: none; border-left: 4px solid transparent; "
+            "border-right: 4px solid transparent; border-top: 5px solid rgba(255,255,255,0.5); margin-right: 8px; }"
+            "QComboBox QAbstractItemView { background-color: #27272a; color: #ffffff; "
+            "border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; "
+            "selection-background-color: rgba(59,130,246,0.3); padding: 4px; }"
+        )
+        self._dict_lang_combo = QComboBox()
+        self._dict_lang_combo.setStyleSheet(_COMBO_STYLE)
+        self._dict_lang_combo.addItem(_t("en", "dictation_lang_auto"), "auto")
+        for code, name in WHISPER_LANGUAGES:
+            self._dict_lang_combo.addItem(f"{name} ({code})", code)
+        layout.addWidget(self._dict_lang_combo, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        hint = self._reg("dictation_lang_hint", QLabel(""))
+        hint.setObjectName("hint")
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        layout.addStretch()
+
+        nav = QHBoxLayout()
+        self._dict_lang_prev_btn = QPushButton("")
+        self._dict_lang_prev_btn.setObjectName("secondary")
+        self._dict_lang_prev_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._dict_lang_prev_btn.clicked.connect(lambda: self._go_to(1))
+        nav.addWidget(self._dict_lang_prev_btn)
+        nav.addStretch()
+
+        self._dict_lang_next_btn = QPushButton("")
+        self._dict_lang_next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._dict_lang_next_btn.clicked.connect(self._go_to_motivation_from_dictation_lang)
+        nav.addWidget(self._dict_lang_next_btn)
+
+        layout.addLayout(nav)
+        return page
+
+    def _go_to_motivation_from_dictation_lang(self) -> None:
+        self._dictation_language = self._dict_lang_combo.currentData()
+        self._go_to(3)
+
+    # ================================================================
+    # Page 3 : Motivation
     # ================================================================
 
     def _build_page_motivation(self) -> QWidget:
@@ -859,14 +963,14 @@ class WelcomeDialog(QDialog):
         btn_prev = self._reg("btn_previous", QPushButton(""))
         btn_prev.setObjectName("secondary")
         btn_prev.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_prev.clicked.connect(lambda: self._go_to(1))
+        btn_prev.clicked.connect(lambda: self._go_to(2))
         nav.addWidget(btn_prev)
         nav.addStretch()
 
         self._motivation_next_btn = self._reg("btn_next", QPushButton(""))
         self._motivation_next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._motivation_next_btn.setEnabled(False)
-        self._motivation_next_btn.clicked.connect(lambda: self._go_to(3))
+        self._motivation_next_btn.clicked.connect(lambda: self._go_to(4))
         nav.addWidget(self._motivation_next_btn)
 
         layout.addLayout(nav)
@@ -883,7 +987,7 @@ class WelcomeDialog(QDialog):
         self._motivation_next_btn.setEnabled(len(self._motivation_selections) > 0)
 
     # ================================================================
-    # Page 3 : Hotkey
+    # Page 4 : Hotkey
     # ================================================================
 
     def _build_page_hotkey(self) -> QWidget:
@@ -925,7 +1029,7 @@ class WelcomeDialog(QDialog):
         btn_prev = QPushButton("")
         btn_prev.setObjectName("secondary")
         btn_prev.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_prev.clicked.connect(lambda: self._go_to(2))
+        btn_prev.clicked.connect(lambda: self._go_to(3))
         nav.addWidget(btn_prev)
         nav.addStretch()
 
@@ -943,10 +1047,10 @@ class WelcomeDialog(QDialog):
 
     def _go_to_mic_from_hotkey(self) -> None:
         self._hotkey = self._hotkey_capture.captured_hotkey
-        self._go_to(4)
+        self._go_to(5)
 
     # ================================================================
-    # Page 4 : Mic test
+    # Page 5 : Mic test
     # ================================================================
 
     def _build_page_mic(self) -> QWidget:
@@ -1001,13 +1105,13 @@ class WelcomeDialog(QDialog):
         self._mic_prev_btn = QPushButton("")
         self._mic_prev_btn.setObjectName("secondary")
         self._mic_prev_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._mic_prev_btn.clicked.connect(lambda: self._go_to(3))
+        self._mic_prev_btn.clicked.connect(lambda: self._go_to(4))
         nav.addWidget(self._mic_prev_btn)
         nav.addStretch()
 
         self._mic_next_btn = QPushButton("")
         self._mic_next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._mic_next_btn.clicked.connect(lambda: self._go_to(5))
+        self._mic_next_btn.clicked.connect(lambda: self._go_to(6))
         nav.addWidget(self._mic_next_btn)
 
         layout.addLayout(nav)
@@ -1083,7 +1187,7 @@ class WelcomeDialog(QDialog):
             self._mic_status.setText(_t(lang, "mic_fail"))
 
     # ================================================================
-    # Page 5 : Demo
+    # Page 6 : Demo
     # ================================================================
 
     def _build_page_demo(self) -> QWidget:
@@ -1131,7 +1235,7 @@ class WelcomeDialog(QDialog):
         self._demo_prev_btn = QPushButton("")
         self._demo_prev_btn.setObjectName("secondary")
         self._demo_prev_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._demo_prev_btn.clicked.connect(lambda: self._go_to(4))
+        self._demo_prev_btn.clicked.connect(lambda: self._go_to(5))
         nav.addWidget(self._demo_prev_btn)
         nav.addStretch()
 
@@ -1139,13 +1243,13 @@ class WelcomeDialog(QDialog):
         self._demo_skip_btn.setObjectName("skip-btn")
         self._demo_skip_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._demo_skip_btn.setVisible(False)
-        self._demo_skip_btn.clicked.connect(lambda: self._go_to(6))
+        self._demo_skip_btn.clicked.connect(lambda: self._go_to(7))
         nav.addWidget(self._demo_skip_btn)
 
         self._demo_next_btn = QPushButton("")
         self._demo_next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._demo_next_btn.setEnabled(False)
-        self._demo_next_btn.clicked.connect(lambda: self._go_to(6))
+        self._demo_next_btn.clicked.connect(lambda: self._go_to(7))
         nav.addWidget(self._demo_next_btn)
 
         layout.addLayout(nav)
@@ -1156,7 +1260,7 @@ class WelcomeDialog(QDialog):
             QTimer.singleShot(10000, self._show_demo_skip)
 
     def _show_demo_skip(self) -> None:
-        if self._stack.currentIndex() == 5 and not self._demo_success:
+        if self._stack.currentIndex() == 6 and not self._demo_success:
             self._demo_skip_btn.setVisible(True)
 
     def _toggle_demo_recording(self) -> None:
@@ -1247,7 +1351,7 @@ class WelcomeDialog(QDialog):
         logger.error(f"Demo transcription error: {error}")
 
     # ================================================================
-    # Page 6 : Tone
+    # Page 7 : Tone
     # ================================================================
 
     def _build_page_tone(self) -> QWidget:
@@ -1300,13 +1404,13 @@ class WelcomeDialog(QDialog):
         self._tone_prev_btn = QPushButton("")
         self._tone_prev_btn.setObjectName("secondary")
         self._tone_prev_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._tone_prev_btn.clicked.connect(lambda: self._go_to(5))
+        self._tone_prev_btn.clicked.connect(lambda: self._go_to(6))
         nav.addWidget(self._tone_prev_btn)
         nav.addStretch()
 
         self._tone_next_btn = QPushButton("")
         self._tone_next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._tone_next_btn.clicked.connect(lambda: self._go_to(7))
+        self._tone_next_btn.clicked.connect(lambda: self._go_to(8))
         nav.addWidget(self._tone_next_btn)
 
         layout.addLayout(nav)
@@ -1318,7 +1422,7 @@ class WelcomeDialog(QDialog):
             card.selected = (key == mode)
 
     # ================================================================
-    # Page 7 : Ready
+    # Page 8 : Ready
     # ================================================================
 
     def _build_page_ready(self) -> QWidget:
@@ -1386,6 +1490,10 @@ class WelcomeDialog(QDialog):
     @property
     def language(self) -> str:
         return self._language
+
+    @property
+    def dictation_language(self) -> str:
+        return self._dictation_language
 
     def closeEvent(self, event: object) -> None:
         self._stop_mic_test()

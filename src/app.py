@@ -1540,14 +1540,16 @@ class VoxWave:
                     self.config.setdefault("cleaning", {})["mode"] = new_mode
                     self._save_config_nested("cleaning", "mode", new_mode)
                     self._rebuild_pipeline()
-                # Appliquer la langue choisie (interface + dictee)
+                # Appliquer la langue d'interface
                 new_lang = dialog.language
                 if new_lang != self.config.get("language"):
                     self.config["language"] = new_lang
                     self._save_config("language", new_lang)
-                if new_lang != self.config.get("whisper", {}).get("language"):
-                    self.config.setdefault("whisper", {})["language"] = new_lang
-                    self._save_config_nested("whisper", "language", new_lang)
+                # Appliquer la langue de dictee (separee)
+                new_dict_lang = dialog.dictation_language
+                if new_dict_lang != self.config.get("whisper", {}).get("language"):
+                    self.config.setdefault("whisper", {})["language"] = new_dict_lang
+                    self._save_config_nested("whisper", "language", new_dict_lang)
                 # Marquer le premier lancement comme termine
                 self.config["first_launch"] = False
                 self._save_config("first_launch", "false")

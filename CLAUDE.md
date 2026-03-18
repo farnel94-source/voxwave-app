@@ -123,19 +123,20 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 - Warning dans `keyboard.py` et `waveform_widget.py` si `sys.platform == "darwin"`
 - Raison : Wispr Flow et Aqua Voice dominent sur Mac, aucun concurrent serieux sur Windows/Linux
 
-## Onboarding v2.1 (welcome_dialog.py) — Inspire Wispr Flow
-8 pages avec indicateur de progression (dots + messages encourageants) :
+## Onboarding v2.2 (welcome_dialog.py) — Inspire Wispr Flow
+9 pages avec indicateur de progression (dots + messages encourageants) :
 1. **Bienvenue** : logo + bullets + bouton Commencer
-2. **Pourquoi VoxWave ?** : 4 cartes multi-select (motivations), Suivant bloque sans selection
-3. **Raccourci clavier** : HotkeyCapture, no-skip 3s (Suivant desactive temporairement)
-4. **Langue** : QComboBox (15 langues), sauvegardee dans config
-5. **Test micro** : test 3s avec barre de volume + bip audio (play_start/play_stop via AudioFeedback)
-6. **Demo interactive** : bouton Dicter toggle, QTextEdit resultat, transcription dans un thread, bouton Passer apres 10s
-7. **Ton d'ecriture** : 3 cartes radio (Brut/Naturel/Professionnel) avec exemples
-8. **Pret !** : rappel hotkey + mode d'ecriture + indication tray
+2. **Langue interface** : QComboBox (15 langues), sauvegardee dans `config["language"]`
+3. **Langue dictee** : QComboBox ("Auto-detect" + 99 langues Whisper), sauvegardee dans `config["whisper"]["language"]` — pre-selectionne la langue d'interface
+4. **Pourquoi VoxWave ?** : 4 cartes multi-select (motivations), Suivant bloque sans selection
+5. **Raccourci clavier** : HotkeyCapture, no-skip 3s (Suivant desactive temporairement)
+6. **Test micro** : test 3s avec barre de volume + bip audio (play_start/play_stop via AudioFeedback)
+7. **Demo interactive** : bouton Dicter toggle, QTextEdit resultat, transcription dans un thread, bouton Passer apres 10s
+8. **Ton d'ecriture** : 2 cartes radio (Brut/Auto) avec exemples
+9. **Pret !** : rappel hotkey + mode d'ecriture + indication tray
 
 ### Widgets custom onboarding
-- `_ProgressDots` : 8 cercles peints via QPainter + "Etape X sur 8"
+- `_ProgressDots` : 9 cercles peints via QPainter + "Etape X sur 9"
 - `_ClickableCard` : carte avec paintEvent (3 etats visuels: normal/hover/selected) + checkmark
 - `_TranscriptionWorker` : QObject avec signals finished/error, tourne dans un thread
 
