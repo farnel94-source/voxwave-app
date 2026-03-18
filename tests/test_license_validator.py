@@ -14,7 +14,7 @@ class TestLicenseStorage:
     """Tests LicenseStorage."""
 
     def test_save_and_load_license(self, tmp_path):
-        with patch("src.licensing.storage.VOXTOOL_DIR", tmp_path), \
+        with patch("src.licensing.storage.VOXWAVE_DIR", tmp_path), \
              patch("src.licensing.storage.LICENSE_FILE", tmp_path / "license.enc"), \
              patch("src.licensing.storage.KEY_FILE", tmp_path / ".key"), \
              patch("src.licensing.storage.USAGE_FILE", tmp_path / "usage.json"):
@@ -27,7 +27,7 @@ class TestLicenseStorage:
             assert loaded["license_key"] == "test-123"
 
     def test_load_license_empty(self, tmp_path):
-        with patch("src.licensing.storage.VOXTOOL_DIR", tmp_path), \
+        with patch("src.licensing.storage.VOXWAVE_DIR", tmp_path), \
              patch("src.licensing.storage.LICENSE_FILE", tmp_path / "license.enc"), \
              patch("src.licensing.storage.KEY_FILE", tmp_path / ".key"), \
              patch("src.licensing.storage.USAGE_FILE", tmp_path / "usage.json"):
@@ -37,7 +37,7 @@ class TestLicenseStorage:
             assert storage.load_license() is None
 
     def test_delete_license(self, tmp_path):
-        with patch("src.licensing.storage.VOXTOOL_DIR", tmp_path), \
+        with patch("src.licensing.storage.VOXWAVE_DIR", tmp_path), \
              patch("src.licensing.storage.LICENSE_FILE", tmp_path / "license.enc"), \
              patch("src.licensing.storage.KEY_FILE", tmp_path / ".key"), \
              patch("src.licensing.storage.USAGE_FILE", tmp_path / "usage.json"):
@@ -49,7 +49,7 @@ class TestLicenseStorage:
             assert storage.load_license() is None
 
     def test_usage_counter(self, tmp_path):
-        with patch("src.licensing.storage.VOXTOOL_DIR", tmp_path), \
+        with patch("src.licensing.storage.VOXWAVE_DIR", tmp_path), \
              patch("src.licensing.storage.USAGE_FILE", tmp_path / "usage.json"):
             from src.licensing.storage import LicenseStorage
 
@@ -60,7 +60,7 @@ class TestLicenseStorage:
             assert LicenseStorage.get_usage() == 2
 
     def test_daily_usage_counter(self, tmp_path):
-        with patch("src.licensing.storage.VOXTOOL_DIR", tmp_path), \
+        with patch("src.licensing.storage.VOXWAVE_DIR", tmp_path), \
              patch("src.licensing.storage.USAGE_FILE", tmp_path / "usage.json"):
             from src.licensing.storage import LicenseStorage
 
@@ -71,7 +71,7 @@ class TestLicenseStorage:
             assert LicenseStorage.get_daily_usage() == 2
 
     def test_daily_usage_resets_on_new_day(self, tmp_path):
-        with patch("src.licensing.storage.VOXTOOL_DIR", tmp_path), \
+        with patch("src.licensing.storage.VOXWAVE_DIR", tmp_path), \
              patch("src.licensing.storage.USAGE_FILE", tmp_path / "usage.json"):
             from src.licensing.storage import LicenseStorage
 
@@ -187,6 +187,8 @@ class TestLicenseValidator:
         assert info["remaining_today"] == 43
 
     def test_offline_validation_trusts_cache(self):
+        """Cache récent (<7 jours) doit être accepté offline."""
+        import time
         from src.licensing.validator import LicenseValidator
 
         validator = LicenseValidator()
@@ -194,8 +196,27 @@ class TestLicenseValidator:
         validator.storage.load_license.return_value = {"license_key": "key-123"}
         validator.client = MagicMock()
         validator.client.validate_license.side_effect = LicenseError("Network error")
+        # Simuler un cache récent (validé il y a 1 heure)
+        validator._cached_valid = True
+        validator._cache_time = time.time() - 3600
 
         assert validator.is_licensed() is True
+
+    def test_offline_validation_rejects_expired_cache(self):
+        """Cache expiré (>7 jours) doit être rejeté offline → free tier."""
+        import time
+        from src.licensing.validator import LicenseValidator
+
+        validator = LicenseValidator()
+        validator.storage = MagicMock()
+        validator.storage.load_license.return_value = {"license_key": "key-123"}
+        validator.client = MagicMock()
+        validator.client.validate_license.side_effect = LicenseError("Network error")
+        # Simuler un cache vieux de 8 jours
+        validator._cached_valid = True
+        validator._cache_time = time.time() - (8 * 86400)
+
+        assert validator.is_licensed() is False
 
     @patch("src.licensing.validator._is_dev_mode", return_value=False)
     def test_get_transcription_provider_free(self, _):

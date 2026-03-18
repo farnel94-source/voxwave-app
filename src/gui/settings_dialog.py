@@ -1,6 +1,8 @@
-"""Dialogue de parametres The Wave — UI moderne inspiree Wispr/Aqua."""
+"""Dialogue de parametres VoxWave — UI moderne inspiree Wispr/Aqua."""
 
 import logging
+import os
+import sys
 from typing import Optional
 
 from src.config.defaults import WHISPER_LANGUAGES
@@ -43,10 +45,10 @@ _SETTINGS_T = {
         "label_activation": "Activation method",
         "hint_activation": "How to start/stop dictation",
         "activation_hotkey": "Keyboard shortcut only",
-        "activation_icon": "The Wave icon only",
+        "activation_icon": "VoxWave icon only",
         "activation_both": "Both (keyboard + icon)",
         "section_writing": "WRITING MODE",
-        "desc_writing": "How should The Wave clean your dictations?",
+        "desc_writing": "How should VoxWave clean your dictations?",
         "tone_raw": "Raw",
         "tone_raw_desc": "No processing, exact transcription",
         "tone_auto": "Auto",
@@ -74,7 +76,8 @@ _SETTINGS_T = {
             "4. Clean text is pasted automatically"
         ),
         "help_report_title": "Report an issue",
-        "help_report_hint": "Contact us: support@thewave.app",
+        "help_report_hint": "Contact us: support@voxwave.app",
+        "help_open_logs": "Open logs folder",
     },
     "fr": {
         "title": "Parametres",
@@ -91,10 +94,10 @@ _SETTINGS_T = {
         "label_activation": "Methode d'activation",
         "hint_activation": "Comment demarrer/arreter la dictee",
         "activation_hotkey": "Raccourci clavier uniquement",
-        "activation_icon": "Icone The Wave uniquement",
+        "activation_icon": "Icone VoxWave uniquement",
         "activation_both": "Les deux (clavier + icone)",
         "section_writing": "MODE D'ECRITURE",
-        "desc_writing": "Comment The Wave doit nettoyer vos dictees ?",
+        "desc_writing": "Comment VoxWave doit nettoyer vos dictees ?",
         "tone_raw": "Brut",
         "tone_raw_desc": "Aucun traitement, texte exact de la transcription",
         "tone_auto": "Auto",
@@ -122,7 +125,8 @@ _SETTINGS_T = {
             "4. Le texte nettoye est colle automatiquement"
         ),
         "help_report_title": "Signaler un probleme",
-        "help_report_hint": "Contactez-nous : support@thewave.app",
+        "help_report_hint": "Contactez-nous : support@voxwave.app",
+        "help_open_logs": "Ouvrir le dossier logs",
     },
     "es": {
         "title": "Configuracion",
@@ -137,10 +141,10 @@ _SETTINGS_T = {
         "label_activation": "Metodo de activacion",
         "hint_activation": "Como iniciar/detener el dictado",
         "activation_hotkey": "Solo atajo de teclado",
-        "activation_icon": "Solo icono The Wave",
+        "activation_icon": "Solo icono VoxWave",
         "activation_both": "Ambos (teclado + icono)",
         "section_writing": "MODO DE ESCRITURA",
-        "desc_writing": "Como debe limpiar The Wave sus dictados?",
+        "desc_writing": "Como debe limpiar VoxWave sus dictados?",
         "tone_raw": "Bruto", "tone_raw_desc": "Sin procesamiento, transcripcion exacta",
         "tone_auto": "Auto", "tone_auto_desc": "Detecta la aplicacion y adapta automaticamente",
         "section_audio": "DISPOSITIVO DE AUDIO",
@@ -166,7 +170,8 @@ _SETTINGS_T = {
             "4. El texto limpio se pega automaticamente"
         ),
         "help_report_title": "Reportar un problema",
-        "help_report_hint": "Contactenos: support@thewave.app",
+        "help_report_hint": "Contactenos: support@voxwave.app",
+        "help_open_logs": "Abrir carpeta de logs",
     },
     "de": {
         "title": "Einstellungen",
@@ -181,10 +186,10 @@ _SETTINGS_T = {
         "label_activation": "Aktivierungsmethode",
         "hint_activation": "Wie Diktat starten/stoppen",
         "activation_hotkey": "Nur Tastenkurzel",
-        "activation_icon": "Nur The Wave Symbol",
+        "activation_icon": "Nur VoxWave Symbol",
         "activation_both": "Beides (Tastatur + Symbol)",
         "section_writing": "SCHREIBMODUS",
-        "desc_writing": "Wie soll The Wave Ihre Diktate bereinigen?",
+        "desc_writing": "Wie soll VoxWave Ihre Diktate bereinigen?",
         "tone_raw": "Roh", "tone_raw_desc": "Keine Verarbeitung, genaue Transkription",
         "tone_auto": "Auto", "tone_auto_desc": "Erkennt die App und passt sich automatisch an",
         "section_audio": "AUDIOGERAET",
@@ -210,7 +215,8 @@ _SETTINGS_T = {
             "4. Bereinigter Text wird eingefugt"
         ),
         "help_report_title": "Problem melden",
-        "help_report_hint": "Kontakt: support@thewave.app",
+        "help_report_hint": "Kontakt: support@voxwave.app",
+        "help_open_logs": "Log-Ordner offnen",
     },
     "it": {
         "title": "Impostazioni",
@@ -225,10 +231,10 @@ _SETTINGS_T = {
         "label_activation": "Metodo di attivazione",
         "hint_activation": "Come avviare/fermare la dettatura",
         "activation_hotkey": "Solo scorciatoia tastiera",
-        "activation_icon": "Solo icona The Wave",
+        "activation_icon": "Solo icona VoxWave",
         "activation_both": "Entrambi (tastiera + icona)",
         "section_writing": "MODALITA DI SCRITTURA",
-        "desc_writing": "Come deve pulire The Wave i tuoi dettati?",
+        "desc_writing": "Come deve pulire VoxWave i tuoi dettati?",
         "tone_raw": "Grezzo", "tone_raw_desc": "Nessuna elaborazione, trascrizione esatta",
         "tone_auto": "Auto", "tone_auto_desc": "Rileva l'app e si adatta automaticamente",
         "section_audio": "DISPOSITIVO AUDIO",
@@ -254,7 +260,8 @@ _SETTINGS_T = {
             "4. Il testo pulito viene incollato"
         ),
         "help_report_title": "Segnala un problema",
-        "help_report_hint": "Contattaci: support@thewave.app",
+        "help_report_hint": "Contattaci: support@voxwave.app",
+        "help_open_logs": "Apri cartella log",
     },
     "pt": {
         "title": "Configuracoes",
@@ -269,10 +276,10 @@ _SETTINGS_T = {
         "label_activation": "Metodo de ativacao",
         "hint_activation": "Como iniciar/parar o ditado",
         "activation_hotkey": "Somente atalho de teclado",
-        "activation_icon": "Somente icone The Wave",
+        "activation_icon": "Somente icone VoxWave",
         "activation_both": "Ambos (teclado + icone)",
         "section_writing": "MODO DE ESCRITA",
-        "desc_writing": "Como o The Wave deve limpar seus ditados?",
+        "desc_writing": "Como o VoxWave deve limpar seus ditados?",
         "tone_raw": "Bruto", "tone_raw_desc": "Sem processamento, transcricao exata",
         "tone_auto": "Auto", "tone_auto_desc": "Detecta o aplicativo e adapta automaticamente",
         "section_audio": "DISPOSITIVO DE AUDIO",
@@ -298,7 +305,8 @@ _SETTINGS_T = {
             "4. O texto limpo e colado automaticamente"
         ),
         "help_report_title": "Reportar um problema",
-        "help_report_hint": "Contato: support@thewave.app",
+        "help_report_hint": "Contato: support@voxwave.app",
+        "help_open_logs": "Abrir pasta de logs",
     },
     "nl": {
         "title": "Instellingen",
@@ -313,10 +321,10 @@ _SETTINGS_T = {
         "label_activation": "Activeringsmethode",
         "hint_activation": "Hoe dicteren te starten/stoppen",
         "activation_hotkey": "Alleen sneltoets",
-        "activation_icon": "Alleen The Wave icoon",
+        "activation_icon": "Alleen VoxWave icoon",
         "activation_both": "Beide (toetsenbord + icoon)",
         "section_writing": "SCHRIJFMODUS",
-        "desc_writing": "Hoe moet The Wave uw dictaten verwerken?",
+        "desc_writing": "Hoe moet VoxWave uw dictaten verwerken?",
         "tone_raw": "Rauw", "tone_raw_desc": "Geen verwerking, exacte transcriptie",
         "tone_auto": "Auto", "tone_auto_desc": "Detecteert de app en past automatisch aan",
         "section_audio": "AUDIOAPPARAAT",
@@ -342,7 +350,8 @@ _SETTINGS_T = {
             "4. Schone tekst wordt automatisch geplakt"
         ),
         "help_report_title": "Probleem melden",
-        "help_report_hint": "Contact: support@thewave.app",
+        "help_report_hint": "Contact: support@voxwave.app",
+        "help_open_logs": "Open logmap",
     },
     "ja": {
         "title": "設定",
@@ -357,10 +366,10 @@ _SETTINGS_T = {
         "label_activation": "起動方法",
         "hint_activation": "ディクテーションの開始/停止方法",
         "activation_hotkey": "ショートカットキーのみ",
-        "activation_icon": "The Waveアイコンのみ",
+        "activation_icon": "VoxWaveアイコンのみ",
         "activation_both": "両方 (キーボード + アイコン)",
         "section_writing": "書き方モード",
-        "desc_writing": "The Waveはどのようにテキストを整理しますか？",
+        "desc_writing": "VoxWaveはどのようにテキストを整理しますか？",
         "tone_raw": "そのまま", "tone_raw_desc": "処理なし、正確な書き起こし",
         "tone_auto": "自動", "tone_auto_desc": "アプリを検出して自動的に適応",
         "section_audio": "音声デバイス",
@@ -386,7 +395,8 @@ _SETTINGS_T = {
             "4. 整理されたテキストが自動で貼り付けられる"
         ),
         "help_report_title": "問題を報告",
-        "help_report_hint": "お問い合わせ: support@thewave.app",
+        "help_report_hint": "お問い合わせ: support@voxwave.app",
+        "help_open_logs": "ログフォルダを開く",
     },
     "ko": {
         "title": "설정",
@@ -401,10 +411,10 @@ _SETTINGS_T = {
         "label_activation": "활성화 방법",
         "hint_activation": "받아쓰기 시작/중지 방법",
         "activation_hotkey": "단축키만 사용",
-        "activation_icon": "The Wave 아이콘만 사용",
+        "activation_icon": "VoxWave 아이콘만 사용",
         "activation_both": "둘 다 (키보드 + 아이콘)",
         "section_writing": "작성 모드",
-        "desc_writing": "The Wave가 받아쓰기를 어떻게 정리할까요?",
+        "desc_writing": "VoxWave가 받아쓰기를 어떻게 정리할까요?",
         "tone_raw": "원본", "tone_raw_desc": "처리 없음, 정확한 전사",
         "tone_auto": "자동", "tone_auto_desc": "앱을 감지하여 자동으로 적응",
         "section_audio": "오디오 장치",
@@ -430,7 +440,8 @@ _SETTINGS_T = {
             "4. 정리된 텍스트가 자동으로 붙여넣기"
         ),
         "help_report_title": "문제 신고",
-        "help_report_hint": "문의: support@thewave.app",
+        "help_report_hint": "문의: support@voxwave.app",
+        "help_open_logs": "로그 폴더 열기",
     },
     "zh": {
         "title": "设置",
@@ -445,10 +456,10 @@ _SETTINGS_T = {
         "label_activation": "激活方式",
         "hint_activation": "如何开始/停止听写",
         "activation_hotkey": "仅使用快捷键",
-        "activation_icon": "仅使用The Wave图标",
+        "activation_icon": "仅使用VoxWave图标",
         "activation_both": "两者 (键盘 + 图标)",
         "section_writing": "写作模式",
-        "desc_writing": "The Wave应如何整理您的听写内容？",
+        "desc_writing": "VoxWave应如何整理您的听写内容？",
         "tone_raw": "原始", "tone_raw_desc": "不处理，精确转录",
         "tone_auto": "自动", "tone_auto_desc": "检测应用并自动适应",
         "section_audio": "音频设备",
@@ -474,7 +485,8 @@ _SETTINGS_T = {
             "4. 整理后的文本自动粘贴"
         ),
         "help_report_title": "报告问题",
-        "help_report_hint": "联系我们: support@thewave.app",
+        "help_report_hint": "联系我们: support@voxwave.app",
+        "help_open_logs": "打开日志文件夹",
     },
     "ru": {
         "title": "Nastrojki",
@@ -489,10 +501,10 @@ _SETTINGS_T = {
         "label_activation": "Metod aktivacii",
         "hint_activation": "Kak nachat/ostanovit diktovku",
         "activation_hotkey": "Tolko gorjachaja klavisha",
-        "activation_icon": "Tolko ikonka The Wave",
+        "activation_icon": "Tolko ikonka VoxWave",
         "activation_both": "Oba (klaviatura + ikonka)",
         "section_writing": "REZHIM NAPISANIJA",
-        "desc_writing": "Kak The Wave dolzhen obrabatyvat vashi diktovki?",
+        "desc_writing": "Kak VoxWave dolzhen obrabatyvat vashi diktovki?",
         "tone_raw": "Syroj", "tone_raw_desc": "Bez obrabotki, tochnaja transkriptsija",
         "tone_auto": "Avto", "tone_auto_desc": "Opredeljaet prilozhenie i adaptiruetsja avtomaticheski",
         "section_audio": "AUDIOUSTROJSTVO",
@@ -518,7 +530,8 @@ _SETTINGS_T = {
             "4. Chistyj tekst vstavljaetsja avtomaticheski"
         ),
         "help_report_title": "Soobshit o probleme",
-        "help_report_hint": "Kontakt: support@thewave.app",
+        "help_report_hint": "Kontakt: support@voxwave.app",
+        "help_open_logs": "Otkrit papku logov",
     },
     "ar": {
         "title": "الإعدادات",
@@ -533,10 +546,10 @@ _SETTINGS_T = {
         "label_activation": "طريقة التفعيل",
         "hint_activation": "كيفية بدء/إيقاف الإملاء",
         "activation_hotkey": "اختصار لوحة المفاتيح فقط",
-        "activation_icon": "أيقونة The Wave فقط",
+        "activation_icon": "أيقونة VoxWave فقط",
         "activation_both": "كلاهما (لوحة المفاتيح + الأيقونة)",
         "section_writing": "وضع الكتابة",
-        "desc_writing": "كيف يجب أن يعالج The Wave إملاءاتك؟",
+        "desc_writing": "كيف يجب أن يعالج VoxWave إملاءاتك؟",
         "tone_raw": "خام", "tone_raw_desc": "بدون معالجة، نسخ دقيق",
         "tone_auto": "تلقائي", "tone_auto_desc": "يكتشف التطبيق ويتكيف تلقائيًا",
         "section_audio": "جهاز الصوت",
@@ -562,7 +575,8 @@ _SETTINGS_T = {
             "4. يتم لصق النص تلقائياً"
         ),
         "help_report_title": "الإبلاغ عن مشكلة",
-        "help_report_hint": "تواصل معنا: support@thewave.app",
+        "help_report_hint": "تواصل معنا: support@voxwave.app",
+        "help_open_logs": "فتح مجلد السجلات",
     },
     "tr": {
         "title": "Ayarlar",
@@ -577,10 +591,10 @@ _SETTINGS_T = {
         "label_activation": "Etkinlestirme yontemi",
         "hint_activation": "Dikte nasil baslatilir/durdurulur",
         "activation_hotkey": "Sadece klavye kisayolu",
-        "activation_icon": "Sadece The Wave simgesi",
+        "activation_icon": "Sadece VoxWave simgesi",
         "activation_both": "Ikisi de (klavye + simge)",
         "section_writing": "YAZMA MODU",
-        "desc_writing": "The Wave diktelerinizi nasil duzenlemelidir?",
+        "desc_writing": "VoxWave diktelerinizi nasil duzenlemelidir?",
         "tone_raw": "Ham", "tone_raw_desc": "Islem yok, tam transkripsiyon",
         "tone_auto": "Otomatik", "tone_auto_desc": "Uygulamayi tespit eder ve otomatik olarak uyarlar",
         "section_audio": "SES CIHAZI",
@@ -606,7 +620,8 @@ _SETTINGS_T = {
             "4. Temiz metin otomatik yapistiriliyor"
         ),
         "help_report_title": "Sorun bildir",
-        "help_report_hint": "Iletisim: support@thewave.app",
+        "help_report_hint": "Iletisim: support@voxwave.app",
+        "help_open_logs": "Log klasorunu ac",
     },
     "pl": {
         "title": "Ustawienia",
@@ -621,10 +636,10 @@ _SETTINGS_T = {
         "label_activation": "Metoda aktywacji",
         "hint_activation": "Jak rozpoczac/zatrzymac dyktowanie",
         "activation_hotkey": "Tylko skrot klawiszowy",
-        "activation_icon": "Tylko ikona The Wave",
+        "activation_icon": "Tylko ikona VoxWave",
         "activation_both": "Oba (klawiatura + ikona)",
         "section_writing": "TRYB PISANIA",
-        "desc_writing": "Jak The Wave ma czyscic twoje dyktowania?",
+        "desc_writing": "Jak VoxWave ma czyscic twoje dyktowania?",
         "tone_raw": "Surowy", "tone_raw_desc": "Bez przetwarzania, dokladna transkrypcja",
         "tone_auto": "Auto", "tone_auto_desc": "Wykrywa aplikacje i automatycznie dostosowuje",
         "section_audio": "URZADZENIE AUDIO",
@@ -650,7 +665,8 @@ _SETTINGS_T = {
             "4. Czysty tekst jest automatycznie wklejony"
         ),
         "help_report_title": "Zglos problem",
-        "help_report_hint": "Kontakt: support@thewave.app",
+        "help_report_hint": "Kontakt: support@voxwave.app",
+        "help_open_logs": "Otworz folder logow",
     },
     "sv": {
         "title": "Installningar",
@@ -665,10 +681,10 @@ _SETTINGS_T = {
         "label_activation": "Aktiveringsmetod",
         "hint_activation": "Hur man startar/stoppar diktering",
         "activation_hotkey": "Endast kortkommando",
-        "activation_icon": "Endast The Wave-ikon",
+        "activation_icon": "Endast VoxWave-ikon",
         "activation_both": "Bada (tangentbord + ikon)",
         "section_writing": "SKRIVLAGE",
-        "desc_writing": "Hur ska The Wave rensa dina dikteringar?",
+        "desc_writing": "Hur ska VoxWave rensa dina dikteringar?",
         "tone_raw": "Rakt", "tone_raw_desc": "Ingen behandling, exakt transkription",
         "tone_auto": "Auto", "tone_auto_desc": "Identifierar appen och anpassar automatiskt",
         "section_audio": "LJUDENHET",
@@ -694,7 +710,8 @@ _SETTINGS_T = {
             "4. Ren text klistras automatiskt in"
         ),
         "help_report_title": "Rapportera ett problem",
-        "help_report_hint": "Kontakt: support@thewave.app",
+        "help_report_hint": "Kontakt: support@voxwave.app",
+        "help_open_logs": "Oppna loggmapp",
     },
 }
 
@@ -1017,7 +1034,7 @@ class _ToneCard(QWidget):
 # ====================================================================
 
 class SettingsDialog(QDialog):
-    """Dialogue de parametres The Wave — design moderne avec navigation laterale."""
+    """Dialogue de parametres VoxWave — design moderne avec navigation laterale."""
 
     def __init__(
         self,
@@ -1056,12 +1073,22 @@ class SettingsDialog(QDialog):
         self._build_ui()
 
     def _setup_window(self) -> None:
-        self.setWindowTitle(f"The Wave — {_st(self._sys_lang, 'title')}")
+        self.setWindowTitle(f"VoxWave — {_st(self._sys_lang, 'title')}")
         self.setFixedSize(620, 580)
         self.setStyleSheet(_STYLESHEET)
-        self.setWindowFlags(
-            Qt.WindowType.Dialog | Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.Tool
+        flags = (
+            Qt.WindowType.Dialog
+            | Qt.WindowType.CustomizeWindowHint
+            | Qt.WindowType.WindowTitleHint
+            | Qt.WindowType.WindowCloseButtonHint
+            | Qt.WindowType.WindowMinimizeButtonHint
         )
+        if sys.platform == "win32":
+            # Fenetre "tool" sous Windows: n'ajoute pas d'entree taskbar separee.
+            flags |= Qt.WindowType.Tool
+        self.setWindowFlags(flags)
+        if sys.platform == "win32":
+            logger.debug("SettingsDialog win32 flags: %s", int(self.windowFlags()))
 
     def _build_ui(self) -> None:
         root = QHBoxLayout(self)
@@ -1102,7 +1129,7 @@ class SettingsDialog(QDialog):
         sidebar_layout.addStretch()
 
         # Version
-        version = QLabel("The Wave v2.1")
+        version = QLabel("VoxWave v2.1")
         version.setStyleSheet("color: rgba(255,255,255,0.25); font-size: 10px; padding: 0 16px;")
         sidebar_layout.addWidget(version)
 
@@ -1489,7 +1516,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(status_label)
 
         desc = QLabel(
-            "Le free tier vous permet d'utiliser The Wave avec un nombre\n"
+            "Le free tier vous permet d'utiliser VoxWave avec un nombre\n"
             "limite de dictees par jour. Activez une licence pour un\n"
             "usage illimite."
         )
@@ -1539,6 +1566,19 @@ class SettingsDialog(QDialog):
         report_hint.setObjectName("hint")
         layout.addWidget(report_hint)
 
+        # -- Bouton ouvrir les logs --
+        logs_btn = QPushButton(t["help_open_logs"])
+        logs_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        logs_btn.setStyleSheet("""
+            QPushButton {
+                background: #2a2a3e; color: #60a5fa; border: 1px solid #3b3b5c;
+                border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 600;
+            }
+            QPushButton:hover { background: #3b3b5c; }
+        """)
+        logs_btn.clicked.connect(self._on_open_logs)
+        layout.addWidget(logs_btn)
+
         # -- Separateur --
         sep2 = QLabel()
         sep2.setFixedHeight(1)
@@ -1546,7 +1586,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(sep2)
 
         # -- Section A propos --
-        version_label = QLabel("The Wave v2.1")
+        version_label = QLabel("VoxWave v2.1")
         version_label.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px;")
         layout.addWidget(version_label)
 
@@ -1561,7 +1601,7 @@ class SettingsDialog(QDialog):
         layout.addStretch()
 
         # Bouton Quitter (rouge, en bas)
-        quit_btn = QPushButton("Quitter The Wave")
+        quit_btn = QPushButton("Quitter VoxWave")
         quit_btn.setObjectName("quit-btn")
         quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         quit_btn.clicked.connect(self._on_quit_clicked)
@@ -1573,6 +1613,18 @@ class SettingsDialog(QDialog):
         """Lance l'activation de licence."""
         if self._on_activate_license:
             self._on_activate_license()
+
+    def _on_open_logs(self) -> None:
+        """Ouvre le dossier de logs dans l'explorateur de fichiers."""
+        import subprocess
+        from src.app import _get_log_dir
+
+        log_dir = _get_log_dir()
+        os.makedirs(log_dir, exist_ok=True)
+        if sys.platform == "win32":
+            os.startfile(log_dir)
+        else:
+            subprocess.Popen(["xdg-open", log_dir])
 
     def _on_quit_clicked(self) -> None:
         """Quitte l'application via le bouton Quitter."""

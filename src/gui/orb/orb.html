@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Wave Voice Input</title>
+<title>VoxWave Voice Input</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -300,6 +300,7 @@ body {
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script>
 let currentState = 'idle';
+let successFlashTimeout = null;
 let bridge = null;
 let timerSeconds = 0;
 let timerInterval = null;
@@ -358,13 +359,21 @@ function applyIdleState() {
 
 function doSuccessFlash(callback) {
     logoCircle.classList.add('success');
-    setTimeout(function() {
+    successFlashTimeout = setTimeout(function() {
+        successFlashTimeout = null;
         logoCircle.classList.remove('success');
         callback();
     }, 800);
 }
 
 function setState(state) {
+    // Cancel any pending success flash timeout
+    if (successFlashTimeout) {
+        clearTimeout(successFlashTimeout);
+        successFlashTimeout = null;
+        logoCircle.classList.remove('success');
+    }
+
     var prevState = currentState;
 
     if (state === 'idle' && prevState === 'processing') {
@@ -394,7 +403,7 @@ function setState(state) {
         expandArea.classList.remove('visible');
         voiceInput.classList.add('active', 'processing');
         voiceInput.classList.remove('error');
-        processingText.childNodes[0].textContent = 'Traitement';
+        processingText.childNodes[0].textContent = '...';
         processingDots.style.display = '';
         stopTimer();
         stopAuraAnimation();

@@ -1,1 +1,1 @@
-"""Utilitaires VoxTool."""
+"""Utilitaires VoxWave."""

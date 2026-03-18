@@ -1,4 +1,4 @@
-"""Feedback audio (beeps) pour indiquer l'état de VoxTool.
+"""Feedback audio (beeps) pour indiquer l'état de VoxWave.
 
 Windows : winsound.Beep() (pas de dépendance).
 Autres OS : sinusoïdes numpy + sounddevice.play().

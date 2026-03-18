@@ -1,11 +1,12 @@
-"""Script de build automatise multi-plateforme pour VoxTool.
+"""Script de build automatise multi-plateforme pour VoxWave.
 
 Usage:
     python build.py build                   # Detecte la plateforme
     python build.py build --platform linux  # AppImage Linux
     python build.py build --platform windows # exe + ZIP Windows
+    python build.py installer               # Cree l'installer (Inno Setup Windows)
     python build.py clean                   # Nettoie les artefacts
-    python build.py all                     # Clean + Build + Package
+    python build.py all                     # Clean + Build + Package + Installer
 """
 
 import os
@@ -19,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 DIST = ROOT / "dist"
 BUILD = ROOT / "build"
-SPEC = ROOT / "voxtool.spec"
+SPEC = ROOT / "voxwave.spec"
 
 
 def detect_platform() -> str:
@@ -51,7 +52,7 @@ def clean() -> None:
 
 def build_pyinstaller() -> None:
     """Lance PyInstaller avec le spec."""
-    print("Build VoxTool (PyInstaller)...")
+    print("Build VoxWave (PyInstaller)...")
     cmd = [
         sys.executable, "-m", "PyInstaller",
         str(SPEC),
@@ -69,29 +70,29 @@ def build_linux() -> None:
     """Build Linux : PyInstaller + AppImage."""
     build_pyinstaller()
 
-    exe_path = DIST / "VoxTool"
+    exe_path = DIST / "VoxWave"
     if not exe_path.exists():
         print(f"Erreur: {exe_path} introuvable apres build.")
         sys.exit(1)
 
     # Creer la structure AppDir
-    appdir = DIST / "VoxTool.AppDir"
+    appdir = DIST / "VoxWave.AppDir"
     if appdir.exists():
         shutil.rmtree(appdir)
     appdir.mkdir(parents=True)
 
     usr_bin = appdir / "usr" / "bin"
     usr_bin.mkdir(parents=True)
-    shutil.copy2(exe_path, usr_bin / "VoxTool")
+    shutil.copy2(exe_path, usr_bin / "VoxWave")
 
     # Desktop file
-    desktop = appdir / "VoxTool.desktop"
+    desktop = appdir / "VoxWave.desktop"
     desktop.write_text(
         "[Desktop Entry]\n"
         "Type=Application\n"
-        "Name=VoxTool\n"
-        "Exec=VoxTool\n"
-        "Icon=voxtool\n"
+        "Name=VoxWave\n"
+        "Exec=VoxWave\n"
+        "Icon=voxwave\n"
         "Comment=Dictee vocale intelligente\n"
         "Categories=Utility;Audio;\n"
         "Terminal=false\n"
@@ -99,7 +100,7 @@ def build_linux() -> None:
 
     # Icon (simple placeholder PNG si pas d'icone)
     icon_src = ROOT / "assets" / "icon.png"
-    icon_dst = appdir / "voxtool.png"
+    icon_dst = appdir / "voxwave.png"
     if icon_src.exists():
         shutil.copy2(icon_src, icon_dst)
     else:
@@ -111,7 +112,7 @@ def build_linux() -> None:
     apprun.write_text(
         "#!/bin/bash\n"
         'HERE="$(dirname "$(readlink -f "$0")")"\n'
-        'exec "$HERE/usr/bin/VoxTool" "$@"\n'
+        'exec "$HERE/usr/bin/VoxWave" "$@"\n'
     )
     apprun.chmod(0o755)
 
@@ -124,7 +125,7 @@ def build_linux() -> None:
     # Creer l'AppImage avec appimagetool si disponible
     appimagetool = shutil.which("appimagetool")
     if appimagetool:
-        appimage_path = DIST / "VoxTool-x86_64.AppImage"
+        appimage_path = DIST / "VoxWave-x86_64.AppImage"
         print(f"Creation AppImage avec appimagetool...")
         result = subprocess.run(
             [appimagetool, str(appdir), str(appimage_path)],
@@ -134,10 +135,10 @@ def build_linux() -> None:
             size_mb = appimage_path.stat().st_size / (1024 * 1024)
             print(f"AppImage cree: {appimage_path} ({size_mb:.1f} MB)")
         else:
-            print("Erreur creation AppImage. AppDir disponible dans dist/VoxTool.AppDir/")
+            print("Erreur creation AppImage. AppDir disponible dans dist/VoxWave.AppDir/")
     else:
         print(
-            "appimagetool non trouve. AppDir disponible dans dist/VoxTool.AppDir/\n"
+            "appimagetool non trouve. AppDir disponible dans dist/VoxWave.AppDir/\n"
             "Pour creer l'AppImage, installez appimagetool:\n"
             "  wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage\n"
             "  chmod +x appimagetool-x86_64.AppImage && sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool"
@@ -152,15 +153,15 @@ def build_windows() -> None:
 
 def package_windows() -> None:
     """Cree un ZIP de distribution Windows."""
-    exe_path = DIST / "VoxTool.exe"
+    exe_path = DIST / "VoxWave.exe"
     if not exe_path.exists():
         print(f"Erreur: {exe_path} introuvable.")
         sys.exit(1)
 
-    zip_path = DIST / "VoxTool-windows.zip"
+    zip_path = DIST / "VoxWave-windows.zip"
     print(f"Packaging {zip_path}...")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.write(exe_path, "VoxTool.exe")
+        zf.write(exe_path, "VoxWave.exe")
         for extra in ["config.yaml", ".env.example"]:
             src = ROOT / extra
             if src.exists():
@@ -176,11 +177,56 @@ def _create_placeholder_icon(path: Path) -> None:
         img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         draw.ellipse([32, 32, 224, 224], fill="#4cc9f0", outline="#1a1a2e", width=4)
-        draw.text((80, 100), "VT", fill="#1a1a2e")
+        draw.text((80, 100), "VW", fill="#1a1a2e")
         img.save(str(path))
     except ImportError:
         # Pas de Pillow — skip l'icone
         pass
+
+
+def build_installer_windows() -> None:
+    """Compile l'installer Windows avec Inno Setup (ISCC)."""
+    exe_path = DIST / "VoxWave.exe"
+    if not exe_path.exists():
+        print(f"Erreur: {exe_path} introuvable. Lancez 'python build.py build' d'abord.")
+        sys.exit(1)
+
+    iss_path = ROOT / "installers" / "voxwave.iss"
+    if not iss_path.exists():
+        print(f"Erreur: {iss_path} introuvable.")
+        sys.exit(1)
+
+    # Chercher ISCC (Inno Setup Compiler)
+    iscc = shutil.which("iscc") or shutil.which("ISCC")
+    if not iscc:
+        # Chemins Windows courants
+        for candidate in [
+            r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            r"C:\Program Files\Inno Setup 6\ISCC.exe",
+        ]:
+            if os.path.exists(candidate):
+                iscc = candidate
+                break
+
+    if not iscc:
+        print(
+            "ISCC (Inno Setup Compiler) non trouve.\n"
+            "Installez Inno Setup 6 : https://jrsoftware.org/isdown.php\n"
+            "Ou ajoutez ISCC.exe au PATH."
+        )
+        sys.exit(1)
+
+    print("Creation installer Windows (Inno Setup)...")
+    result = subprocess.run([iscc, str(iss_path)], cwd=str(ROOT))
+    if result.returncode != 0:
+        print("Erreur creation installer !")
+        sys.exit(1)
+
+    # Trouver le fichier genere
+    for f in DIST.glob("VoxWave-Setup-*.exe"):
+        size_mb = f.stat().st_size / (1024 * 1024)
+        print(f"Installer cree: {f} ({size_mb:.1f} MB)")
+        break
 
 
 def build(target_platform: str = None) -> None:
@@ -219,6 +265,8 @@ def main() -> None:
         clean()
     elif args[0] == "package":
         package_windows()
+    elif args[0] == "installer":
+        build_installer_windows()
     elif args[0] == "all":
         target = None
         for i, arg in enumerate(args):
@@ -226,8 +274,11 @@ def main() -> None:
                 target = args[i + 1]
         clean()
         build(target)
+        # Sur Windows, creer aussi l'installer Inno Setup
+        if (target or detect_platform()) == "windows":
+            build_installer_windows()
     else:
-        print("Usage: python build.py [clean|build|package|all] [--platform linux|windows]")
+        print("Usage: python build.py [clean|build|package|installer|all] [--platform linux|windows]")
         sys.exit(1)
 
 

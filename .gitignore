@@ -49,3 +49,16 @@ scripts/validate-claude-config.js
 
 # Git worktrees
 .worktrees/
+
+# Internal (pas dans le repo public)
+Marketing/
+landing/
+docs/
+CLAUDE.md
+voxtool/
+voxtool.spec
+demo_waveform.py
+check_platform.py
+test_sync.txt
+app.py
+installers/

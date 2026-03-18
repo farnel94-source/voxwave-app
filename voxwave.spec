@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec pour VoxTool (multi-plateforme)."""
+"""PyInstaller spec pour VoxWave (multi-plateforme)."""
 
 import os
 import sys
@@ -124,7 +124,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='VoxTool',
+    name='VoxWave',
     debug=False,
     bootloader_ignore_signals=False,
     strip=is_linux,

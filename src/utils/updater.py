@@ -15,7 +15,7 @@ from packaging.version import Version
 
 logger = logging.getLogger(__name__)
 
-GITHUB_REPO = "OWNER/REPO"  # placeholder — remplacer par le vrai repo
+GITHUB_REPO = "farnel94-source/voxwave-app"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 REQUEST_TIMEOUT = (3, 5)  # (connect, read)
 CACHE_TTL_HOURS = 12

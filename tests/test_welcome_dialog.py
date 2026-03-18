@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Mock PySide6 et dépendances lourdes avant import
-sys.modules.setdefault("sounddevice", MagicMock())
-sys.modules.setdefault("numpy", MagicMock())
+# Mock sounddevice (nécessite du hardware audio absent en CI)
+if "sounddevice" not in sys.modules:
+    sys.modules["sounddevice"] = MagicMock()
 
 
 @pytest.fixture
@@ -109,3 +109,103 @@ class TestBug_DemoRecordingPlaysFeedback:
 
         dialog._demo_recording = True
         dialog._stop_demo_recording()  # Ne doit pas crasher
+
+
+def test_welcome_page_uses_create_qicon_not_logo_png(monkeypatch):
+    """La page welcome doit utiliser create_qicon et ne plus charger logo.png."""
+    from src.gui import welcome_dialog as wd
+
+    class FakeWidget:
+        pass
+
+    class FakeLayout:
+        def __init__(self, _parent=None):
+            self.widgets = []
+
+        def setContentsMargins(self, *_args):
+            pass
+
+        def setSpacing(self, *_args):
+            pass
+
+        def addWidget(self, widget, **_kwargs):
+            self.widgets.append(widget)
+
+        def addSpacing(self, *_args):
+            pass
+
+        def addStretch(self):
+            pass
+
+    class FakeFont:
+        def setPointSize(self, *_args):
+            pass
+
+        def setBold(self, *_args):
+            pass
+
+    class FakeLabel:
+        instances = []
+
+        def __init__(self, *_args, **_kwargs):
+            self.pixmap_set = None
+            FakeLabel.instances.append(self)
+
+        def setAlignment(self, *_args):
+            pass
+
+        def setPixmap(self, pixmap):
+            self.pixmap_set = pixmap
+
+        def setObjectName(self, *_args):
+            pass
+
+        def setFont(self, *_args):
+            pass
+
+    class FakePixmap:
+        def isNull(self):
+            return False
+
+    fake_pixmap = FakePixmap()
+    fake_icon = MagicMock()
+    fake_icon.pixmap.return_value = fake_pixmap
+
+    class FakeQIcon:
+        class Mode:
+            Normal = 0
+
+        class State:
+            Off = 0
+
+    class FakeSignal:
+        def connect(self, _fn):
+            pass
+
+    class FakeButton:
+        def __init__(self, *_args, **_kwargs):
+            self.clicked = FakeSignal()
+
+        def setCursor(self, *_args):
+            pass
+
+    class DummyDialog:
+        def _reg(self, _key, widget):
+            return widget
+
+    qpixmap_ctor = MagicMock()
+
+    monkeypatch.setattr(wd, "QWidget", FakeWidget)
+    monkeypatch.setattr(wd, "QVBoxLayout", FakeLayout)
+    monkeypatch.setattr(wd, "QLabel", FakeLabel)
+    monkeypatch.setattr(wd, "QFont", FakeFont)
+    monkeypatch.setattr(wd, "QIcon", FakeQIcon)
+    monkeypatch.setattr(wd, "QPixmap", qpixmap_ctor)
+    monkeypatch.setattr(wd, "QPushButton", FakeButton)
+
+    with patch.object(wd, "create_qicon", return_value=fake_icon) as create_qicon_mock:
+        wd.WelcomeDialog._build_page_welcome(DummyDialog())
+
+    create_qicon_mock.assert_called_once_with("idle", size=96)
+    assert qpixmap_ctor.call_count == 0
+    assert FakeLabel.instances[0].pixmap_set is fake_pixmap

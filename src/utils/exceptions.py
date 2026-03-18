@@ -1,21 +1,21 @@
-"""Hiérarchie d'exceptions VoxTool."""
+"""Hiérarchie d'exceptions VoxWave."""
 
 
-class VoxToolError(Exception):
-    """Erreur de base VoxTool."""
+class VoxWaveError(Exception):
+    """Erreur de base VoxWave."""
 
 
-class TranscriptionError(VoxToolError):
+class TranscriptionError(VoxWaveError):
     """Erreur lors de la transcription audio."""
 
 
-class CleaningError(VoxToolError):
+class CleaningError(VoxWaveError):
     """Erreur lors du nettoyage de texte."""
 
 
-class AudioCaptureError(VoxToolError):
+class AudioCaptureError(VoxWaveError):
     """Erreur lors de la capture audio."""
 
 
-class LicenseError(VoxToolError):
+class LicenseError(VoxWaveError):
     """Erreur liée à la licence."""

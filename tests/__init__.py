@@ -1,1 +1,1 @@
-"""Tests VoxTool."""
+"""Tests VoxWave."""

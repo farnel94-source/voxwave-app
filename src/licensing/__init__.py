@@ -1,1 +1,1 @@
-"""Licensing module for VoxTool."""
+"""Licensing module for VoxWave."""

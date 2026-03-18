@@ -20,13 +20,13 @@ logger = logging.getLogger(__name__)
 def _is_dev_mode() -> bool:
     """Verifie si le mode developpeur est active.
 
-    Le dev mode est active par la presence du fichier ~/.voxtool/.dev
+    Le dev mode est active par la presence du fichier ~/.voxwave/.dev
     (pas par variable d'env, pour eviter toute exploitation).
 
     Returns:
-        True si le fichier ~/.voxtool/.dev existe.
+        True si le fichier ~/.voxwave/.dev existe.
     """
-    dev_file = Path.home() / ".voxtool" / ".dev"
+    dev_file = Path.home() / ".voxwave" / ".dev"
     return dev_file.is_file()
 
 
@@ -35,7 +35,7 @@ class LicenseValidator:
 
     def __init__(
         self,
-        free_daily_limit: int = 50,
+        free_daily_limit: int = 200,
         free_limit: int = 1000,
         cache_duration: int = 86400,
     ) -> None:
@@ -73,17 +73,35 @@ class LicenseValidator:
             return False
 
         # Valider via API (avec fallback sur le cache local)
+        license_key = license_data.get("license_key")
+        if not license_key:
+            return False
+
         try:
-            result = self.client.validate_license(license_data["license_key"])
+            result = self.client.validate_license(license_key)
             self._cached_valid = result.get("valid", False)
             self._cache_time = time.time()
             return self._cached_valid
         except LicenseError:
-            # Offline : faire confiance au cache local
-            logger.warning("Validation licence offline, utilisation du cache local")
-            self._cached_valid = True
-            self._cache_time = time.time()
-            return True
+            # Offline : faire confiance au cache SEULEMENT si < 7 jours
+            max_offline_seconds = 7 * 86400
+            if (
+                self._cached_valid is not None
+                and (time.time() - self._cache_time) < max_offline_seconds
+            ):
+                logger.warning(
+                    "Validation licence offline, utilisation du cache local "
+                    "(age: %.1f jours)",
+                    (time.time() - self._cache_time) / 86400,
+                )
+                return self._cached_valid
+            logger.warning(
+                "Validation licence offline et cache expire (>7 jours) "
+                "— retour au free tier"
+            )
+            self._cached_valid = False
+            self._cache_time = 0.0
+            return False
 
     def can_transcribe(self) -> bool:
         """Verifie si l'utilisateur peut encore transcrire.

@@ -1,13 +1,10 @@
 """Generation d'icones dynamiques pour le system tray."""
 
 import logging
-import os
 from typing import Literal
 
 from PIL import Image, ImageDraw
 from PySide6.QtGui import QIcon, QImage, QPixmap
-
-from src.utils.platform import resource_path
 
 logger = logging.getLogger(__name__)
 
@@ -21,35 +18,124 @@ STATE_COLORS: dict[str, str] = {
     "error": "#FF4444",      # Rouge clair
 }
 
-# Cache du logo redimensionne
-_logo_cache: dict[int, Image.Image] = {}
+# Cache de l'icone de base
+_base_icon_cache: dict[int, Image.Image] = {}
 
 
-def _load_logo(size: int) -> Image.Image:
-    """Charge et redimensionne le logo The Wave.
+def _hex_to_rgba(color: str, alpha: int = 255) -> tuple[int, int, int, int]:
+    """Convertit une couleur hex en tuple RGBA."""
+    color = color.lstrip("#")
+    if len(color) != 6:
+        return (128, 128, 128, alpha)
+    return (
+        int(color[0:2], 16),
+        int(color[2:4], 16),
+        int(color[4:6], 16),
+        alpha,
+    )
 
-    Args:
-        size: Taille cible en pixels.
 
-    Returns:
-        Image PIL RGBA du logo redimensionne.
-    """
-    if size in _logo_cache:
-        return _logo_cache[size].copy()
+def _sample_cubic_bezier(
+    p0: tuple[float, float],
+    p1: tuple[float, float],
+    p2: tuple[float, float],
+    p3: tuple[float, float],
+    steps: int,
+) -> list[tuple[float, float]]:
+    """Echantillonne une courbe de Bezier cubique."""
+    points: list[tuple[float, float]] = []
+    for i in range(steps + 1):
+        t = i / steps
+        mt = 1.0 - t
+        x = (
+            (mt ** 3) * p0[0]
+            + 3 * (mt ** 2) * t * p1[0]
+            + 3 * mt * (t ** 2) * p2[0]
+            + (t ** 3) * p3[0]
+        )
+        y = (
+            (mt ** 3) * p0[1]
+            + 3 * (mt ** 2) * t * p1[1]
+            + 3 * mt * (t ** 2) * p2[1]
+            + (t ** 3) * p3[1]
+        )
+        points.append((x, y))
+    return points
 
-    logo_path = resource_path(os.path.join("src", "gui", "orb", "logo.png"))
-    try:
-        logo = Image.open(logo_path).convert("RGBA")
-        logo = logo.resize((size, size), Image.Resampling.LANCZOS)
-        _logo_cache[size] = logo
-        return logo.copy()
-    except Exception as e:
-        logger.warning(f"Logo introuvable ({logo_path}), fallback cercle: {e}")
-        return None
+
+def _draw_wave_logo(size: int) -> Image.Image:
+    """Cree une icone vectorielle 'cercle + vagues' style orb."""
+    if size in _base_icon_cache:
+        return _base_icon_cache[size].copy()
+
+    # Supersampling pour un rendu net aux petites tailles (16/24/32 px).
+    scale = 4
+    canvas_size = size * scale
+    image = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+
+    cx = cy = canvas_size / 2
+    radius = canvas_size * 0.45  # +10% visuel pour mieux matcher les icones app Windows
+    ring_width = max(2, int(canvas_size * 0.03))
+
+    # Halo subtil
+    halo_radius = radius + canvas_size * 0.015
+    draw.ellipse(
+        [cx - halo_radius, cy - halo_radius, cx + halo_radius, cy + halo_radius],
+        fill=(8, 16, 30, 70),
+    )
+
+    # Cercle principal
+    draw.ellipse(
+        [cx - radius, cy - radius, cx + radius, cy + radius],
+        fill=(18, 30, 52, 236),
+        outline=(92, 120, 165, 190),
+        width=ring_width,
+    )
+
+    # Tracé des vagues (reprend le path de orb.html, viewBox 100x100)
+    start = (20.0, 45.0)
+    curves = [
+        ((22.0, 45.0), (26.0, 60.0), (32.0, 60.0)),
+        ((38.0, 60.0), (38.0, 40.0), (42.0, 40.0)),
+        ((46.0, 40.0), (46.0, 58.0), (50.0, 58.0)),
+        ((54.0, 58.0), (54.0, 40.0), (58.0, 40.0)),
+        ((62.0, 40.0), (62.0, 58.0), (66.0, 58.0)),
+        ((70.0, 58.0), (74.0, 42.0), (80.0, 42.0)),
+    ]
+
+    wave_width = canvas_size * 0.54
+    wave_scale = wave_width / 60.0  # path x: 20 -> 80
+
+    def transform(pt: tuple[float, float]) -> tuple[float, float]:
+        # Center path around (50,50), then scale and recenter in icon
+        x = (pt[0] - 50.0) * wave_scale + cx
+        y = (pt[1] - 50.0) * wave_scale + cy
+        return (x, y)
+
+    points: list[tuple[float, float]] = [transform(start)]
+    prev = start
+    for c1, c2, p3 in curves:
+        sampled = _sample_cubic_bezier(prev, c1, c2, p3, steps=14)
+        points.extend(transform(p) for p in sampled[1:])
+        prev = p3
+
+    wave_width_px = max(2, int(canvas_size * 0.045))
+    draw.line(points, fill=(230, 236, 248, 240), width=wave_width_px, joint="curve")
+
+    # Downsample final
+    final_img = image.resize((size, size), Image.Resampling.LANCZOS)
+    bbox = final_img.split()[-1].getbbox()
+    if bbox:
+        bw = bbox[2] - bbox[0]
+        bh = bbox[3] - bbox[1]
+        logger.debug(f"icons idle bbox: size={size} bbox={bbox} content={bw}x{bh}")
+    _base_icon_cache[size] = final_img
+    return final_img.copy()
 
 
 def create_icon(state: IconState = "idle", size: int = 64) -> Image.Image:
-    """Cree une icone selon l'etat : logo The Wave + badge colore.
+    """Cree une icone selon l'etat : cercle + vagues + badge colore.
 
     Args:
         state: Etat de l'application (idle, recording, processing, error).
@@ -58,33 +144,19 @@ def create_icon(state: IconState = "idle", size: int = 64) -> Image.Image:
     Returns:
         Image PIL de l'icone.
     """
-    # Essayer de charger le logo
-    logo = _load_logo(size)
-    if logo is not None:
-        image = logo
-    else:
-        # Fallback: cercle colore (ancien comportement)
-        color = STATE_COLORS.get(state, STATE_COLORS["idle"])
-        image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(image)
-        margin = size // 8
-        draw.ellipse(
-            [margin, margin, size - margin, size - margin],
-            fill=color, outline="#FFFFFF", width=max(1, size // 16),
-        )
-        return image
+    image = _draw_wave_logo(size)
 
     # Ajouter un badge colore en bas a droite (sauf idle)
     if state != "idle":
-        color = STATE_COLORS.get(state, STATE_COLORS["idle"])
+        color = _hex_to_rgba(STATE_COLORS.get(state, STATE_COLORS["idle"]))
         draw = ImageDraw.Draw(image)
-        badge_r = max(size // 8, 4)
-        bx = size - badge_r - 1
-        by = size - badge_r - 1
+        badge_r = max(size // 8, 4)  # 8 px @64
+        bx = size - badge_r - max(size // 40, 2)
+        by = size - badge_r - max(size // 40, 2)
         # Fond blanc pour le contour du badge
         draw.ellipse(
             [bx - badge_r - 1, by - badge_r - 1, bx + badge_r + 1, by + badge_r + 1],
-            fill="#FFFFFF",
+            fill=(255, 255, 255, 255),
         )
         # Badge colore
         draw.ellipse(
@@ -117,7 +189,8 @@ def force_taskbar_icon_win32(hwnd: int) -> None:
     """Force l'icone barre des taches Windows via WM_SETICON (Win32 API).
 
     Qt ne re-envoie pas toujours WM_SETICON quand la fenetre demarre minimisee.
-    Cette fonction sauvegarde le logo en .ico temporaire et l'applique directement.
+    Cette fonction sauvegarde l'icone generee en .ico temporaire et l'applique
+    directement pour garantir la coherence taskbar/tray.
 
     Args:
         hwnd: Handle Windows de la fenetre (int(widget.winId())).
@@ -126,17 +199,18 @@ def force_taskbar_icon_win32(hwnd: int) -> None:
     import tempfile
     import ctypes
 
-    logo = _load_logo(256)
-    if logo is None:
-        logger.warning("force_taskbar_icon_win32: logo introuvable, abandon")
-        return
+    icon_img = create_icon("idle", 256)
 
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".ico", delete=False) as f:
             tmp_path = f.name
         print(f"[TaskbarIcon] Sauvegarde ICO dans : {tmp_path}", flush=True)
-        logo.save(tmp_path, format="ICO", sizes=[(16, 16), (32, 32), (48, 48), (256, 256)])
+        icon_img.save(
+            tmp_path,
+            format="ICO",
+            sizes=[(16, 16), (24, 24), (32, 32), (40, 40), (48, 48), (64, 64), (128, 128), (256, 256)],
+        )
         print(f"[TaskbarIcon] ICO sauvegarde OK ({os.path.getsize(tmp_path)} octets)", flush=True)
 
         WM_SETICON = 0x0080

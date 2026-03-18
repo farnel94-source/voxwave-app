@@ -4,7 +4,7 @@ import sys
 import types
 from unittest.mock import MagicMock, patch
 
-from src.app import TheWave
+from src.app import VoxWave
 import src.app as app_module
 from PySide6.QtCore import Qt
 from src.gui.settings_dialog import SettingsDialog
@@ -43,7 +43,7 @@ def _build_fake_settings_module(sample_config, captured_kwargs, instances):
 
 def test_focus_existing_dialog_none_is_noop(sample_config):
     """None ne doit rien faire."""
-    app = TheWave(sample_config)
+    app = VoxWave(sample_config)
 
     with patch("src.app._force_foreground_win32") as force_fg:
         app._focus_existing_dialog(None, origin="unit-test")
@@ -53,7 +53,7 @@ def test_focus_existing_dialog_none_is_noop(sample_config):
 
 def test_focus_existing_dialog_windows_retries(sample_config, monkeypatch):
     """Sous Windows, on schedule 2 retries (50ms, 150ms)."""
-    app = TheWave(sample_config)
+    app = VoxWave(sample_config)
     dialog = MagicMock()
     dialog.isMinimized.return_value = True
 
@@ -93,7 +93,7 @@ def test_focus_existing_dialog_windows_retries(sample_config, monkeypatch):
 
 def test_on_settings_existing_dialog_uses_focus_helper(sample_config):
     """_on_settings doit focaliser le dialog existant sans en recréer un."""
-    app = TheWave(sample_config)
+    app = VoxWave(sample_config)
     app._settings_dialog = MagicMock()
 
     with patch.object(app, "_focus_existing_dialog") as focus_helper:
@@ -104,7 +104,7 @@ def test_on_settings_existing_dialog_uses_focus_helper(sample_config):
 
 def test_on_help_existing_dialog_uses_focus_helper(sample_config):
     """_on_help doit focaliser le dialog existant sans en recréer un."""
-    app = TheWave(sample_config)
+    app = VoxWave(sample_config)
     app._settings_dialog = MagicMock()
 
     with patch.object(app, "_focus_existing_dialog") as focus_helper:
@@ -115,7 +115,7 @@ def test_on_help_existing_dialog_uses_focus_helper(sample_config):
 
 def test_on_settings_creates_dialog_with_parent_none(sample_config, monkeypatch):
     """Nouveau dialog settings: parent=None (pas owner minimisé taskbar)."""
-    app = TheWave(sample_config)
+    app = VoxWave(sample_config)
     captured_kwargs = []
     instances = []
     fake_module = _build_fake_settings_module(sample_config, captured_kwargs, instances)
@@ -132,7 +132,7 @@ def test_on_settings_creates_dialog_with_parent_none(sample_config, monkeypatch)
 
 def test_on_help_creates_dialog_with_parent_none(sample_config, monkeypatch):
     """Nouveau dialog help: parent=None (pas owner minimisé taskbar)."""
-    app = TheWave(sample_config)
+    app = VoxWave(sample_config)
     captured_kwargs = []
     instances = []
     fake_module = _build_fake_settings_module(sample_config, captured_kwargs, instances)

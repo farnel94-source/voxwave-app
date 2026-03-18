@@ -12,17 +12,17 @@ from cryptography.fernet import Fernet
 
 logger = logging.getLogger(__name__)
 
-VOXTOOL_DIR = Path.home() / ".voxtool"
-LICENSE_FILE = VOXTOOL_DIR / "license.enc"
-USAGE_FILE = VOXTOOL_DIR / "usage.json"
-KEY_FILE = VOXTOOL_DIR / ".key"
+VOXWAVE_DIR = Path.home() / ".voxwave"
+LICENSE_FILE = VOXWAVE_DIR / "license.enc"
+USAGE_FILE = VOXWAVE_DIR / "usage.json"
+KEY_FILE = VOXWAVE_DIR / ".key"
 
 
 class LicenseStorage:
     """Sauvegarde et lecture de la licence locale chiffree."""
 
     def __init__(self) -> None:
-        VOXTOOL_DIR.mkdir(parents=True, exist_ok=True)
+        VOXWAVE_DIR.mkdir(parents=True, exist_ok=True)
         self._fernet = self._get_or_create_fernet()
 
     def _get_or_create_fernet(self) -> Fernet:
@@ -100,9 +100,9 @@ class LicenseStorage:
         Args:
             data: Dict avec count, daily_count, daily_date.
         """
-        VOXTOOL_DIR.mkdir(parents=True, exist_ok=True)
+        VOXWAVE_DIR.mkdir(parents=True, exist_ok=True)
         try:
-            fd, tmp_path = tempfile.mkstemp(dir=VOXTOOL_DIR, suffix=".tmp")
+            fd, tmp_path = tempfile.mkstemp(dir=VOXWAVE_DIR, suffix=".tmp")
             with os.fdopen(fd, "w") as f:
                 json.dump(data, f)
             os.replace(tmp_path, USAGE_FILE)

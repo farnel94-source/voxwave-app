@@ -1,7 +1,7 @@
 """Détection de fin de parole en temps réel via Silero VAD (ONNX).
 
 Le modèle ONNX (~2MB) est téléchargé automatiquement depuis GitHub
-au premier lancement et mis en cache dans ~/.cache/voxtool/.
+au premier lancement et mis en cache dans ~/.cache/voxwave/.
 
 Usage:
     vad = SileroVAD(threshold=0.5)
@@ -27,7 +27,7 @@ _MODEL_URL = (
     "https://raw.githubusercontent.com/snakers4/silero-vad"
     "/master/src/silero_vad/data/silero_vad.onnx"
 )
-_MODEL_CACHE_DIR = Path.home() / ".cache" / "voxtool"
+_MODEL_CACHE_DIR = Path.home() / ".cache" / "voxwave"
 _MODEL_PATH = _MODEL_CACHE_DIR / "silero_vad.onnx"
 
 # Silero VAD attend des chunks de taille fixe selon le sample rate

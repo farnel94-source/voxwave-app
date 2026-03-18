@@ -1,12 +1,12 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="voxtool",
+    name="voxwave",
     version="0.1.0",
     description="Dictée vocale intelligente - Parle, transcrit, nettoie, colle.",
-    author="VoxTool",
+    author="VoxWave",
     python_requires=">=3.11",
-    packages=find_packages(),
+    packages=find_packages(include=["src", "src.*"]),
     install_requires=[
         "faster-whisper>=1.0.0",
         "sounddevice>=0.4.6",
@@ -28,7 +28,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "voxtool=src.app:main",
+            "voxwave=src.app:main",
         ],
     },
 )

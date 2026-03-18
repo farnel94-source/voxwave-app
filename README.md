@@ -1,4 +1,4 @@
-# 🎙️ VoxTool — Dictée Vocale Intelligente
+# VoxWave — Dictee Vocale Intelligente
 
 > Parle → Transcrit → Nettoie → Colle le texte propre
 
@@ -12,7 +12,7 @@
 
 ```bash
 # Cloner le projet
-git clone <repo> && cd voxtool
+git clone <repo> && cd voxwave
 
 # Installer les dépendances
 pip install -r requirements.txt
@@ -26,13 +26,13 @@ ollama pull gemma3:4b
 
 ```bash
 # Lancer l'app
-python -m voxtool
+python -m voxwave
 
 # Avec un modèle Whisper spécifique
-python -m voxtool --model small
+python -m voxwave --model small
 
 # Tester le micro
-python -m voxtool --test
+python -m voxwave --test
 ```
 
 ## Configuration

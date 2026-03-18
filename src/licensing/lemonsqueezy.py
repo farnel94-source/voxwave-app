@@ -43,7 +43,7 @@ class LemonSqueezyClient:
         except requests.RequestException as e:
             raise LicenseError(f"Erreur API LemonSqueezy: {e}") from e
 
-    def activate_license(self, license_key: str, instance_name: str = "VoxTool") -> dict:
+    def activate_license(self, license_key: str, instance_name: str = "VoxWave") -> dict:
         """Active une licence pour cette instance.
 
         Args:

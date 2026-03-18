@@ -1,1 +1,1 @@
-"""Configuration management for VoxTool."""
+"""Configuration management for VoxWave."""

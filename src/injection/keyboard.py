@@ -2,7 +2,7 @@
 
 Supporte Windows et Linux (X11 xdotool + Wayland wtype).
 Le clipboard original est sauvegarde et restaure apres injection.
-Note: macOS n'est pas supporte — The Wave cible Windows et Linux.
+Note: macOS n'est pas supporte — VoxWave cible Windows et Linux.
 """
 
 import logging
@@ -17,7 +17,7 @@ from typing import Any, Callable, Literal, Optional, TypeVar
 logger = logging.getLogger(__name__)
 
 if sys.platform == "darwin":
-    logger.warning("The Wave ne supporte pas macOS. L'injection clavier peut ne pas fonctionner.")
+    logger.warning("VoxWave ne supporte pas macOS. L'injection clavier peut ne pas fonctionner.")
 
 T = TypeVar("T")
 
@@ -180,7 +180,8 @@ class TextInjector:
             self._inject_paste(text)
         else:
             self._inject_type(text)
-        logger.info("Texte injecte (%d chars): %s", len(text), text)
+        preview = text[:20] + "..." if len(text) > 20 else text
+        logger.debug("Texte injecte (%d chars): %s", len(text), preview)
 
     def _inject_paste(self, text: str) -> None:
         """Injecte via clipboard + paste selon la plateforme."""

@@ -1,1 +1,1 @@
-"""GUI components for VoxTool (system tray)."""
+"""GUI components for VoxWave (system tray)."""
