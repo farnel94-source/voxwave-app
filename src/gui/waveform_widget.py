@@ -5,6 +5,7 @@ qui se transforme en barre de frequences animees pendant l'enregistrement.
 3 etats : idle (icone micro), recording (barres animees + timer), processing (traitement).
 """
 
+import json
 import logging
 import os
 import sys
@@ -31,7 +32,7 @@ def _restore_foreground_window() -> Optional[Callable]:
         Callable qui restaure le focus, ou None si non-Windows.
     """
     if sys.platform == "darwin":
-        logger.warning("restore_foreground: macOS non supporte par The Wave")
+        logger.warning("restore_foreground: macOS non supporte par VoxWave")
         return None
     if sys.platform != "win32":
         return None
@@ -298,6 +299,7 @@ class WaveformWidget(QWidget):
     def _do_show_recording(self) -> None:
         """Passe en mode recording (main thread)."""
         self._state = "recording"
+        logger.debug("WaveformWidget: → recording")
         self._run_js("setState('recording')")
         self._amplitude_timer.start()
         self.show()
@@ -306,6 +308,7 @@ class WaveformWidget(QWidget):
     def _do_show_processing(self) -> None:
         """Passe en mode processing (main thread)."""
         self._state = "processing"
+        logger.debug("WaveformWidget: → processing")
         self._amplitude_timer.stop()
         self._run_js("setState('processing')")
 
@@ -313,6 +316,7 @@ class WaveformWidget(QWidget):
     def _do_show_idle(self) -> None:
         """Retourne a l'etat idle (main thread)."""
         self._state = "idle"
+        logger.debug("WaveformWidget: → idle (visible=%s)", self.isVisible())
         self._amplitude_timer.stop()
         self._run_js("setState('idle')")
 
@@ -320,6 +324,7 @@ class WaveformWidget(QWidget):
     def _do_show_error(self) -> None:
         """Passe en mode error pendant 3s puis revient a idle (main thread)."""
         self._state = "error"
+        logger.debug("WaveformWidget: → error")
         self._amplitude_timer.stop()
         self._run_js("setState('error')")
         QTimer.singleShot(ERROR_DISPLAY_MS, self._do_show_idle)
@@ -327,24 +332,31 @@ class WaveformWidget(QWidget):
     @Slot(str)
     def _do_update_step(self, step_text: str) -> None:
         """Met a jour l'indicateur d'etape (main thread)."""
-        escaped = step_text.replace("'", "\\'")
-        self._run_js(f"updateStep('{escaped}')")
+        safe = json.dumps(step_text)
+        self._run_js(f"updateStep({safe})")
 
     @Slot(str)
     def _do_hide_delayed(self) -> None:
         """Cache le widget après 900ms pour laisser le flash vert jouer (main thread)."""
+        logger.info("WaveformWidget: HIDE delayed requested")
         QTimer.singleShot(900, self.hide)
 
+    def hide(self) -> None:
+        """Surcharge hide() pour tracer qui demande le masquage."""
+        logger.debug("WaveformWidget: hide() called", stack_info=True)
+        super().hide()
+
+    @Slot(str)
     def _do_set_error_text(self, text: str) -> None:
         """Met a jour le texte d'erreur dans l'orb (main thread)."""
-        escaped = text.replace("'", "\\'")
-        self._run_js(f"setErrorText('{escaped}')")
+        safe = json.dumps(text)
+        self._run_js(f"setErrorText({safe})")
 
     @Slot(str)
     def _do_show_preview(self, text: str) -> None:
         """Affiche un apercu de la transcription (main thread, auto-hide 3s)."""
-        escaped = text.replace("'", "\\'").replace("\n", " ")
-        self._run_js(f"showPreview('{escaped}')")
+        safe = json.dumps(text.replace("\n", " "))
+        self._run_js(f"showPreview({safe})")
 
     def _send_amplitude(self) -> None:
         """Envoie l'amplitude audio courante au JS."""

@@ -25,6 +25,7 @@ class HybridTranscriptionEngine:
         language: str = "fr",
         sample_rate: int = 16000,
         on_fallback: Optional[Callable[[str], None]] = None,
+        interface_language: Optional[str] = None,
     ) -> None:
         """Initialise les engines cloud et local.
 
@@ -34,10 +35,12 @@ class HybridTranscriptionEngine:
             language: Langue de transcription.
             sample_rate: Taux d'échantillonnage audio (depuis config.yaml).
             on_fallback: Callback appele lors d'un fallback (message str).
+            interface_language: Langue d'interface (hint initial en mode auto).
         """
-        self.language = language
+        self._language = language
         self.sample_rate = sample_rate
         self.on_fallback = on_fallback
+        self._interface_language = interface_language
         self._groq_engine: Optional[object] = None
         self._local_engine: Optional[object] = None
         self._groq_model = groq_model
@@ -48,6 +51,24 @@ class HybridTranscriptionEngine:
         self._init_groq()
         self._init_local()
 
+    @property
+    def language(self) -> str:
+        return self._language
+
+    @language.setter
+    def language(self, value: str) -> None:
+        """Propage le changement de langue aux sous-moteurs."""
+        self._language = value
+        if self._groq_engine and hasattr(self._groq_engine, "language"):
+            self._groq_engine.language = value
+            # Reset la détection pour garantir un 1er appel neutre en mode auto
+            if value == "auto" and hasattr(self._groq_engine, "_last_detected_language"):
+                self._groq_engine._last_detected_language = None
+        if self._local_engine and hasattr(self._local_engine, "language"):
+            self._local_engine.language = value
+            if value == "auto" and hasattr(self._local_engine, "_last_known_language"):
+                self._local_engine._last_known_language = None
+
     def _init_groq(self) -> None:
         """Tente d'initialiser le moteur Groq."""
         try:
@@ -56,6 +77,7 @@ class HybridTranscriptionEngine:
                 model=self._groq_model,
                 language=self.language,
                 sample_rate=self.sample_rate,
+                interface_language=self._interface_language,
             )
             self._groq_engine.set_circuit_breaker(self._circuit)
             logger.info("Groq engine initialisé")

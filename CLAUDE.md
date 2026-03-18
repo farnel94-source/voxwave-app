@@ -32,7 +32,7 @@ voxwave/
 │   │   └── processor.py        # Traitement audio (chunking, validation duree)
 │   ├── transcription/
 │   │   ├── whisper_engine.py    # Moteur faster-whisper (local) — condition_on_previous_text=False (évite hallucinations)
-│   │   ├── groq_engine.py      # Moteur Groq API (cloud) — flag _available, circuit breaker, rejet avg_logprob+hallucination combiné
+│   │   ├── groq_engine.py      # Moteur Groq API (cloud) — flag _available, circuit breaker, rejet avg_logprob+hallucination combiné, hint auto langue via prompt=
 │   │   ├── hybrid_engine.py    # Hybride: Groq → Whisper local, callback on_fallback
 │   │   └── hallucinations.py   # Detection hallucinations Whisper
 │   ├── cleaning/
@@ -90,6 +90,7 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 - Check connectivite au demarrage : ping Groq/OpenAI (timeout 3s), pre-ouverture circuit si injoignable
 - Notification tray lors d'un fallback : "Transcription : mode local (cloud indisponible)"
 - **Rejet Groq** : `avg_logprob < -0.7` seul = warning (texte conservé). `avg_logprob < -0.7` + `is_hallucination()` = rejeté. Ne JAMAIS rejeter sur un seul signal.
+- **Mode auto langue** : En `whisper.language: auto`, Groq reçoit un hint `prompt=` (PAS `language=`) basé sur `_last_detected_language` ou `_interface_language` (langue d'interface). Évite le biais anglais de Whisper sans forcer de langue. `_GROQ_HINTS` contient des prompts localisés pour 15 langues.
 - **Trim audio** : `prepare_for_whisper()` utilise `pad_ms=500` (pas 300) pour garder les fins de phrase à voix décroissante.
 - **`_detect_ollama_host()`** (app.py) : scanne les ports [11434, 11435, 11433] au demarrage (socket, timeout 0.5s) et retourne le premier qui repond. Stocke le resultat dans `config["cleaning"]["ollama_host"]`. PIEGE : toujours `try/finally: sock.close()` pour eviter un leak de socket.
 

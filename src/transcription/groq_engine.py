@@ -51,6 +51,7 @@ class GroqWhisperEngine:
         language: str = "fr",
         api_key: Optional[str] = None,
         sample_rate: int = 16000,
+        interface_language: Optional[str] = None,
     ) -> None:
         """Initialise le moteur Groq.
 
@@ -59,10 +60,12 @@ class GroqWhisperEngine:
             language: Langue de transcription.
             api_key: Clé API Groq (ou variable d'env GROQ_API_KEY).
             sample_rate: Taux d'échantillonnage audio (depuis config.yaml).
+            interface_language: Langue d'interface (hint initial en mode auto).
         """
         self.model = model
         self.language = language
         self.sample_rate = sample_rate
+        self._interface_language = interface_language
         self.api_key = (api_key or os.getenv("GROQ_API_KEY") or "").strip()
         self._available = bool(self.api_key)
         self._circuit: Optional[object] = None
@@ -135,10 +138,16 @@ class GroqWhisperEngine:
             "model": self.model,
             "response_format": "verbose_json",
             "temperature": 0.0,
-            "prompt": _GROQ_HINTS.get(self.language, _GROQ_HINTS_DEFAULT),
         }
-        # En mode auto, ne pas passer language → Groq/Whisper détecte automatiquement
-        if self.language != "auto":
+        # En mode auto : utiliser la dernière langue détectée pour le hint (évite biais anglais)
+        # Si aucune langue détectée encore, utiliser la langue d'interface comme hint initial
+        if self.language == "auto":
+            hint_lang = self._last_detected_language or self._interface_language
+            hint = _GROQ_HINTS.get(hint_lang) if hint_lang else None
+            if hint:
+                kwargs["prompt"] = hint
+        else:
+            kwargs["prompt"] = _GROQ_HINTS.get(self.language, _GROQ_HINTS_DEFAULT)
             kwargs["language"] = self.language
         return client.audio.transcriptions.create(**kwargs)
 

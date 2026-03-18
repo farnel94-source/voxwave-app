@@ -535,6 +535,13 @@ class VoxWave:
             self._tray_health_timer.timeout.connect(self._check_tray_health)
             self._tray_health_timer.start(30_000)  # 30s
 
+        # Health-check orb widget sur Windows (peut perdre always-on-top)
+        if sys.platform == "win32" and self.waveform:
+            from PySide6.QtCore import QTimer
+            self._orb_health_timer = QTimer()
+            self._orb_health_timer.timeout.connect(self._check_orb_health)
+            self._orb_health_timer.start(60_000)  # 60s
+
         # Pre-warm en background : charger Whisper + verifier Ollama
         self._prewarm_engines()
         logger.info("VoxWave pret !")
@@ -665,6 +672,7 @@ class VoxWave:
         """
         language = self.config["whisper"]["language"]
         sample_rate = self.config["audio"]["sample_rate"]
+        interface_lang = self.config.get("language", "en")
 
         if provider == "hybrid":
             from src.transcription.hybrid_engine import HybridTranscriptionEngine
@@ -675,12 +683,14 @@ class VoxWave:
                 language=language,
                 sample_rate=sample_rate,
                 on_fallback=self._on_fallback,
+                interface_language=interface_lang,
             )
         elif provider == "cloud":
             from src.transcription.groq_engine import GroqWhisperEngine
             groq_model = self.config.get("groq", {}).get("model", "whisper-large-v3")
             return GroqWhisperEngine(
                 model=groq_model, language=language, sample_rate=sample_rate,
+                interface_language=interface_lang,
             )
         else:
             from src.transcription.whisper_engine import WhisperEngine
@@ -801,7 +811,7 @@ class VoxWave:
             audio_config = self.config["audio"]
             duration = len(audio) / audio_config["sample_rate"]
             min_duration = audio_config.get("min_audio_duration", 0.5)
-            max_duration = audio_config.get("max_audio_duration", 120.0)
+            max_duration = audio_config.get("max_audio_duration", 300.0)
             logger.info(f"Audio capture: {duration:.2f}s")
 
             if duration < min_duration:
@@ -918,7 +928,7 @@ class VoxWave:
             audio_config = self.config["audio"]
             duration = len(audio) / audio_config["sample_rate"]
             min_duration = audio_config.get("min_audio_duration", 0.5)
-            max_duration = audio_config.get("max_audio_duration", 120.0)
+            max_duration = audio_config.get("max_audio_duration", 300.0)
             logger.info(f"[progressif] Audio: {duration:.2f}s")
 
             if duration < min_duration:
@@ -938,18 +948,37 @@ class VoxWave:
                 logger.info(f"[progressif] Aucune parole detectee apres trim ({post_duration:.2f}s), ignore")
                 return
 
-            # Vérif taille WAV (limite Groq API : 25MB)
-            if len(audio) * 2 > 24_000_000:
-                audio = audio[:24_000_000 // 2]
-
             # --- Étape 1 : Transcription batch Groq (~500ms) ---
             lang = self.config.get("language", "en")
             if self.waveform:
                 self.waveform.update_step(_app_t(lang, "transcription"))
 
             t_groq = time.time()
-            raw_text = self.engine.transcribe(audio)
-            raw_text = strip_hallucination_tails(raw_text)
+
+            # Vérif taille WAV (limite Groq API : 25MB)
+            if len(audio) * 2 > 24_000_000:
+                audio = audio[:24_000_000 // 2]
+
+            chunking_threshold = self.config.get("audio", {}).get("chunking_threshold", 30.0)
+            audio_duration = len(audio) / audio_config["sample_rate"]
+
+            if audio_duration > chunking_threshold:
+                # Audio long : découper aux silences et transcrire chunk par chunk
+                chunks = self.processor.split_at_silence(audio)
+                raw_parts: list[str] = []
+                for i, chunk in enumerate(chunks):
+                    if self.waveform:
+                        self.waveform.update_step(f"Transcription {i+1}/{len(chunks)}...")
+                    part = self.engine.transcribe(chunk)
+                    part = strip_hallucination_tails(part)
+                    if part and part.strip() and not is_hallucination(part):
+                        raw_parts.append(part.strip())
+                raw_text = " ".join(raw_parts)
+            else:
+                # Audio court : transcription directe
+                raw_text = self.engine.transcribe(audio)
+                raw_text = strip_hallucination_tails(raw_text)
+
             _trans_label = self.config.get("transcription", {}).get("provider", "local")
             logger.info(f"[progressif] Transcription ({_trans_label}): {(time.time()-t_groq)*1000:.0f}ms → '{raw_text}'")
 
@@ -1457,6 +1486,14 @@ class VoxWave:
             logger.warning("Tray icon invisible — tentative reshow")
             self.tray.reshow()
 
+    def _check_orb_health(self) -> None:
+        """Verifie que l'orb widget est visible en mode both/orb (Windows)."""
+        activation = self.config.get("activation_method", "both")
+        if activation != "hotkey" and self.waveform and not self.waveform.isVisible():
+            logger.warning("Orb invisible en mode %s — re-show", activation)
+            self.waveform.show()
+            self.waveform.raise_()
+
     def _shutdown(self) -> None:
         """Arrete proprement tous les composants (idempotent)."""
         if self._shutting_down:
@@ -1476,9 +1513,11 @@ class VoxWave:
             self.waveform.show_idle()
         # Shutdown executor
         self._executor.shutdown(wait=False)
-        # Stopper le health-check tray (Linux)
+        # Stopper les health-checks
         if hasattr(self, '_tray_health_timer'):
             self._tray_health_timer.stop()
+        if hasattr(self, '_orb_health_timer'):
+            self._orb_health_timer.stop()
         # Stopper le tray icon proprement
         if self.tray:
             self.tray.stop()
