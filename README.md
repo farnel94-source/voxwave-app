@@ -2,7 +2,9 @@
   <img src="assets/wave-logo.svg" alt="VoxWave" width="80" />
 </p>
 
-<h1 align="center">VoxWave</h1>
+<p align="center">
+  <img src="assets/voxwave-title.svg" alt="VoxWave" height="45" />
+</p>
 
 <p align="center">
   <strong>Voice dictation for Windows & Linux</strong><br>
