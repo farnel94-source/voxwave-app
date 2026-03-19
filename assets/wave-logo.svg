@@ -1,32 +1,17 @@
 <svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Dark circle background -->
-  <circle cx="100" cy="100" r="90" fill="#1a1a2e" fill-opacity="0.9"/>
+  <circle cx="100" cy="100" r="90" fill="#1e1e2e"/>
 
-  <!-- Subtle blue border ring (like the orb aura) -->
-  <circle cx="100" cy="100" r="89" stroke="url(#border-gradient)" stroke-width="2" fill="none" stroke-opacity="0.6"/>
+  <!-- Subtle grey border ring -->
+  <circle cx="100" cy="100" r="89" stroke="#4a4a5a" stroke-width="1.5" fill="none" stroke-opacity="0.5"/>
 
-  <!-- Wave path — from wave-logo.tsx, scaled 2x and centered -->
+  <!-- Wave path — grey/white like the original wave-logo.tsx (#E6ECF8) -->
   <path
     d="M40,90 C44,90 52,120 64,120 C76,120 76,80 84,80 C92,80 92,116 100,116 C108,116 108,80 116,80 C124,80 124,116 132,116 C140,116 148,84 160,84"
-    stroke="url(#wave-gradient)"
+    stroke="#E6ECF8"
     stroke-width="8"
     stroke-linecap="round"
     stroke-linejoin="round"
     fill="none"
   />
-
-  <defs>
-    <!-- Wave gradient (indigo → violet) -->
-    <linearGradient id="wave-gradient" x1="40" y1="80" x2="160" y2="120" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#818CF8"/>
-      <stop offset="1" stop-color="#A78BFA"/>
-    </linearGradient>
-
-    <!-- Border gradient -->
-    <linearGradient id="border-gradient" x1="10" y1="10" x2="190" y2="190" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#6366F1" stop-opacity="0.5"/>
-      <stop offset="0.5" stop-color="#8B5CF6" stop-opacity="0.3"/>
-      <stop offset="1" stop-color="#6366F1" stop-opacity="0.5"/>
-    </linearGradient>
-  </defs>
 </svg>
