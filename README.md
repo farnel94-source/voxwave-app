@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/gui/orb/logo.png" alt="VoxWave" width="80" />
+  <img src="assets/wave-logo.svg" alt="VoxWave" width="80" />
 </p>
 
 <h1 align="center">VoxWave</h1>
@@ -28,11 +28,9 @@
 ---
 
 <p align="center">
-  <img src="assets/orb-idle.png" alt="VoxWave idle" width="120" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="assets/orb-recording.png" alt="VoxWave recording" width="220" />
+  <img src="assets/hero-demo.gif" alt="VoxWave demo — Speak, transcribe, clean, paste" width="700" />
 </p>
-<p align="center"><em>Idle &nbsp;→&nbsp; Recording</em></p>
+<p align="center"><em>Speak → Transcribe → Clean → Paste</em></p>
 
 <p align="center">
   <img src="assets/settings.png" alt="VoxWave settings" width="500" />
