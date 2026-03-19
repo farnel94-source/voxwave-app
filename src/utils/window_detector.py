@@ -26,6 +26,9 @@ _APP_PROFILES: dict[str, str] = {
     "sublime_text": "code",
     "atom": "code",
     "notepad++": "code",
+    "zed": "code",
+    "fleet": "code",
+    "lapce": "code",
     "emacs": "code",
     "vim": "code",
     "nvim": "code",
@@ -41,6 +44,9 @@ _APP_PROFILES: dict[str, str] = {
     "gnome-terminal": "code",
     "alacritty": "code",
     "wezterm": "code",
+    "kitty": "code",
+    "rio": "code",
+    "ghostty": "code",
     # Messagerie (casual)
     "slack": "casual",
     "discord": "casual",
@@ -48,16 +54,20 @@ _APP_PROFILES: dict[str, str] = {
     "whatsapp": "casual",
     "signal": "casual",
     "teams": "casual",
+    "msteams": "casual",
     "zoom": "casual",
     # Email
     "outlook": "email",
     "thunderbird": "email",
     "mailspring": "email",
+    "olk": "email",
     # Documents
     "winword": "document",
     "soffice": "document",
     "libreoffice": "document",
     "notion": "document",
+    "obsidian": "document",
+    "logseq": "document",
 }
 
 
