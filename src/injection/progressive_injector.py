@@ -13,7 +13,7 @@ Stratégie Backspace × N :
 
 Garde-fous anti-effacement accidentel :
     Avant d'envoyer les Backspaces, deux conditions sont vérifiées :
-    1. Délai < 5.0s depuis inject_raw (mesuré via time.monotonic(), immunisé aux ajustements NTP)
+    1. Timeout dynamique depuis inject_raw (5s base + 10ms/char, cap 30s, via time.monotonic())
     2. Aucune action utilisateur (touche ou clic) depuis la fin de inject_raw
        → un listener pynput (clavier + souris) surveille en arrière-plan.
     Si une condition échoue → le texte brut est conservé en place (silent fallback).
@@ -38,10 +38,24 @@ from typing import Iterator
 
 logger = logging.getLogger(__name__)
 
-# Délai max (en secondes) entre inject_raw et replace_with_clean.
-# 5s laisse de la marge pour les profils LLM lents (email, document)
-# tout en restant un filet de sécurité si le listener d'action utilisateur échoue.
-_MAX_REPLACE_DELAY_S = 5.0
+# Timeout dynamique pour replace_with_clean.
+# Formule : BASE + len(raw_text) * PER_CHAR, cap à MAX.
+# Texte court → seuil serré ; texte long (email 5min) → plus de marge.
+_BASE_DELAY_S = 5.0         # minimum : couvre latence réseau + textes courts
+_DELAY_PER_CHAR_S = 0.01    # 10ms par caractère (100 chars = +1s)
+_MAX_DELAY_S = 30.0          # cap absolu de sécurité
+
+
+def _compute_replace_timeout(text_length: int) -> float:
+    """Calcule le timeout dynamique pour replace_with_clean.
+
+    Args:
+        text_length: Nombre de caractères du texte brut injecté.
+
+    Returns:
+        Timeout en secondes, entre _BASE_DELAY_S et _MAX_DELAY_S.
+    """
+    return min(_BASE_DELAY_S + text_length * _DELAY_PER_CHAR_S, _MAX_DELAY_S)
 
 
 class ProgressiveInjector:
@@ -166,7 +180,7 @@ class ProgressiveInjector:
         2. Ctrl+V — colle le texte nettoyé
 
         Garde-fous (vérifiés dans cet ordre) :
-        1. Délai < 5.0s depuis inject_raw (time.monotonic(), immunisé aux ajustements NTP)
+        1. Timeout dynamique depuis inject_raw (5s base + 10ms/char, cap 30s, via time.monotonic())
         2. Aucune action utilisateur (touche ou clic) depuis inject_raw
         → Si une condition échoue : _stop_user_watch() + return (texte brut conservé).
 
@@ -189,9 +203,13 @@ class ProgressiveInjector:
 
         # ── Garde-fous : vérifier AVANT de stopper la surveillance ───────────
         elapsed = time.monotonic() - self._inject_time
-        if elapsed > _MAX_REPLACE_DELAY_S:
+        timeout = _compute_replace_timeout(len(raw_text))
+        if elapsed > timeout:
             self._stop_user_watch()
-            logger.warning(f"Remplacement ignoré : délai dépassé ({elapsed:.1f}s)")
+            logger.warning(
+                f"Remplacement ignoré : délai dépassé "
+                f"({elapsed:.1f}s > {timeout:.1f}s pour {len(raw_text)} chars)"
+            )
             return
 
         if self._user_acted:

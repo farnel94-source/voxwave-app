@@ -1,8 +1,7 @@
-"""Tests pour le garde-fou de délai dans replace_with_clean.
+"""Tests pour le timeout dynamique de replace_with_clean.
 
-Bug : le profil 'email' (prompt LLM plus lourd) provoque un nettoyage
-de ~2.5s, dépassant l'ancien seuil de 1.5s → le remplacement était ignoré.
-Fix : seuil augmenté à 5.0s.
+Le timeout s'adapte à la longueur du texte :
+timeout = 5s base + 10ms/char, cap 30s.
 """
 
 import time
@@ -25,55 +24,100 @@ def injector():
     return inj
 
 
-def _slow_generator(text: str, delay: float):
-    """Simule un stream OpenAI lent (comme le profil email)."""
-    time.sleep(delay)
-    yield text
+class TestComputeReplaceTimeout:
+    """Tests unitaires pour la formule de timeout dynamique."""
+
+    def test_short_text(self):
+        """50 chars → 5.0 + 0.5 = 5.5s."""
+        from src.injection.progressive_injector import _compute_replace_timeout
+        assert _compute_replace_timeout(50) == pytest.approx(5.5, abs=0.01)
+
+    def test_long_text(self):
+        """1000 chars → 5.0 + 10.0 = 15.0s."""
+        from src.injection.progressive_injector import _compute_replace_timeout
+        assert _compute_replace_timeout(1000) == pytest.approx(15.0, abs=0.01)
+
+    def test_cap_at_max(self):
+        """5000 chars → 55.0 mais cap à 30.0s."""
+        from src.injection.progressive_injector import _compute_replace_timeout
+        assert _compute_replace_timeout(5000) == 30.0
+
+    def test_zero_chars(self):
+        """0 chars → minimum 5.0s."""
+        from src.injection.progressive_injector import _compute_replace_timeout
+        assert _compute_replace_timeout(0) == 5.0
 
 
 class TestReplaceTimeout:
-    """Le garde-fou de délai accepte les profils lents mais rejette les extrêmes."""
+    """Tests d'intégration pour le garde-fou dynamique."""
 
     @patch("src.injection.progressive_injector.pyperclip", create=True)
-    def test_email_profile_accepted(self, mock_pyperclip, injector):
-        """Un nettoyage email de 2s doit passer (seuil = 5.0s)."""
+    def test_short_text_accepted_within_timeout(self, mock_pyperclip, injector):
+        """Texte court (18 chars), 2s écoulées → accepté (timeout ~5.2s)."""
         raw = "texte brut de test"
         clean = "Texte propre de test."
         mock_pyperclip.paste.return_value = ""
 
-        injector._inject_time = time.monotonic()
+        injector._inject_time = time.monotonic() - 2.0
         injector._user_acted = False
 
-        injector.replace_with_clean(raw, _slow_generator(clean, 2.0))
+        injector.replace_with_clean(raw, iter([clean]))
 
         injector._send_backspaces.assert_called_once()
 
     @patch("src.injection.progressive_injector.pyperclip", create=True)
-    def test_fast_cleanup_works(self, mock_pyperclip, injector):
-        """Un nettoyage rapide (<1s) passe toujours."""
-        raw = "texte brut"
-        clean = "Texte propre."
-        mock_pyperclip.paste.return_value = ""
-
-        injector._inject_time = time.monotonic()
-        injector._user_acted = False
-
-        injector.replace_with_clean(raw, _slow_generator(clean, 0.3))
-
-        injector._send_backspaces.assert_called_once()
-
-    @patch("src.injection.progressive_injector.pyperclip", create=True)
-    def test_very_long_delay_rejected(self, mock_pyperclip, injector):
-        """Un délai > 5s est rejeté (sécurité)."""
+    def test_short_text_rejected_past_timeout(self, mock_pyperclip, injector):
+        """Texte court (10 chars), 6s écoulées → rejeté (timeout = 5.1s)."""
         raw = "texte brut"
         clean = "Texte propre."
 
-        injector._inject_time = time.monotonic()
+        injector._inject_time = time.monotonic() - 6.0
         injector._user_acted = False
 
-        injector.replace_with_clean(raw, _slow_generator(clean, 5.5))
+        injector.replace_with_clean(raw, iter([clean]))
 
         injector._send_backspaces.assert_not_called()
+
+    @patch("src.injection.progressive_injector.pyperclip", create=True)
+    def test_long_text_gets_more_time(self, mock_pyperclip, injector):
+        """500 chars, 8s écoulées → accepté (timeout = 10.0s)."""
+        raw = "a" * 500
+        clean = "b" * 480
+        mock_pyperclip.paste.return_value = ""
+
+        injector._inject_time = time.monotonic() - 8.0
+        injector._user_acted = False
+
+        injector.replace_with_clean(raw, iter([clean]))
+
+        injector._send_backspaces.assert_called_once()
+
+    @patch("src.injection.progressive_injector.pyperclip", create=True)
+    def test_long_text_still_has_limit(self, mock_pyperclip, injector):
+        """500 chars, 12s écoulées → rejeté (timeout = 10.0s)."""
+        raw = "a" * 500
+        clean = "b" * 480
+
+        injector._inject_time = time.monotonic() - 12.0
+        injector._user_acted = False
+
+        injector.replace_with_clean(raw, iter([clean]))
+
+        injector._send_backspaces.assert_not_called()
+
+    @patch("src.injection.progressive_injector.pyperclip", create=True)
+    def test_very_long_text_capped_at_30s(self, mock_pyperclip, injector):
+        """3000 chars, 25s écoulées → accepté (cap 30s)."""
+        raw = "a" * 3000
+        clean = "b" * 2900
+        mock_pyperclip.paste.return_value = ""
+
+        injector._inject_time = time.monotonic() - 25.0
+        injector._user_acted = False
+
+        injector.replace_with_clean(raw, iter([clean]))
+
+        injector._send_backspaces.assert_called_once()
 
     @patch("src.injection.progressive_injector.pyperclip", create=True)
     def test_user_action_still_blocks(self, mock_pyperclip, injector):
@@ -83,8 +127,8 @@ class TestReplaceTimeout:
         mock_pyperclip.paste.return_value = ""
 
         injector._inject_time = time.monotonic()
-        injector._user_acted = True  # L'utilisateur a tapé/cliqué
+        injector._user_acted = True
 
-        injector.replace_with_clean(raw, _slow_generator(clean, 0.1))
+        injector.replace_with_clean(raw, iter([clean]))
 
         injector._send_backspaces.assert_not_called()
