@@ -102,10 +102,10 @@ class TestBug2_CodeProfileCallsOllama:
 
 
 class TestBug3_OllamaConnectTimeoutTooLong:
-    """Bug 3 : connect_timeout Ollama (5s) > seuil progressive_injector (1.5s).
+    """Bug 3 : connect_timeout Ollama (5s) > seuil progressive_injector (5.0s).
 
     Quand Ollama est absent, la connexion refuse après ~5s.
-    Le progressive injector rejette le remplacement après 1.5s.
+    Le progressive injector rejette le remplacement après 5.0s.
     Résultat : le texte brut n'est jamais remplacé.
 
     Fix : réduire le connect_timeout à ≤ 1s.
@@ -114,7 +114,7 @@ class TestBug3_OllamaConnectTimeoutTooLong:
     def test_ollama_connect_timeout_fits_within_progressive_injector_threshold(self):
         """BUG CONFIRMÉ si le connect_timeout est > 1.0s.
 
-        Le seuil du progressive injector est 1.5s.
+        Le seuil du progressive injector est 5.0s.
         Avec un connect_timeout de 5s, Ollama consomme tout le budget.
         """
         import ast
@@ -135,6 +135,6 @@ class TestBug3_OllamaConnectTimeoutTooLong:
 
         assert connect_timeout <= 1, (
             f"BUG CONFIRMÉ : connect_timeout={connect_timeout}s trop long. "
-            f"Le progressive injector rejette après 1.5s. "
+            f"Le progressive injector rejette après 5.0s. "
             f"Fix attendu : connect_timeout ≤ 1s pour localhost."
         )

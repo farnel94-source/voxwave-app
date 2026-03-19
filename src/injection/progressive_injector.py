@@ -13,7 +13,7 @@ Stratégie Backspace × N :
 
 Garde-fous anti-effacement accidentel :
     Avant d'envoyer les Backspaces, deux conditions sont vérifiées :
-    1. Délai < 1.5s depuis inject_raw (mesuré via time.monotonic(), immunisé aux ajustements NTP)
+    1. Délai < 5.0s depuis inject_raw (mesuré via time.monotonic(), immunisé aux ajustements NTP)
     2. Aucune action utilisateur (touche ou clic) depuis la fin de inject_raw
        → un listener pynput (clavier + souris) surveille en arrière-plan.
     Si une condition échoue → le texte brut est conservé en place (silent fallback).
@@ -37,6 +37,11 @@ import time
 from typing import Iterator
 
 logger = logging.getLogger(__name__)
+
+# Délai max (en secondes) entre inject_raw et replace_with_clean.
+# 5s laisse de la marge pour les profils LLM lents (email, document)
+# tout en restant un filet de sécurité si le listener d'action utilisateur échoue.
+_MAX_REPLACE_DELAY_S = 5.0
 
 
 class ProgressiveInjector:
@@ -161,7 +166,7 @@ class ProgressiveInjector:
         2. Ctrl+V — colle le texte nettoyé
 
         Garde-fous (vérifiés dans cet ordre) :
-        1. Délai < 1.5s depuis inject_raw (time.monotonic(), immunisé aux ajustements NTP)
+        1. Délai < 5.0s depuis inject_raw (time.monotonic(), immunisé aux ajustements NTP)
         2. Aucune action utilisateur (touche ou clic) depuis inject_raw
         → Si une condition échoue : _stop_user_watch() + return (texte brut conservé).
 
@@ -184,7 +189,7 @@ class ProgressiveInjector:
 
         # ── Garde-fous : vérifier AVANT de stopper la surveillance ───────────
         elapsed = time.monotonic() - self._inject_time
-        if elapsed > 1.5:
+        if elapsed > _MAX_REPLACE_DELAY_S:
             self._stop_user_watch()
             logger.warning(f"Remplacement ignoré : délai dépassé ({elapsed:.1f}s)")
             return

@@ -12,7 +12,7 @@ class TestBug1_NoCircuitBreakerForOllama:
     """Bug 1 : pas de circuit breaker pour Ollama local.
 
     Résultat : chaque clean() tente une connexion TCP (1-2s sur Windows).
-    Le progressive injector (seuil 1.5s) est toujours dépassé.
+    Le progressive injector (seuil 5.0s) est toujours dépassé.
 
     Fix attendu :
     - CleaningPipeline crée un _local_circuit (CircuitBreaker)

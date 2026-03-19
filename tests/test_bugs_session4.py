@@ -1,4 +1,4 @@
-"""Tests session 4 — circuit breaker log level + clipboard restore + 1.5s guard.
+"""Tests session 4 — circuit breaker log level + clipboard restore + 5.0s guard.
 
 Le circuit breaker fonctionne (pas de connexion TCP) mais log WARNING à tort.
 """
@@ -144,7 +144,7 @@ class TestBug_ClipboardRestoredAfterInjectRaw:
 
 
 class TestBug_RegexFallbackBlockedBy1_5sGuard:
-    """Bug : quand Ollama fail, la garde 1.5s peut bloquer le remplacement regex.
+    """Bug : quand Ollama fail, la garde 5.0s peut bloquer le remplacement regex.
 
     Fix attendu : si le circuit Ollama est OPEN (prewarm ou premier échec),
     pipeline.clean() doit retourner en < 100ms (pas de tentative réseau).
@@ -167,7 +167,7 @@ class TestBug_RegexFallbackBlockedBy1_5sGuard:
         assert elapsed_ms < 200, (
             f"BUG CONFIRMÉ : pipeline.clean() a pris {elapsed_ms:.0f}ms avec circuit OPEN. "
             "Devrait être < 200ms (pas de tentative Ollama). "
-            "Si > 200ms, la garde 1.5s du progressive_injector sera déclenchée."
+            "Si > 200ms, la garde 5.0s du progressive_injector sera déclenchée."
         )
 
 
