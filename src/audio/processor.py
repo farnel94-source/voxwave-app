@@ -16,6 +16,24 @@ except ImportError:
     logger.info("webrtcvad non disponible, fallback sur VAD energie")
 
 
+def _iter_frames(audio: np.ndarray, frame_size: int):
+    """Itère sur tous les frames audio, y compris le dernier (zero-padded si incomplet).
+
+    Args:
+        audio: Buffer audio float32.
+        frame_size: Taille d'un frame en samples.
+
+    Yields:
+        Tuple (index, frame) où frame fait toujours exactement frame_size samples.
+    """
+    for i in range(0, len(audio), frame_size):
+        frame = audio[i:i + frame_size]
+        if len(frame) < frame_size:
+            # Dernier frame incomplet : zero-pad pour atteindre frame_size
+            frame = np.pad(frame, (0, frame_size - len(frame)), mode="constant")
+        yield i, frame
+
+
 def _float32_to_int16_bytes(audio: np.ndarray) -> bytes:
     """Convertit un array float32 [-1, 1] en bytes int16 pour webrtcvad.
 
@@ -102,8 +120,7 @@ class AudioProcessor:
 
         # Classifier chaque frame comme parole ou silence
         speech_frames = []
-        for i in range(0, len(audio) - frame_size, frame_size):
-            frame = audio[i:i + frame_size]
+        for _, frame in _iter_frames(audio, frame_size):
             frame_bytes = _float32_to_int16_bytes(frame)
             is_speech = self._vad.is_speech(frame_bytes, self.sample_rate)
             speech_frames.append(is_speech)
@@ -163,8 +180,7 @@ class AudioProcessor:
         pad_samples = int(self.sample_rate * pad_ms / 1000)
 
         energies = []
-        for i in range(0, len(audio) - frame_size, frame_size):
-            frame = audio[i:i + frame_size]
+        for _, frame in _iter_frames(audio, frame_size):
             energies.append(np.abs(frame).mean())
 
         if not energies:
@@ -298,8 +314,7 @@ class AudioProcessor:
         if self._vad is not None:
             try:
                 flags = []
-                for i in range(0, len(audio) - frame_size, frame_size):
-                    frame = audio[i:i + frame_size]
+                for _, frame in _iter_frames(audio, frame_size):
                     frame_bytes = _float32_to_int16_bytes(frame)
                     flags.append(self._vad.is_speech(frame_bytes, self.sample_rate))
                 return flags
@@ -308,8 +323,7 @@ class AudioProcessor:
 
         # Fallback energie
         energies = []
-        for i in range(0, len(audio) - frame_size, frame_size):
-            frame = audio[i:i + frame_size]
+        for _, frame in _iter_frames(audio, frame_size):
             energies.append(np.abs(frame).mean())
 
         if not energies:
