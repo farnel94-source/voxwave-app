@@ -190,6 +190,24 @@ class WaveformWidget(QWidget):
         self.setFixedSize(WIDGET_WIDTH, WIDGET_HEIGHT)
         self._center_bottom()
 
+    def ensure_topmost(self) -> None:
+        """Re-applique le flag always-on-top via Win32 SetWindowPos (Windows)."""
+        if sys.platform != "win32" or not self.isVisible():
+            return
+        try:
+            import ctypes
+            import ctypes.wintypes
+            hwnd = int(self.winId())
+            ctypes.windll.user32.SetWindowPos(
+                ctypes.wintypes.HWND(hwnd),
+                ctypes.wintypes.HWND(-1),  # HWND_TOPMOST
+                0, 0, 0, 0,
+                0x0002 | 0x0001 | 0x0010,  # SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+            )
+            logger.debug("ensure_topmost: HWND_TOPMOST restored")
+        except Exception:
+            logger.debug("ensure_topmost: SetWindowPos failed", exc_info=True)
+
     def _center_bottom(self) -> None:
         """Positionne le widget en bas-centre de l'ecran."""
         screen = QApplication.primaryScreen()

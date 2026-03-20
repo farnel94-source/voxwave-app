@@ -541,7 +541,7 @@ class VoxWave:
             from PySide6.QtCore import QTimer
             self._orb_health_timer = QTimer()
             self._orb_health_timer.timeout.connect(self._check_orb_health)
-            self._orb_health_timer.start(60_000)  # 60s
+            self._orb_health_timer.start(30_000)  # 30s
 
         # Pre-warm en background : charger Whisper + verifier Ollama
         self._prewarm_engines()
@@ -1506,12 +1506,15 @@ class VoxWave:
             self.tray.reshow()
 
     def _check_orb_health(self) -> None:
-        """Verifie que l'orb widget est visible en mode both/orb (Windows)."""
+        """Verifie que l'orb widget est visible et topmost en mode both/orb."""
         activation = self.config.get("activation_method", "both")
-        if activation != "hotkey" and self.waveform and not self.waveform.isVisible():
+        if activation == "hotkey" or not self.waveform:
+            return
+        if not self.waveform.isVisible():
             logger.warning("Orb invisible en mode %s — re-show", activation)
             self.waveform.show()
-            self.waveform.raise_()
+        self.waveform.raise_()
+        self.waveform.ensure_topmost()
 
     def _shutdown(self) -> None:
         """Arrete proprement tous les composants (idempotent)."""
