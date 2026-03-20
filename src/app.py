@@ -372,6 +372,7 @@ class VoxWave:
         self._qt_app = None
         self._shutting_down = False
         self._stop_event = threading.Event()
+        self._auto_stop_event = threading.Event()
         self._current_app_profile: str = "default"
         self._processing_thread: Optional[threading.Thread] = None
         self._processing_lock = threading.Lock()
@@ -421,7 +422,7 @@ class VoxWave:
             silence_threshold=self.config["audio"]["silence_threshold"],
             device_id=device_id,
             silero_vad=self._silero_vad,
-            on_silence_detected=self._on_stop if self._silero_vad else None,
+            on_silence_detected=self._schedule_auto_stop if self._silero_vad else None,
             silence_threshold_ms=silence_threshold_ms,
             on_auto_stop=self._schedule_auto_stop,
             auto_stop_enabled=self.config["audio"].get("auto_stop_enabled", False),
@@ -727,6 +728,7 @@ class VoxWave:
 
     def _on_stop(self) -> None:
         """Callback: fin enregistrement -> lance le pipeline dans un thread."""
+        logger.info("_on_stop appelé")
         if self._stop_event.is_set():
             return
         self._stop_event.set()
@@ -785,12 +787,26 @@ class VoxWave:
             )
             self.tray.show_notification("VoxWave", msg)
 
+    def _check_auto_stop(self) -> None:
+        """Pollé par QTimer (100ms) sur le thread Qt principal.
+
+        Vérifie si le thread audio a demandé un auto-stop via threading.Event.
+        """
+        if self._auto_stop_event.is_set():
+            self._auto_stop_event.clear()
+            logger.info("Auto-stop: event reçu sur thread Qt principal")
+            self._on_stop()
+
     def _schedule_auto_stop(self) -> None:
-        """Appelé depuis le thread audio — schedule _on_stop sur le thread Qt principal."""
-        from PySide6.QtCore import QTimer
+        """Appelé depuis le thread audio (PortAudio C callback) — set un Event thread-safe.
+
+        Les signaux Qt ne fonctionnent PAS depuis les threads C de PortAudio
+        (contrairement aux threads Python comme pynput). On utilise un
+        threading.Event pollé par un QTimer côté thread principal.
+        """
         if self.capture.is_recording and not self._shutting_down:
             logger.info("Auto-stop: declenchement depuis thread audio")
-            QTimer.singleShot(0, self._on_stop)
+            self._auto_stop_event.set()
 
     def _process_audio(self, audio) -> None:
         """Pipeline complet : transcription -> nettoyage -> injection (thread separe)."""
@@ -973,6 +989,9 @@ class VoxWave:
                     part = strip_hallucination_tails(part)
                     if part and part.strip() and not is_hallucination(part):
                         raw_parts.append(part.strip())
+                    elif part and part.strip():
+                        logger.info(f"[progressif] Chunk {i+1}/{len(chunks)} rejeté (hallucination): '{part.strip()}'")
+
                 raw_text = " ".join(raw_parts)
             else:
                 # Audio court : transcription directe
@@ -1610,6 +1629,14 @@ class VoxWave:
         self._signal_timer = QTimer()
         self._signal_timer.timeout.connect(lambda: None)
         self._signal_timer.start(500)
+
+        # QTimer polling pour l'auto-stop (thread PortAudio → thread Qt)
+        # Les signaux Qt ne traversent pas les threads C de PortAudio,
+        # donc on poll un threading.Event toutes les 100ms.
+        self._auto_stop_timer = QTimer()
+        self._auto_stop_timer.timeout.connect(self._check_auto_stop)
+        self._auto_stop_timer.start(100)
+        logger.info("Auto-stop QTimer polling démarré (100ms)")
 
         logger.info(f"VoxWave actif ! Hotkey: {self.config['hotkey']} — Fermez le tray pour quitter.")
         self._qt_app.exec()

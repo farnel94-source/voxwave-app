@@ -73,6 +73,7 @@ class AudioCapture:
         self._had_speech: bool = False
         self._last_speech_time: Optional[float] = None
         self._auto_stop_triggered: bool = False
+        self._peak_amplitude: float = 0.0  # amplitude max vue pendant l'enregistrement
         self.buffer: list[np.ndarray] = []
         self._is_recording = False
         self._stream = None
@@ -90,7 +91,13 @@ class AudioCapture:
 
             # Auto-stop amplitude-based (depuis les settings)
             if self.auto_stop_enabled and self.on_auto_stop and not self._auto_stop_triggered:
-                if self._current_amplitude > self.silence_threshold:
+                # Seuil dynamique : 15% du pic d'amplitude observé (minimum: silence_threshold)
+                # Permet de distinguer parole vs bruit de fond quel que soit le micro
+                if self._current_amplitude > self._peak_amplitude:
+                    self._peak_amplitude = self._current_amplitude
+                speech_threshold = max(self._peak_amplitude * 0.15, self.silence_threshold)
+
+                if self._current_amplitude > speech_threshold:
                     self._had_speech = True
                     self._last_speech_time = time.monotonic()
                 elif self._had_speech and self._last_speech_time is not None:
@@ -113,10 +120,9 @@ class AudioCapture:
                     silence_threshold_ms=self._silence_threshold_ms,
                 ):
                     self._silence_triggered = True
-                    # Déclencher dans un thread séparé pour ne pas bloquer l'audio
-                    threading.Thread(
-                        target=self._on_silence_detected, daemon=True
-                    ).start()
+                    # Appel direct — _schedule_auto_stop utilise QTimer.singleShot(0, ...)
+                    # pour dispatcher vers le thread Qt principal (thread-safe)
+                    self._on_silence_detected()
                     logger.info("Auto-stop : silence détecté, fin d'enregistrement")
 
     def start(self) -> None:
@@ -127,6 +133,7 @@ class AudioCapture:
         self._had_speech = False
         self._last_speech_time = None
         self._auto_stop_triggered = False
+        self._peak_amplitude = 0.0
         # Réinitialiser les états LSTM du VAD pour le nouvel enregistrement
         if self._silero_vad is not None:
             self._silero_vad.reset_states()
