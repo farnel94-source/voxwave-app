@@ -127,7 +127,25 @@ class LicenseValidator:
         Returns:
             True si l'utilisation est autorisee, False si limite atteinte.
         """
+        return self.increment_usage_for_provider("cloud")
+
+    def increment_usage_for_provider(self, provider: str = "cloud") -> bool:
+        """Verifie la limite PUIS incremente le compteur.
+
+        Le local (Whisper + regex) n'est jamais bloque.
+        Seul le cloud (Groq + OpenAI) est soumis a la limite free tier.
+
+        Args:
+            provider: 'local' ou 'cloud'/'hybrid'.
+
+        Returns:
+            True si l'utilisation est autorisee, False si limite atteinte.
+        """
         if self.is_licensed():
+            return True
+
+        # Le local est toujours autorise, meme apres la limite
+        if provider == "local":
             return True
 
         # Verifier la limite journaliere AVANT d'incrementer

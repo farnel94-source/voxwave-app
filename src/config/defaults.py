@@ -162,7 +162,7 @@ DEFAULT_CONFIG: dict = {
     "licensing": {
         "provider": "lemonsqueezy",
         "free_limit": 1000,
-        "free_daily_limit": 50,
+        "free_daily_limit": 9999,
         "cache_duration": 86400,
     },
 }

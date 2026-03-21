@@ -816,8 +816,9 @@ class VoxWave:
         self.listener.set_processing(True)
         had_error = False
         try:
-            # Verifier la licence / free tier
-            if self.license_validator and not self.license_validator.increment_usage():
+            # Verifier la licence / free tier (le local n'est jamais bloque)
+            transcription_provider = self.config.get("transcription", {}).get("provider", "local")
+            if self.license_validator and not self.license_validator.increment_usage_for_provider(transcription_provider):
                 msg = "Free tier epuise. Activez une licence pour continuer."
                 logger.warning(msg)
                 if self.tray:
@@ -932,8 +933,9 @@ class VoxWave:
         t_start = time.time()
 
         try:
-            # --- Vérification licence ---
-            if self.license_validator and not self.license_validator.increment_usage():
+            # --- Vérification licence (le local n'est jamais bloqué) ---
+            transcription_provider = self.config.get("transcription", {}).get("provider", "local")
+            if self.license_validator and not self.license_validator.increment_usage_for_provider(transcription_provider):
                 msg = "Free tier épuisé. Activez une licence pour continuer."
                 logger.warning(msg)
                 if self.tray:
