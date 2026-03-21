@@ -67,12 +67,18 @@ def build_pyinstaller() -> None:
 
 
 def build_linux() -> None:
-    """Build Linux : PyInstaller + AppImage."""
+    """Build Linux : PyInstaller (onedir) + AppImage."""
     build_pyinstaller()
 
-    exe_path = DIST / "VoxWave"
+    # onedir produit dist/VoxWave/ (dossier avec exe + libs)
+    onedir_path = DIST / "VoxWave"
+    if not onedir_path.is_dir():
+        print(f"Erreur: {onedir_path} introuvable apres build.")
+        sys.exit(1)
+
+    exe_path = onedir_path / "VoxWave"
     if not exe_path.exists():
-        print(f"Erreur: {exe_path} introuvable apres build.")
+        print(f"Erreur: {exe_path} introuvable dans le dossier onedir.")
         sys.exit(1)
 
     # Creer la structure AppDir
@@ -81,9 +87,9 @@ def build_linux() -> None:
         shutil.rmtree(appdir)
     appdir.mkdir(parents=True)
 
+    # Copier tout le dossier onedir dans usr/bin
     usr_bin = appdir / "usr" / "bin"
-    usr_bin.mkdir(parents=True)
-    shutil.copy2(exe_path, usr_bin / "VoxWave")
+    shutil.copytree(onedir_path, usr_bin)
 
     # Desktop file
     desktop = appdir / "VoxWave.desktop"
@@ -104,7 +110,6 @@ def build_linux() -> None:
     if icon_src.exists():
         shutil.copy2(icon_src, icon_dst)
     else:
-        # Generer une icone placeholder
         _create_placeholder_icon(icon_dst)
 
     # AppRun script
@@ -115,12 +120,6 @@ def build_linux() -> None:
         'exec "$HERE/usr/bin/VoxWave" "$@"\n'
     )
     apprun.chmod(0o755)
-
-    # Copier config et .env.example
-    for extra in ["config.yaml", ".env.example"]:
-        src = ROOT / extra
-        if src.exists():
-            shutil.copy2(src, usr_bin / extra)
 
     # Creer l'AppImage avec appimagetool si disponible
     appimagetool = shutil.which("appimagetool")
@@ -152,20 +151,20 @@ def build_windows() -> None:
 
 
 def package_windows() -> None:
-    """Cree un ZIP de distribution Windows."""
-    exe_path = DIST / "VoxWave.exe"
-    if not exe_path.exists():
-        print(f"Erreur: {exe_path} introuvable.")
+    """Cree un ZIP de distribution Windows (dossier onedir complet)."""
+    # onedir produit dist/VoxWave/ (dossier avec exe + DLLs)
+    onedir_path = DIST / "VoxWave"
+    if not onedir_path.is_dir():
+        print(f"Erreur: {onedir_path} introuvable.")
         sys.exit(1)
 
     zip_path = DIST / "VoxWave-windows.zip"
     print(f"Packaging {zip_path}...")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.write(exe_path, "VoxWave.exe")
-        for extra in ["config.yaml", ".env.example"]:
-            src = ROOT / extra
-            if src.exists():
-                zf.write(src, extra)
+        for file_path in onedir_path.rglob("*"):
+            if file_path.is_file():
+                arcname = os.path.join("VoxWave", file_path.relative_to(onedir_path))
+                zf.write(file_path, arcname)
     size_mb = zip_path.stat().st_size / (1024 * 1024)
     print(f"Package cree: {zip_path} ({size_mb:.1f} MB)")
 
@@ -186,7 +185,8 @@ def _create_placeholder_icon(path: Path) -> None:
 
 def build_installer_windows() -> None:
     """Compile l'installer Windows avec Inno Setup (ISCC)."""
-    exe_path = DIST / "VoxWave.exe"
+    onedir_path = DIST / "VoxWave"
+    exe_path = onedir_path / "VoxWave.exe"
     if not exe_path.exists():
         print(f"Erreur: {exe_path} introuvable. Lancez 'python build.py build' d'abord.")
         sys.exit(1)

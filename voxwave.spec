@@ -33,6 +33,8 @@ a = Analysis(
         (os.path.join(ROOT, 'config.yaml'), '.'),
         (os.path.join(ROOT, '.env.example'), '.'),
         (os.path.join(ROOT, 'src', 'gui', 'orb'), 'src/gui/orb'),
+        (os.path.join(ROOT, 'THIRD_PARTY_LICENSES.txt'), '.'),
+        (os.path.join(ROOT, 'LICENSE'), '.'),
     ],
     hiddenimports=[
         'faster_whisper',
@@ -120,10 +122,8 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='VoxWave',
     debug=False,
     bootloader_ignore_signals=False,
@@ -138,4 +138,16 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=icon_file,
+)
+
+# onedir : les DLLs/SO restent separees (obligation LGPL pour PySide6 et pynput)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=is_linux,
+    upx=True,
+    upx_exclude=[],
+    name='VoxWave',
 )
