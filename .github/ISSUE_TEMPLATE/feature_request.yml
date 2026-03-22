@@ -1,0 +1,47 @@
+name: Feature Request
+description: Suggest a new feature for VoxWave
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your suggestion! Please describe the feature you'd like.
+        **Important:** Feature requests must be approved before a PR is submitted.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      placeholder: "I'm always frustrated when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      placeholder: Describe how you'd like it to work
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: Any other approaches you've thought about?
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Transcription (Whisper / Groq)
+        - Text cleanup (LLM / regex)
+        - GUI (orb, settings, onboarding)
+        - Hotkey / input
+        - Injection / clipboard
+        - Packaging / installer
+        - Other
+    validations:
+      required: true
