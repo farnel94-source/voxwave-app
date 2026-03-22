@@ -24,7 +24,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y portaudio19-dev libegl1 libgl1-mesa-glx
+          sudo apt-get install -y portaudio19-dev libegl1 libgl1-mesa-dri libxkbcommon0
 
       - name: Install Python dependencies
         run: |
