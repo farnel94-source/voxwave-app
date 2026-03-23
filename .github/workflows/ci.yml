@@ -24,7 +24,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y portaudio19-dev libegl1 libgl1-mesa-dri libxkbcommon0
+          sudo apt-get install -y portaudio19-dev libegl1 libgl1-mesa-dri libxkbcommon0 xvfb
 
       - name: Install Python dependencies
         run: |
@@ -34,7 +34,10 @@ jobs:
       - name: Run tests
         env:
           QT_QPA_PLATFORM: offscreen
+          DISPLAY: ":99"
         run: |
+          Xvfb :99 -screen 0 1024x768x24 &
+          sleep 1
           pytest tests/ -q \
             --ignore=tests/test_waveform_widget.py \
             --ignore=tests/test_tray_icon.py \
