@@ -201,6 +201,17 @@ class ProgressiveInjector:
             logger.warning("Texte nettoyé vide après streaming, texte brut conservé")
             return
 
+        # Validation ratio : rejeter si le LLM a tronqué/résumé le texte
+        if raw_text:
+            char_ratio = len(clean_text) / len(raw_text)
+            if char_ratio < 0.5:
+                self._stop_user_watch()
+                logger.warning(
+                    f"Remplacement ignoré : texte nettoyé trop court "
+                    f"(ratio={char_ratio:.2f}, {len(clean_text)}/{len(raw_text)} chars)"
+                )
+                return
+
         # ── Garde-fous : vérifier AVANT de stopper la surveillance ───────────
         elapsed = time.monotonic() - self._inject_time
         timeout = _compute_replace_timeout(len(raw_text))

@@ -1053,6 +1053,8 @@ class VoxWave:
                     clean_text = self.pipeline._clean_verbatim(_regex_result)
                     if clean_text and clean_text.strip() and clean_text != raw_text:
                         self._prog_injector.replace_with_clean(raw_text, iter([clean_text]))
+                    else:
+                        self._prog_injector._stop_user_watch()
 
                 elif (cloud_cleaner is not None
                       and cloud_cleaner._available
@@ -1073,6 +1075,8 @@ class VoxWave:
                     clean_text = self.pipeline.clean(raw_text, context_profile=app_profile)
                     if clean_text and clean_text.strip() and clean_text != raw_text:
                         self._prog_injector.replace_with_clean(raw_text, iter([clean_text]))
+                    else:
+                        self._prog_injector._stop_user_watch()
 
             self.feedback.play_complete()
             logger.info(f"[progressif] Pipeline terminé en {(time.time()-t_start)*1000:.0f}ms")
