@@ -32,7 +32,7 @@ a = Analysis(
     datas=[
         (os.path.join(ROOT, 'config.yaml'), '.'),
         (os.path.join(ROOT, '.env.example'), '.'),
-        (os.path.join(ROOT, 'src', 'gui', 'orb'), 'src/gui/orb'),
+        # orb.html supprime — rendu QPainter natif (orb_widget.py)
         (os.path.join(ROOT, 'THIRD_PARTY_LICENSES.txt'), '.'),
         (os.path.join(ROOT, 'LICENSE'), '.'),
     ],
@@ -47,9 +47,7 @@ a = Analysis(
         'PySide6.QtCore',
         'PySide6.QtGui',
         'PySide6.QtWidgets',
-        'PySide6.QtWebEngineWidgets',
-        'PySide6.QtWebChannel',
-        'PySide6.QtWebEngineCore',
+        # WebEngine supprime — plus de Chromium
         'shiboken6',
         'PIL',
         'PIL.Image',
@@ -87,7 +85,7 @@ a = Analysis(
         'src.gui',
         'src.gui.icons',
         'src.gui.tray_icon',
-        'src.gui.waveform_widget',
+        'src.gui.orb_widget',
         'src.config',
         'src.config.defaults',
         'src.config.validator',

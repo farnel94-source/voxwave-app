@@ -502,9 +502,9 @@ class VoxWave:
             cache_duration=licensing_config.get("cache_duration", 86400),
         )
 
-        # Waveform widget (PySide6 — cree apres QApplication)
-        from src.gui.waveform_widget import WaveformWidget
-        self.waveform = WaveformWidget(
+        # Orb widget (QPainter natif — remplace QWebEngineView)
+        from src.gui.orb_widget import OrbWidget
+        self.waveform = OrbWidget(
             capture=self.capture,
             on_start=self._on_start,
             on_stop=self._on_stop,
