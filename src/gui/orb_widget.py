@@ -2,9 +2,12 @@
 
 Replaces the QWebEngineView-based waveform_widget.py.
 Draws the orb (logo, aura, text, animations) using native QPainter.
-Transparent background via WA_TranslucentBackground (no Chromium dependency).
+Transparency via Win32 UpdateLayeredWindow (bypasses PySide6 6.11 bug).
+On Linux, uses WA_TranslucentBackground (works fine).
 """
 
+import ctypes
+import ctypes.wintypes
 import logging
 import math
 import sys
@@ -13,7 +16,7 @@ from typing import Callable, Optional
 
 from PySide6.QtCore import Qt, QTimer, Signal, Slot, QPointF, QRectF
 from PySide6.QtGui import (
-    QBrush, QColor, QFont, QLinearGradient, QPainter, QPainterPath,
+    QBrush, QColor, QFont, QImage, QLinearGradient, QPainter, QPainterPath,
     QPen, QPixmap, QRadialGradient,
 )
 from PySide6.QtWidgets import QApplication, QWidget
@@ -39,13 +42,59 @@ PARTICLE_COUNT = 15
 # Drag threshold
 DRAG_THRESHOLD = 5
 
+# Win32 constants
+_IS_WIN32 = sys.platform == "win32"
+GWL_EXSTYLE = -20
+WS_EX_LAYERED = 0x00080000
+ULW_ALPHA = 0x00000002
+AC_SRC_OVER = 0
+AC_SRC_ALPHA = 1
+
+
+# --- Win32 structures (module-level, definis une seule fois) ---
+
+if _IS_WIN32:
+    class POINT(ctypes.Structure):
+        _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+    class SIZE(ctypes.Structure):
+        _fields_ = [("cx", ctypes.c_long), ("cy", ctypes.c_long)]
+
+    class BLENDFUNCTION(ctypes.Structure):
+        _fields_ = [
+            ("BlendOp", ctypes.c_byte),
+            ("BlendFlags", ctypes.c_byte),
+            ("SourceConstantAlpha", ctypes.c_byte),
+            ("AlphaFormat", ctypes.c_byte),
+        ]
+
+    class BITMAPINFOHEADER(ctypes.Structure):
+        _fields_ = [
+            ("biSize", ctypes.c_uint),
+            ("biWidth", ctypes.c_int),
+            ("biHeight", ctypes.c_int),
+            ("biPlanes", ctypes.c_ushort),
+            ("biBitCount", ctypes.c_ushort),
+            ("biCompression", ctypes.c_uint),
+            ("biSizeImage", ctypes.c_uint),
+            ("biXPelsPerMeter", ctypes.c_int),
+            ("biYPelsPerMeter", ctypes.c_int),
+            ("biClrUsed", ctypes.c_uint),
+            ("biClrImportant", ctypes.c_uint),
+        ]
+
+    class BITMAPINFO(ctypes.Structure):
+        _fields_ = [
+            ("bmiHeader", BITMAPINFOHEADER),
+            ("bmiColors", ctypes.c_uint * 3),
+        ]
+
 
 def _restore_foreground_window() -> Optional[Callable]:
     """Capture la fenetre active et retourne une fonction pour la restaurer."""
-    if sys.platform != "win32":
+    if not _IS_WIN32:
         return None
     try:
-        import ctypes
         hwnd = ctypes.windll.user32.GetForegroundWindow()
         if not hwnd:
             return None
@@ -58,6 +107,55 @@ def _restore_foreground_window() -> Optional[Callable]:
         return restore
     except Exception:
         return None
+
+
+def _update_layered_window(hwnd: int, image: QImage) -> bool:
+    """Envoie un QImage a Windows via UpdateLayeredWindow (per-pixel alpha)."""
+    w, h = image.width(), image.height()
+    user32 = ctypes.windll.user32
+    gdi32 = ctypes.windll.gdi32
+
+    hdc_screen = user32.GetDC(0)
+    hdc_mem = gdi32.CreateCompatibleDC(hdc_screen)
+
+    bmi = BITMAPINFO()
+    bmi.bmiHeader.biSize = ctypes.sizeof(BITMAPINFOHEADER)
+    bmi.bmiHeader.biWidth = w
+    bmi.bmiHeader.biHeight = -h  # top-down
+    bmi.bmiHeader.biPlanes = 1
+    bmi.bmiHeader.biBitCount = 32
+    bmi.bmiHeader.biCompression = 0
+
+    bits = ctypes.c_void_p()
+    hbitmap = gdi32.CreateDIBSection(
+        hdc_mem, ctypes.byref(bmi), 0, ctypes.byref(bits), None, 0
+    )
+    if not hbitmap:
+        gdi32.DeleteDC(hdc_mem)
+        user32.ReleaseDC(0, hdc_screen)
+        return False
+
+    raw = bytes(image.constBits())
+    ctypes.memmove(bits, raw, w * h * 4)
+
+    old_bmp = gdi32.SelectObject(hdc_mem, hbitmap)
+
+    pt_src = POINT(0, 0)
+    size = SIZE(w, h)
+    blend = BLENDFUNCTION(AC_SRC_OVER, 0, 255, AC_SRC_ALPHA)
+
+    result = user32.UpdateLayeredWindow(
+        hwnd, hdc_screen, None, ctypes.byref(size),
+        hdc_mem, ctypes.byref(pt_src), 0,
+        ctypes.byref(blend), ULW_ALPHA,
+    )
+
+    gdi32.SelectObject(hdc_mem, old_bmp)
+    gdi32.DeleteObject(hbitmap)
+    gdi32.DeleteDC(hdc_mem)
+    user32.ReleaseDC(0, hdc_screen)
+
+    return bool(result)
 
 
 class OrbWidget(QWidget):
@@ -118,11 +216,20 @@ class OrbWidget(QWidget):
         self._cached_dpr = 0.0
         self._shadow_cache: Optional[QPixmap] = None
 
+        # Win32 layered window
+        self._use_layered = _IS_WIN32
+        self._hwnd = 0
+
         self._setup_window()
         self._setup_timers()
         self._connect_signals()
         self._build_static_cache()
         self.show()
+
+        # Win32: activer WS_EX_LAYERED apres show() pour que le HWND existe
+        if self._use_layered:
+            self._setup_layered_window()
+            self._render_layered()
 
     # ================================================================
     # Window setup
@@ -136,10 +243,53 @@ class OrbWidget(QWidget):
             | Qt.Tool
             | Qt.WindowDoesNotAcceptFocus
         )
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        if not self._use_layered:
+            # Linux: utiliser la transparence Qt native (fonctionne bien)
+            self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.setFixedSize(WIDGET_WIDTH, WIDGET_HEIGHT)
         self._center_bottom()
+
+    def _setup_layered_window(self) -> None:
+        """Active WS_EX_LAYERED + desactive DWM sur Windows."""
+        try:
+            self._hwnd = int(self.winId())
+
+            # WS_EX_LAYERED
+            style = ctypes.windll.user32.GetWindowLongW(self._hwnd, GWL_EXSTYLE)
+            ctypes.windll.user32.SetWindowLongW(
+                self._hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED
+            )
+
+            # Desactiver coins arrondis Windows 11
+            DWMWA_WINDOW_CORNER_PREFERENCE = 33
+            val = ctypes.c_int(1)  # DWMWCP_DONOTROUND
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                self._hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
+                ctypes.byref(val), ctypes.sizeof(val),
+            )
+
+            # Desactiver backdrop DWM
+            DWMWA_SYSTEMBACKDROP_TYPE = 38
+            val2 = ctypes.c_int(1)  # DWMSBT_NONE
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                self._hwnd, DWMWA_SYSTEMBACKDROP_TYPE,
+                ctypes.byref(val2), ctypes.sizeof(val2),
+            )
+
+            # Desactiver NC rendering DWM
+            DWMWA_NCRENDERING_POLICY = 2
+            val3 = ctypes.c_int(1)  # DWMNCRP_DISABLED
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                self._hwnd, DWMWA_NCRENDERING_POLICY,
+                ctypes.byref(val3), ctypes.sizeof(val3),
+            )
+
+            logger.debug("Layered window setup OK (HWND=%s)", self._hwnd)
+        except Exception:
+            logger.warning("Layered window setup failed, falling back to Qt", exc_info=True)
+            self._use_layered = False
+            self.setAttribute(Qt.WA_TranslucentBackground, True)
 
     def _center_bottom(self) -> None:
         """Positionne le widget en bas-centre de l'ecran."""
@@ -174,7 +324,7 @@ class OrbWidget(QWidget):
         self.sig_hide_widget_delayed.connect(self._do_hide_delayed)
 
     # ================================================================
-    # Static cache (shadow + edge ring at amplitude=0)
+    # Static cache (shadow layer)
     # ================================================================
 
     def _build_static_cache(self) -> None:
@@ -183,23 +333,20 @@ class OrbWidget(QWidget):
         self._cached_dpr = dpr
         size = int(AURA_SIZE * dpr)
 
-        # Shadow layer (couche 0)
         shadow = QPixmap(size, size)
         shadow.setDevicePixelRatio(dpr)
         shadow.fill(Qt.transparent)
         p = QPainter(shadow)
         p.setRenderHint(QPainter.Antialiasing)
 
-        # Clip to circle
         clip = QPainterPath()
         clip.addEllipse(QRectF(0, 0, AURA_SIZE, AURA_SIZE))
         p.setClipPath(clip)
 
-        # Radial gradient: black shadow
         center = QPointF(AURA_SIZE / 2, AURA_SIZE / 2)
         grad = QRadialGradient(center, 42)
-        grad.setColorAt(0.0, QColor(0, 0, 0, 25))    # 0.10 opacity
-        grad.setColorAt(0.6, QColor(0, 0, 0, 13))    # 0.05 opacity
+        grad.setColorAt(0.0, QColor(0, 0, 0, 25))
+        grad.setColorAt(0.6, QColor(0, 0, 0, 13))
         grad.setColorAt(1.0, QColor(0, 0, 0, 0))
         p.setBrush(QBrush(grad))
         p.setPen(Qt.NoPen)
@@ -249,24 +396,21 @@ class OrbWidget(QWidget):
 
     def ensure_topmost(self) -> None:
         """Re-applique le flag always-on-top via Win32 SetWindowPos."""
-        if sys.platform != "win32" or not self.isVisible():
+        if not _IS_WIN32 or not self.isVisible():
             return
         try:
-            import ctypes
-            import ctypes.wintypes
             hwnd = int(self.winId())
             ctypes.windll.user32.SetWindowPos(
                 ctypes.wintypes.HWND(hwnd),
                 ctypes.wintypes.HWND(-1),  # HWND_TOPMOST
                 0, 0, 0, 0,
-                0x0002 | 0x0001 | 0x0010,  # SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+                0x0002 | 0x0001 | 0x0010,
             )
         except Exception:
             logger.debug("ensure_topmost failed", exc_info=True)
 
     @property
     def state(self) -> str:
-        """Retourne l'etat courant du widget."""
         return self._state
 
     # ================================================================
@@ -330,27 +474,27 @@ class OrbWidget(QWidget):
     # ================================================================
 
     def _animation_tick(self) -> None:
-        """Appele toutes les 33ms (30 FPS). Met a jour l'etat d'animation."""
+        """Appele toutes les 33ms (30 FPS)."""
         now = time.monotonic()
         self._anim_time = now - self._anim_start
 
-        # Smooth amplitude (exponential moving average)
         self._amplitude += (self._target_amplitude - self._amplitude) * 0.12
         self._smoothed_volume += (self._target_amplitude - self._smoothed_volume) * 0.2
 
-        # Timer update
         if self._state == "recording" and self._timer_start > 0:
             self._timer_seconds = int(now - self._timer_start)
 
-        # Expand animation (pill opening/closing)
         target_expand = 1.0 if self._state in ("recording", "processing", "error") else 0.0
         self._expand_progress += (target_expand - self._expand_progress) * 0.15
 
         self._invalidate_cache()
-        self.update()  # Trigger repaint
+
+        if self._use_layered:
+            self._render_layered()
+        else:
+            self.update()
 
     def _amplitude_tick(self) -> None:
-        """Lit l'amplitude du micro et met a jour la cible."""
         if self._capture:
             raw = getattr(self._capture, "current_amplitude", 0.0)
             self._target_amplitude = min(raw * 4.0, 1.0)
@@ -360,21 +504,19 @@ class OrbWidget(QWidget):
     # ================================================================
 
     def _get_breathe(self) -> float:
-        """Retourne la valeur de respiration (0.0 -> 1.0)."""
-        period = 1.8 if self._state == "recording" else 3.5
-        return math.sin(self._anim_time * 2 * math.pi / period) * 0.5 + 0.5
+        # Original orb.html: sin(time * 2) pour idle (~3.14s period)
+        if self._state == "recording":
+            return math.sin(self._anim_time * 2 * math.pi / 1.8) * 0.5 + 0.5
+        return math.sin(self._anim_time * 2) * 0.5 + 0.5
 
     def _get_shake_offset(self) -> float:
-        """Retourne le decalage horizontal pour l'animation shake (error)."""
         if self._state != "error":
             return 0.0
         elapsed = time.monotonic() - self._error_start
         if elapsed > 0.45:
             return 0.0
-        # Keyframes: 0, -3, 3, -2, 2, -1, 1, 0
         keyframes = [0, -3, 3, -2, 2, -1, 1, 0]
         times = [0, 0.06, 0.12, 0.18, 0.24, 0.30, 0.36, 0.45]
-        # Find segment
         for i in range(len(times) - 1):
             if elapsed <= times[i + 1]:
                 t = (elapsed - times[i]) / (times[i + 1] - times[i])
@@ -382,11 +524,9 @@ class OrbWidget(QWidget):
         return 0.0
 
     def _get_success_scale(self) -> float:
-        """Retourne le scale factor pour l'animation success bounce."""
         elapsed = time.monotonic() - self._success_start
         if elapsed > 0.5 or self._success_start == 0.0:
             return 1.0
-        # Keyframes: 1.0, 1.06, 0.98, 1.0
         keyframes = [1.0, 1.06, 0.98, 1.0]
         times = [0, 0.2, 0.35, 0.5]
         for i in range(len(times) - 1):
@@ -396,43 +536,65 @@ class OrbWidget(QWidget):
         return 1.0
 
     def _get_dot_offset(self, dot_index: int) -> float:
-        """Retourne le decalage vertical pour un dot de processing."""
         cycle = 1.4
         delay = dot_index * 0.14
         phase = ((self._anim_time - delay) % cycle) / cycle
         return -4.0 * max(0.0, math.sin(math.pi * phase))
 
     # ================================================================
-    # Paint — main entry point
+    # Render — layered window (Windows) or paintEvent (Linux)
     # ================================================================
 
+    def _render_layered(self) -> None:
+        """Rend tout dans un QImage et l'envoie via UpdateLayeredWindow."""
+        if not self._hwnd or not self.isVisible():
+            return
+
+        # Tenir compte du DPR (scaling Windows 125%/150%/200%)
+        dpr = self.devicePixelRatioF()
+        pw = int(WIDGET_WIDTH * dpr)
+        ph = int(WIDGET_HEIGHT * dpr)
+
+        image = QImage(pw, ph, QImage.Format_ARGB32_Premultiplied)
+        image.fill(Qt.transparent)
+
+        painter = QPainter(image)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        painter.scale(dpr, dpr)  # Dessiner en coordonnees logiques
+        self._paint_all(painter)
+        painter.end()
+
+        _update_layered_window(self._hwnd, image)
+
     def paintEvent(self, event) -> None:
-        """Dessine l'orbe complet."""
+        """Fallback pour Linux (WA_TranslucentBackground fonctionne)."""
+        if self._use_layered:
+            return  # Sur Windows, on utilise _render_layered
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        self._paint_all(painter)
+        painter.end()
 
-        # Logo center position
-        logo_cx = 58.0  # Left-aligned logo (like orb.html)
+    def _paint_all(self, painter: QPainter) -> None:
+        """Dessine l'orbe complet dans le painter donne."""
+        logo_cx = 58.0
         logo_cy = WIDGET_HEIGHT / 2.0
 
-        # Shake offset (error state)
         shake_dx = self._get_shake_offset()
         if shake_dx != 0:
             painter.translate(shake_dx, 0)
 
-        # Success scale
         scale = self._get_success_scale()
         if abs(scale - 1.0) > 0.001:
             painter.translate(logo_cx, logo_cy)
             painter.scale(scale, scale)
             painter.translate(-logo_cx, -logo_cy)
 
-        # Draw layers
         self._paint_aura(painter, logo_cx, logo_cy)
         self._paint_logo(painter, logo_cx, logo_cy)
 
-        # Text (to the right of logo, in the expanded pill area)
         if self._expand_progress > 0.01:
             if self._state == "recording":
                 self._paint_timer(painter, logo_cx, logo_cy)
@@ -441,165 +603,129 @@ class OrbWidget(QWidget):
             elif self._state == "error":
                 self._paint_error(painter, logo_cx, logo_cy)
 
-        painter.end()
-
     # ================================================================
     # Paint — Aura (5 layers)
     # ================================================================
 
     def _paint_aura(self, painter: QPainter, cx: float, cy: float) -> None:
-        """Dessine les 5 couches de l'aura autour du logo."""
         intensity = min(pow(self._smoothed_volume * 2.5, 1.2), 1.5)
         breathe = self._get_breathe()
-        is_active = self._state in ("recording", "idle")
 
-        if not is_active and self._state != "idle":
-            # No aura in processing/error
+        # Aura uniquement en recording (comme orb.html original)
+        # En idle, seul le glow blanc du logo pulse (dans _paint_glow)
+        if self._state != "recording":
             return
 
-        # Aura opacity based on state
-        if self._state == "recording":
-            base_opacity = 0.6 + intensity * 0.4
-        else:
-            base_opacity = 0.3 + breathe * 0.15
+        # Dessiner directement sur le painter (pas de base_opacity global)
+        # pour matcher le rendu de orb.html qui dessine chaque couche independamment
+        aura_center = QPointF(cx, cy)
 
-        dpr = self.devicePixelRatioF()
-        aura_pix = QPixmap(int(AURA_SIZE * dpr), int(AURA_SIZE * dpr))
-        aura_pix.setDevicePixelRatio(dpr)
-        aura_pix.fill(Qt.transparent)
+        # Layer 0: Shadow (cercle de contraste pour fond blanc)
+        shadow_radius = CORE_BASE_RADIUS + 5 + intensity * 15
+        shadow_grad = QRadialGradient(aura_center, shadow_radius)
+        shadow_grad.setFocalRadius(CORE_BASE_RADIUS * 0.5)
+        sa0 = int(min(255, (0.10 + intensity * 0.15) * 255))
+        sa1 = int(min(255, (0.05 + intensity * 0.08) * 255))
+        shadow_grad.setColorAt(0.0, QColor(0, 0, 0, sa0))
+        shadow_grad.setColorAt(0.6, QColor(0, 0, 0, sa1))
+        shadow_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+        painter.setBrush(QBrush(shadow_grad))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(aura_center, shadow_radius, shadow_radius)
 
-        ap = QPainter(aura_pix)
-        ap.setRenderHint(QPainter.Antialiasing)
-
-        # Clip to circle
-        clip = QPainterPath()
-        clip.addEllipse(QRectF(0, 0, AURA_SIZE, AURA_SIZE))
-        ap.setClipPath(clip)
-
-        aura_center = QPointF(AURA_SIZE / 2, AURA_SIZE / 2)
-
-        # Layer 0: Shadow (from cache)
-        if self._shadow_cache:
-            shadow_opacity = 0.10 + intensity * 0.15
-            ap.setOpacity(shadow_opacity)
-            ap.drawPixmap(0, 0, self._shadow_cache)
-            ap.setOpacity(1.0)
-
-        # Layer 1: Outer aura (dynamic radial gradient)
-        outer_radius = CORE_BASE_RADIUS + 20 + breathe * 6 + intensity * 30
+        # Layer 1: Outer aura (valeurs orb.html exactes)
+        outer_radius = CORE_BASE_RADIUS + 8 + breathe * 4 + intensity * 20
         outer_grad = QRadialGradient(aura_center, outer_radius)
-        outer_a = int(min(255, (0.15 + intensity * 0.35) * 255))
-        outer_grad.setColorAt(0.0, QColor(99, 102, 241, outer_a))      # indigo
-        outer_grad.setColorAt(0.5, QColor(59, 130, 246, int(outer_a * 0.6)))  # blue
-        outer_grad.setColorAt(1.0, QColor(59, 130, 246, 0))
-        ap.setBrush(QBrush(outer_grad))
-        ap.setPen(Qt.NoPen)
-        ap.drawEllipse(QRectF(0, 0, AURA_SIZE, AURA_SIZE))
+        outer_grad.setFocalRadius(CORE_BASE_RADIUS)
+        oa0 = int(min(255, (0.08 + intensity * 0.45) * 255))
+        oa1 = int(min(255, (0.04 + intensity * 0.25) * 255))
+        outer_grad.setColorAt(0.0, QColor(99, 102, 241, oa0))
+        outer_grad.setColorAt(0.5, QColor(59, 130, 246, oa1))
+        outer_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+        painter.setBrush(QBrush(outer_grad))
+        painter.drawEllipse(aura_center, outer_radius, outer_radius)
 
-        # Layer 2: Core glow (dynamic radial gradient)
+        # Layer 2: Core glow (valeurs orb.html exactes)
         core_radius = CORE_BASE_RADIUS + intensity * 35
         core_grad = QRadialGradient(aura_center, core_radius)
-        core_a = int(min(255, (0.2 + intensity * 0.3) * 255))
-        core_grad.setColorAt(0.0, QColor(34, 211, 238, core_a))        # cyan
-        core_grad.setColorAt(0.5, QColor(59, 130, 246, int(core_a * 0.5)))
+        ca0 = int(min(255, (0.4 + intensity * 0.6) * 255))
+        ca1 = int(min(255, (0.15 + intensity * 0.5) * 255))
+        core_grad.setColorAt(0.0, QColor(34, 211, 238, ca0))
+        core_grad.setColorAt(0.6, QColor(59, 130, 246, ca1))
         core_grad.setColorAt(1.0, QColor(59, 130, 246, 0))
-        ap.setBrush(QBrush(core_grad))
-        ap.drawEllipse(QRectF(0, 0, AURA_SIZE, AURA_SIZE))
+        painter.setBrush(QBrush(core_grad))
+        painter.drawEllipse(aura_center, core_radius, core_radius)
 
-        # Layer 3: Particles (15 small dots)
+        # Layer 3: Particles (valeurs orb.html exactes)
         t = self._anim_time
         for i in range(PARTICLE_COUNT):
-            angle = (i / PARTICLE_COUNT) * 2 * math.pi + t * 0.5 + i * math.radians(132.5)
-            dist = CORE_BASE_RADIUS + math.sin(t * 3 + i * math.radians(54)) * 6 + intensity * 40
-            px = aura_center.x() + math.cos(angle) * dist
-            py = aura_center.y() + math.sin(angle) * dist
+            angle = (i / PARTICLE_COUNT) * 2 * math.pi + t * 0.5 + i * 132.5
+            dist = CORE_BASE_RADIUS + math.sin(t * 3 + i * 54) * 6 + intensity * 40
+            px = cx + math.cos(angle) * dist
+            py = cy + math.sin(angle) * dist
             dot_size = 1.5 + intensity * 1.5
-            dot_opacity = int(min(255, (0.2 + intensity * 0.5) * 255))
-            ap.setBrush(QBrush(QColor(147, 197, 253, dot_opacity)))
-            ap.setPen(Qt.NoPen)
-            ap.drawEllipse(QPointF(px, py), dot_size, dot_size)
+            dot_alpha = 0.2 + intensity * 0.7 + math.sin(t * 4 + i * 27) * 0.15
+            dot_alpha = max(0.0, min(1.0, dot_alpha))
+            painter.setBrush(QBrush(QColor(147, 197, 253, int(dot_alpha * 255))))
+            painter.setPen(Qt.NoPen)
+            painter.drawEllipse(QPointF(px, py), dot_size, dot_size)
 
         # Layer 4: Edge ring
         edge_radius = outer_radius - 1
         if edge_radius > 5:
-            ap.setBrush(Qt.NoBrush)
-            ap.setPen(QPen(QColor(0, 0, 0, 38), 1.5))  # rgba(0,0,0,0.15)
-            ap.drawEllipse(aura_center, edge_radius, edge_radius)
-
-        ap.end()
-
-        # Composite aura pixmap centered on logo
-        ax = cx - AURA_SIZE / 2
-        ay = cy - AURA_SIZE / 2
-        painter.setOpacity(base_opacity)
-        painter.drawPixmap(QPointF(ax, ay), aura_pix)
-        painter.setOpacity(1.0)
+            painter.setBrush(Qt.NoBrush)
+            painter.setPen(QPen(QColor(0, 0, 0, 38), 1.5))
+            painter.drawEllipse(aura_center, edge_radius, edge_radius)
 
     # ================================================================
-    # Paint — Logo (circle + SVG "vw" path)
+    # Paint — Logo
     # ================================================================
 
     def _paint_logo(self, painter: QPainter, cx: float, cy: float) -> None:
-        """Dessine le cercle du logo et le path SVG 'vw'."""
-        # Glow (drop-shadow behind circle)
         self._paint_glow(painter, cx, cy)
 
-        # Circle background
-        painter.setBrush(QBrush(QColor(15, 23, 42, 153)))  # rgba(15,23,42,0.6)
+        painter.setBrush(QBrush(QColor(15, 23, 42, 153)))
 
-        # Border color per state
         if self._state == "recording":
-            border_color = QColor(59, 130, 246, 128)   # blue 0.5
+            border_color = QColor(59, 130, 246, 128)
         elif self._state == "error":
-            border_color = QColor(239, 68, 68, 128)    # red 0.5
+            border_color = QColor(239, 68, 68, 128)
         else:
-            border_color = QColor(148, 163, 184, 77)   # slate 0.3
+            border_color = QColor(120, 130, 145, 160)
 
-        painter.setPen(QPen(border_color, 1))
+        painter.setPen(QPen(border_color, 1.5))
         painter.drawEllipse(QPointF(cx, cy), LOGO_RADIUS, LOGO_RADIUS)
-
-        # SVG "vw" path
         self._paint_vw_path(painter, cx, cy)
 
     def _paint_glow(self, painter: QPainter, cx: float, cy: float) -> None:
-        """Dessine le glow (drop-shadow) derriere le cercle logo."""
+        """Glow subtil derriere le logo (simule CSS drop-shadow)."""
         now = time.monotonic()
         breathe = self._get_breathe()
 
-        # Glow parameters per state
-        if self._state == "error":
-            glow_color = QColor(239, 68, 68, int(0.8 * 255))
-            glow_extra = 4
-        elif self._success_start > 0 and (now - self._success_start) < 0.5:
-            # Success flash (green)
+        # Success flash et error : cercle SOLIDE bien visible
+        if self._success_start > 0 and (now - self._success_start) < 0.5:
             progress = (now - self._success_start) / 0.5
             alpha = int((1.0 - progress) * 0.9 * 255)
-            glow_color = QColor(74, 222, 128, alpha)
-            glow_extra = 6
-        elif self._state == "recording":
-            alpha = int((0.2 + breathe * 0.2) * 255)
-            glow_color = QColor(255, 255, 255, alpha)
-            glow_extra = 3 + breathe * 3
-        else:
-            # idle
-            alpha = int((0.1 + breathe * 0.1) * 255)
-            glow_color = QColor(255, 255, 255, alpha)
-            glow_extra = 2 + breathe * 2
+            painter.setBrush(QBrush(QColor(74, 222, 128, alpha)))
+            painter.setPen(Qt.NoPen)
+            painter.drawEllipse(QPointF(cx, cy), LOGO_RADIUS + 6, LOGO_RADIUS + 6)
+            return
 
-        painter.setBrush(QBrush(glow_color))
-        painter.setPen(Qt.NoPen)
-        painter.drawEllipse(QPointF(cx, cy), LOGO_RADIUS + glow_extra, LOGO_RADIUS + glow_extra)
+        if self._state == "error":
+            painter.setBrush(QBrush(QColor(239, 68, 68, int(0.7 * 255))))
+            painter.setPen(Qt.NoPen)
+            painter.drawEllipse(QPointF(cx, cy), LOGO_RADIUS + 4, LOGO_RADIUS + 4)
+            return
+
+        # Idle / recording : pas de glow supplementaire
+        return
 
     def _paint_vw_path(self, painter: QPainter, cx: float, cy: float) -> None:
-        """Dessine le path SVG 'vw' a l'interieur du cercle logo."""
-        # Scale: viewBox 100x100 -> 28x28px (factor 0.28)
         scale = 0.28
-        # Offset to center the 28x28 path in the 44x44 circle
-        ox = cx - 14  # 28/2 = 14
+        ox = cx - 14
         oy = cy - 14
 
         path = QPainterPath()
-        # M(20,45) then 6 cubicTo calls
         path.moveTo(ox + 20 * scale, oy + 45 * scale)
         path.cubicTo(
             ox + 22 * scale, oy + 45 * scale,
@@ -632,15 +758,14 @@ class OrbWidget(QWidget):
             ox + 80 * scale, oy + 42 * scale,
         )
 
-        # Stroke gradient (white -> gray)
         grad = QLinearGradient(
             QPointF(ox + 20 * scale, oy + 45 * scale),
             QPointF(ox + 80 * scale, oy + 45 * scale),
         )
-        grad.setColorAt(0.0, QColor(255, 255, 255, 230))  # rgba(255,255,255,0.9)
-        grad.setColorAt(1.0, QColor(200, 200, 210, 179))  # rgba(200,200,210,0.7)
+        grad.setColorAt(0.0, QColor(255, 255, 255, 230))
+        grad.setColorAt(1.0, QColor(200, 200, 210, 179))
 
-        pen = QPen(QBrush(grad), 3.5 * scale)  # ~1.0px
+        pen = QPen(QBrush(grad), 3.5 * scale)
         pen.setCapStyle(Qt.RoundCap)
         pen.setJoinStyle(Qt.RoundJoin)
 
@@ -649,11 +774,10 @@ class OrbWidget(QWidget):
         painter.drawPath(path)
 
     # ================================================================
-    # Paint — Text (timer, processing, error)
+    # Paint — Text
     # ================================================================
 
     def _paint_timer(self, painter: QPainter, cx: float, cy: float) -> None:
-        """Dessine le timer MM:SS pendant le recording."""
         mins = self._timer_seconds // 60
         secs = self._timer_seconds % 60
         text = f"{mins:02d}:{secs:02d}"
@@ -662,9 +786,8 @@ class OrbWidget(QWidget):
         font.setStyleStrategy(QFont.PreferAntialias)
         painter.setFont(font)
 
-        # Position: to the right of logo circle
         text_x = cx + LOGO_RADIUS + 12
-        text_y = cy + 5  # Vertically centered
+        text_y = cy + 5
 
         opacity = min(1.0, self._expand_progress * 2)
         painter.setOpacity(opacity * 0.75)
@@ -673,13 +796,10 @@ class OrbWidget(QWidget):
         painter.setOpacity(1.0)
 
     def _paint_processing(self, painter: QPainter, cx: float, cy: float) -> None:
-        """Dessine le texte de processing + 3 dots animes."""
         text_x = cx + LOGO_RADIUS + 12
         text_y = cy + 5
-
         opacity = min(1.0, self._expand_progress * 2)
 
-        # Show preview text if available, otherwise step text
         display_text = self._preview_text if self._preview_text else self._step_text
         if not display_text:
             display_text = "Traitement..."
@@ -690,7 +810,6 @@ class OrbWidget(QWidget):
         painter.setPen(QPen(QColor(255, 255, 255)))
         painter.drawText(QPointF(text_x, text_y), display_text)
 
-        # Bouncing dots (only if no preview)
         if not self._preview_text:
             fm = painter.fontMetrics()
             text_width = fm.horizontalAdvance(display_text)
@@ -709,18 +828,17 @@ class OrbWidget(QWidget):
         painter.setOpacity(1.0)
 
     def _paint_error(self, painter: QPainter, cx: float, cy: float) -> None:
-        """Dessine le texte d'erreur en rouge."""
         text_x = cx + LOGO_RADIUS + 12
         text_y = cy + 5
-
         opacity = min(1.0, self._expand_progress * 2)
+
         display_text = self._error_text if self._error_text else "Erreur"
 
         font = QFont("Segoe UI", 12)
         font.setBold(True)
         painter.setFont(font)
         painter.setOpacity(opacity)
-        painter.setPen(QPen(QColor(248, 113, 113)))  # #F87171
+        painter.setPen(QPen(QColor(248, 113, 113)))
         painter.drawText(QPointF(text_x, text_y), display_text)
         painter.setOpacity(1.0)
 
@@ -729,16 +847,13 @@ class OrbWidget(QWidget):
     # ================================================================
 
     def mousePressEvent(self, event) -> None:
-        """Debut du drag ou du clic."""
         if event.button() == Qt.LeftButton:
             self._mouse_press_pos = event.globalPosition().toPoint()
             self._drag_start_pos = self.pos()
             self._drag_started = False
-            # Save foreground window for focus restoration
             self._saved_restore = _restore_foreground_window()
 
     def mouseMoveEvent(self, event) -> None:
-        """Drag si le deplacement depasse le seuil de 5px."""
         if self._mouse_press_pos is None:
             return
         current = event.globalPosition().toPoint()
@@ -751,13 +866,10 @@ class OrbWidget(QWidget):
             self.move(new_pos)
 
     def mouseReleaseEvent(self, event) -> None:
-        """Fin du drag ou clic (start/stop)."""
         if event.button() == Qt.LeftButton and not self._drag_started:
-            # Click — start or stop based on state
             if self._state == "idle":
                 if self._on_start:
                     self._on_start()
-                # Restore foreground window
                 if self._saved_restore:
                     QTimer.singleShot(100, self._saved_restore)
             elif self._state == "recording":
@@ -771,11 +883,9 @@ class OrbWidget(QWidget):
         self._drag_started = False
 
     def contextMenuEvent(self, event) -> None:
-        """Clic droit → ouvrir les parametres."""
         if self._on_settings:
             self._on_settings()
 
     def moveEvent(self, event) -> None:
-        """Detecte un changement de DPI quand le widget bouge entre ecrans."""
         super().moveEvent(event)
         self._invalidate_cache()

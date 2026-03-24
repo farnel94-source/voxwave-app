@@ -46,10 +46,7 @@ voxwave/
 │   ├── licensing/
 │   │   └── validator.py        # Validation licence LemonSqueezy (free tier + pro)
 │   ├── gui/
-│   │   ├── orb/
-│   │   │   ├── orb.html        # Widget Voice Input HTML/CSS/JS (barres animees + hover icons settings/quit)
-│   │   │   └── logo.png        # Logo VoxWave
-│   │   ├── waveform_widget.py  # QWebEngineView frameless, always-on-top, draggable + hover icons
+│   │   ├── orb_widget.py       # QPainter orb widget (UpdateLayeredWindow Win32 pour transparence)
 │   │   ├── tray_icon.py        # Icone system tray PySide6 (QSystemTrayIcon) + icones unicode
 │   │   ├── settings_dialog.py  # Parametres modernes (sidebar navigation, 5 sections dont Aide)
 │   │   ├── welcome_dialog.py   # Onboarding v2.1 (8 pages, inspire Wispr Flow, page langue)
@@ -97,25 +94,32 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 - **PIEGE thread auto-stop** : `on_silence_detected` (Silero VAD) et `on_auto_stop` (amplitude) doivent pointer vers `_schedule_auto_stop` (pas `_on_stop`). `_schedule_auto_stop` utilise `QTimer.singleShot(0, ...)` pour dispatcher vers le thread Qt principal. Ne JAMAIS lancer le callback dans un `threading.Thread` — appel direct suffit.
 - **`_detect_ollama_host()`** (app.py) : scanne les ports [11434, 11435, 11433] au demarrage (socket, timeout 0.5s) et retourne le premier qui repond. Stocke le resultat dans `config["cleaning"]["ollama_host"]`. PIEGE : toujours `try/finally: sock.close()` pour eviter un leak de socket.
 
-## GUI (PySide6 + QWebEngineView)
-- **Widget flottant** (`waveform_widget.py`) : fenetre frameless, always-on-top, draggable, 300x116px
+## GUI (PySide6 natif QPainter)
+- **Widget flottant** (`orb_widget.py`) : fenetre frameless, always-on-top, draggable, 300x116px, rendu 100% QPainter
+  - **Remplace** l'ancien `waveform_widget.py` (QWebEngineView + orb.html) — plus de dependance Chromium
   - **`ensure_topmost()`** : re-applique `HWND_TOPMOST` via Win32 `SetWindowPos` (ctypes). Appelé par `_check_orb_health()` toutes les 30s. Nécessaire car Windows peut retirer le flag topmost (fullscreen, UAC, Explorer restart, lock/unlock).
   - **PIEGE** : Qt `raise_()` seul ne restaure PAS le flag `HWND_TOPMOST` au niveau Win32. Toujours utiliser `ensure_topmost()` en complément.
-- **orb.html** : logo VoxWave + pill expandable avec anneau reactif + timer + hover icons (settings/quit)
-  - **Idle** : logo seul avec animation de respiration subtile (glow blanc pulse 3.5s)
-  - **Recording** : logo + anneau reactif a l'amplitude + timer (pill s'ouvre a droite)
-  - **Processing** : logo + "Traitement" + dots animes (3 points qui rebondissent)
-  - **Error** : logo avec glow rouge + texte "Erreur" + animation shake
-  - **Transition processing → idle** : flash de succes vert (glow + bounce) avant retour idle
-- **Anneau reactif** : cercle positionne autour du logo, scale/opacite/couleur drives par amplitude Python (frame-par-frame via `requestAnimationFrame`, pas de CSS transition)
-- **Visibilite fond clair** (canvas aura dans `animateAura()`) :
-  - **Shadow layer** (couche 0) : gradient radial noir sous l'aura, opacite dynamique (0.10 → 0.25 selon intensite)
-  - **Edge ring** (couche 4) : anneau fin `rgba(0,0,0,0.15)` au bord de l'aura (strokeStyle, lineWidth 1.5)
-  - **Boost dynamique** : multiplicateurs d'opacite augmentes pour que la voix cree un contraste fort (outer aura ×2.2, core glow ×1.4, particules ×3 en taille)
-  - **Text shadows CSS** : `text-shadow: 0 1px 3px rgba(0,0,0,0.5)` sur `.timer`, `.processing-text`, `.error-text` + `box-shadow` sur `.processing-dots span`
-  - **PIEGE** : `backdrop-filter` ne fonctionne PAS sur QWebEngineView avec fenetre transparente — ne pas retenter
+- **Transparence Windows** : Win32 `UpdateLayeredWindow` API (bypass complet de Qt compositing)
+  - **PIEGE PySide6 6.11+** : `WA_TranslucentBackground` est CASSE sur Windows pour TOUS les widgets (pas seulement QWebEngineView). Rectangle opaque visible autour du widget. Bug general PySide6 6.11.0 + Chromium 134+.
+  - **Solution** : `WS_EX_LAYERED` + `UpdateLayeredWindow` avec per-pixel alpha. Rend dans un `QImage(Format_ARGB32_Premultiplied)` puis envoie les pixels via Win32 API.
+  - **DWM** : desactiver coins arrondis (`DWMWA_WINDOW_CORNER_PREFERENCE`), backdrop (`DWMWA_SYSTEMBACKDROP_TYPE`), NC rendering (`DWMWA_NCRENDERING_POLICY`)
+  - **DPR** : rendre le QImage a `width*dpr × height*dpr` puis `painter.scale(dpr, dpr)` pour dessiner en coordonnees logiques
+  - **`QImage.constBits()`** : sur Python 3.14/PySide6 6.11, retourne `bytes` pas un pointeur — utiliser `bytes(image.constBits())` pour `ctypes.memmove`
+  - **Linux** : `WA_TranslucentBackground` fonctionne toujours — pas besoin de UpdateLayeredWindow
+- **Etats visuels** (QPainter) :
+  - **Idle** : logo seul avec bordure grise fine (1.5px), flash vert de succes apres transcription
+  - **Recording** : logo + aura reactive (5 couches: shadow, outer, core glow, particules, edge ring) + timer
+  - **Processing** : logo + "Traitement" + dots animes
+  - **Error** : logo avec glow rouge + texte "Erreur"
+  - **Transition processing → idle** : flash de succes vert (cercle solide qui fade out en 0.5s)
+- **Aura recording** (5 couches QPainter, replique orb.html) :
+  - **Shadow layer** (couche 0) : QRadialGradient noir, rayon serre autour du logo
+  - **Outer aura** (couche 1) : QRadialGradient indigo→bleu
+  - **Core glow** (couche 2) : QRadialGradient cyan→bleu
+  - **Particules** (couche 3) : 15 points animes orbitant autour du logo
+  - **Edge ring** (couche 4) : anneau fin noir semi-transparent au bord de l'aura
 - **Hover icons** : au survol du logo (idle uniquement), 2 boutons ronds apparaissent (settings + quit)
-- **Bridge Python ↔ JS** : QWebChannel (setState, updateAmplitude, updateStep, setErrorText, showPreview, on_quit_clicked)
+- **API identique** a l'ancien WaveformWidget : `set_state()`, `update_amplitude()`, `update_step()`, `set_error_text()`, `show_preview()`, `on_quit_clicked`
 - **Tray icon** : menu avec icones unicode et separateurs (▶ Dictee / ⚙ Parametres / ❓ Aide / ✧ Licence / ⓘ A propos / ✕ Quitter). Clic gauche tray → ouvre directement les Parametres (via `_on_settings`)
 - **Barre des taches Windows** : `_TaskbarWindow` (dans `app.py`) — fenetre fantome minimisee (opacity=0, WA_ShowWithoutActivating) qui donne a l'app une presence permanente dans la barre des taches avec le logo VoxWave.
   - Necessite `SetCurrentProcessExplicitAppUserModelID("com.voxwave.app")` (via `ctypes`) appele avant la creation de la fenetre
@@ -126,7 +130,7 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 
 ## Plateforme
 - **Windows + Linux uniquement** — macOS non supporte (check au demarrage dans `app.py`, `sys.exit(1)`)
-- Warning dans `keyboard.py` et `waveform_widget.py` si `sys.platform == "darwin"`
+- Warning dans `keyboard.py` et `orb_widget.py` si `sys.platform == "darwin"`
 - Raison : Wispr Flow et Aqua Voice dominent sur Mac, aucun concurrent serieux sur Windows/Linux
 
 ## Profils d'app (window_detector.py)
