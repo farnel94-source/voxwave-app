@@ -306,9 +306,9 @@ black src/ tests/
 ## Release & Distribution
 - **GitHub** : https://github.com/farnel94-source/voxwave-app (public, master)
 - **Release v0.1.0** : https://github.com/farnel94-source/voxwave-app/releases/tag/v0.1.0
-  - `VoxWave-Setup-0.1.0.exe` (210 MB) — installateur Windows (Inno Setup)
-  - `VoxWave-windows.zip` (324 MB) — portable Windows
-  - Build Linux (.AppImage) pas encore fait
+  - `VoxWave-Setup-0.1.0.exe` (103 MB) — installateur Windows (Inno Setup)
+  - `VoxWave-windows.zip` (~170 MB) — portable Windows
+  - `VoxWave-x86_64.AppImage` (157 MB) — Linux
 - **Python Windows** : 3.14.2 (`C:\Python314`) — surveiller compatibilite libs
 - **Icone** : `assets/icon.ico` genere depuis `create_icon("idle")` dans `icons.py` (cercle bleu fonce + vagues blanches). Ne PAS utiliser `logo.png` (ancien logo).
 
@@ -318,11 +318,12 @@ black src/ tests/
 - **PIL ICO multi-tailles** : utiliser `images[-1].save('icon.ico', format='ICO', append_images=images[:-1])`, pas `sizes=`
 - **Cache icones Windows** : apres recompilation, `taskkill /IM explorer.exe /F` + `explorer.exe` pour voir la nouvelle icone
 
-## Lancement — Avancement (23 mars 2026)
+## Lancement — Avancement (24 mars 2026)
 - [x] Repo GitHub public
-- [x] Build Windows + Release v0.1.0
-- [ ] Mettre a jour liens download dans `landing/app/download/page.tsx` (remplacer `#` par URLs GitHub Releases)
+- [x] Build Windows + Linux + Release v0.1.0 (mise a jour 24 mars : rebuild QPainter 103 MB + AppImage 157 MB)
+- [x] Mettre a jour liens download dans landing (8 corrections dans 5 fichiers : download, footer, open-source, features, guide)
+- [x] Changelog landing mis a jour (fausses versions 1.x → vraie v0.1.0)
 - [ ] Deployer landing page sur Vercel + acheter domaine
 - [ ] Configurer LemonSqueezy (non bloquant, lancement gratuit possible)
 - [ ] Code signing Windows (optionnel, certificat ~$70-200/an)
-- [ ] Build Linux (.AppImage)
+- [ ] Newsletter : connecter le formulaire a un backend (FastAPI + SQLite pour stocker les emails)
