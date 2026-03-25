@@ -130,6 +130,16 @@ def build_linux() -> None:
         "    # Tenter quand meme (la detection peut echouer)\n"
         "fi\n"
         "\n"
+        "# Verifier les outils d'injection texte (clipboard + paste)\n"
+        'MISSING=""\n'
+        'command -v xclip >/dev/null 2>&1 || MISSING="$MISSING xclip"\n'
+        'command -v xdotool >/dev/null 2>&1 || MISSING="$MISSING xdotool"\n'
+        'if [ -n "$MISSING" ]; then\n'
+        '    echo "ATTENTION: Outils manquants pour le copier-coller :$MISSING"\n'
+        '    echo "Installez-les : sudo apt install$MISSING"\n'
+        '    echo ""\n'
+        "fi\n"
+        "\n"
         'exec "$HERE/usr/bin/VoxWave" "$@"\n'
     )
     apprun.chmod(0o755)

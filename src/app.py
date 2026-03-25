@@ -1566,6 +1566,25 @@ class VoxWave:
             print("Plateformes supportees : Windows, Linux.")
             sys.exit(1)
 
+        # Lock file anti-double-instance
+        self._lock_file = None
+        lock_path = os.path.join(
+            os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+            "voxwave", ".lock",
+        )
+        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+        self._lock_file = open(lock_path, "w")
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+                msvcrt.locking(self._lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(self._lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, OSError):
+            logger.warning("VoxWave est deja en cours d'execution, fermeture")
+            sys.exit(0)
+
         from PySide6.QtCore import QTimer
         from PySide6.QtWidgets import QApplication
 

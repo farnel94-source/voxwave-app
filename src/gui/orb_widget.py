@@ -248,6 +248,12 @@ class OrbWidget(QWidget):
             self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.setFixedSize(WIDGET_WIDTH, WIDGET_HEIGHT)
+        if not self._use_layered:
+            # Masque arrondi : coupe les pixels au niveau OS (pas de fond gris)
+            from PySide6.QtGui import QRegion
+            mask_path = QPainterPath()
+            mask_path.addRoundedRect(QRectF(0, 0, WIDGET_WIDTH, WIDGET_HEIGHT), 20, 20)
+            self.setMask(QRegion(mask_path.toFillPolygon().toPolygon()))
         self._center_bottom()
 
     def _setup_layered_window(self) -> None:
@@ -579,7 +585,7 @@ class OrbWidget(QWidget):
 
     def _paint_linux_background(self, painter: QPainter) -> None:
         """Fond opaque arrondi pour Linux (fallback sans compositeur)."""
-        bg = QColor(20, 20, 30, 240)
+        bg = QColor(20, 20, 30, 255)
         painter.setPen(Qt.NoPen)
         painter.setBrush(QBrush(bg))
         path = QPainterPath()
@@ -589,6 +595,9 @@ class OrbWidget(QWidget):
     def _paint_all(self, painter: QPainter) -> None:
         """Dessine l'orbe complet dans le painter donne."""
         if not _IS_WIN32:
+            clip_path = QPainterPath()
+            clip_path.addRoundedRect(QRectF(0, 0, WIDGET_WIDTH, WIDGET_HEIGHT), 20, 20)
+            painter.setClipPath(clip_path)
             self._paint_linux_background(painter)
 
         logo_cx = 58.0

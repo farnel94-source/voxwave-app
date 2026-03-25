@@ -249,20 +249,37 @@ class TextInjector:
             self._restore_clipboard(original)
 
     def _inject_paste_x11(self, text: str) -> None:
-        """Injection X11 : pyperclip + xdotool key ctrl+v."""
+        """Injection X11 : pyperclip + xdotool key ctrl+v, fallback xdotool type."""
         original = self._save_clipboard()
         try:
             self._copy_to_clipboard(text)
             time.sleep(0.05)
 
-            if shutil.which("xdotool"):
-                subprocess.run(
-                    ["xdotool", "key", "ctrl+v"],
-                    timeout=5, check=False,
-                )
+            # Verifier que le clipboard a bien ete ecrit
+            import pyperclip
+            try:
+                clipboard_ok = _with_timeout(pyperclip.paste, 1.0, "") == text
+            except Exception:
+                clipboard_ok = False
+
+            if clipboard_ok:
+                if shutil.which("xdotool"):
+                    subprocess.run(
+                        ["xdotool", "key", "ctrl+v"],
+                        timeout=5, check=False,
+                    )
+                else:
+                    self._do_pynput_paste()
             else:
-                # Fallback pynput
-                self._do_pynput_paste()
+                # Clipboard indisponible (xclip manquant) — fallback injection directe
+                logger.warning("Clipboard indisponible, fallback xdotool type")
+                if shutil.which("xdotool"):
+                    subprocess.run(
+                        ["xdotool", "type", "--clearmodifiers", "--delay", "12", text],
+                        timeout=10, check=False,
+                    )
+                else:
+                    self._do_pynput_paste()
         finally:
             self._restore_clipboard(original)
 
