@@ -136,7 +136,7 @@ DEFAULT_CONFIG: dict = {
     "whisper": {
         "model": "base",
         "beam_size": 5,
-        "vad_filter": True,
+        "vad_filter": False,
         "language": "en",
     },
     "groq": {

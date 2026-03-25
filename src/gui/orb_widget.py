@@ -577,8 +577,20 @@ class OrbWidget(QWidget):
         self._paint_all(painter)
         painter.end()
 
+    def _paint_linux_background(self, painter: QPainter) -> None:
+        """Fond opaque arrondi pour Linux (fallback sans compositeur)."""
+        bg = QColor(20, 20, 30, 240)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(bg))
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(0, 0, WIDGET_WIDTH, WIDGET_HEIGHT), 20, 20)
+        painter.drawPath(path)
+
     def _paint_all(self, painter: QPainter) -> None:
         """Dessine l'orbe complet dans le painter donne."""
+        if not _IS_WIN32:
+            self._paint_linux_background(painter)
+
         logo_cx = 58.0
         logo_cy = WIDGET_HEIGHT / 2.0
 

@@ -76,8 +76,7 @@ class WhisperEngine:
             audio,
             beam_size=5,
             language=lang_param,
-            vad_filter=True,
-            vad_parameters={"min_silence_duration_ms": 500},
+            vad_filter=False,
             condition_on_previous_text=False,
         )
         text = " ".join(seg.text for seg in segments).strip()

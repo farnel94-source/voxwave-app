@@ -31,7 +31,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (os.path.join(ROOT, 'config.yaml'), '.'),
-        (os.path.join(ROOT, '.env.example'), '.'),
+        (os.path.join(ROOT, '.env'), '.'),
         # orb.html supprime — rendu QPainter natif (orb_widget.py)
         (os.path.join(ROOT, 'THIRD_PARTY_LICENSES.txt'), '.'),
         (os.path.join(ROOT, 'LICENSE'), '.'),

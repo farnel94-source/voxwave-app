@@ -112,11 +112,24 @@ def build_linux() -> None:
     else:
         _create_placeholder_icon(icon_dst)
 
-    # AppRun script
+    # AppRun script (avec check libxcb-cursor0 pour Qt 6.5+)
     apprun = appdir / "AppRun"
     apprun.write_text(
         "#!/bin/bash\n"
         'HERE="$(dirname "$(readlink -f "$0")")"\n'
+        "\n"
+        "# Verifier libxcb-cursor0 (requis par Qt 6.5+)\n"
+        "if ! ldconfig -p 2>/dev/null | grep -q libxcb-cursor; then\n"
+        '    echo ""\n'
+        '    echo "ERREUR: libxcb-cursor0 est requis mais non installe."\n'
+        '    echo "Installez-le avec :"\n'
+        '    echo "  Ubuntu/Debian/Mint : sudo apt install libxcb-cursor0"\n'
+        '    echo "  Fedora             : sudo dnf install xcb-util-cursor"\n'
+        '    echo "  Arch               : sudo pacman -S xcb-util-cursor"\n'
+        '    echo ""\n'
+        "    # Tenter quand meme (la detection peut echouer)\n"
+        "fi\n"
+        "\n"
         'exec "$HERE/usr/bin/VoxWave" "$@"\n'
     )
     apprun.chmod(0o755)
