@@ -28,7 +28,13 @@ elif is_darwin:
 a = Analysis(
     [os.path.join(ROOT, 'src', '__main__.py')],
     pathex=[ROOT],
-    binaries=[],
+    binaries=([
+        # webrtcvad-wheels : inclure manuellement (hook PyInstaller incompatible avec webrtcvad-wheels)
+        (os.path.join(ROOT, '.venv', 'lib', f'python{sys.version_info.major}.{sys.version_info.minor}',
+         'site-packages', f'_webrtcvad.cpython-{sys.version_info.major}{sys.version_info.minor}-x86_64-linux-gnu.so'), '.'),
+        (os.path.join(ROOT, '.venv', 'lib', f'python{sys.version_info.major}.{sys.version_info.minor}',
+         'site-packages', 'webrtcvad.py'), '.'),
+    ] if is_linux else []),
     datas=[
         (os.path.join(ROOT, 'config.yaml'), '.'),
         (os.path.join(ROOT, '.env'), '.'),
