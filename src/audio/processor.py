@@ -194,7 +194,7 @@ class AudioProcessor:
         speech_detected = any(e > threshold for e in energies)
         if not speech_detected:
             logger.info("Aucune parole detectee (VAD energie), audio ignore")
-                return np.array([], dtype=np.float32)
+            return np.array([], dtype=np.float32)
 
         start_frame = 0
         end_frame = len(energies) - 1
