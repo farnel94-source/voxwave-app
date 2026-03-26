@@ -142,10 +142,9 @@ class GroqWhisperEngine:
         # En mode auto : utiliser la dernière langue détectée pour le hint (évite biais anglais)
         # Si aucune langue détectée encore, utiliser la langue d'interface comme hint initial
         if self.language == "auto":
-            # Mode auto : PAS de hint au 1er appel (laisser Whisper detecter seul)
-            # Apres detection, utiliser le hint de la langue detectee pour stabiliser
-            if self._last_detected_language:
-                hint = _GROQ_HINTS.get(self._last_detected_language, _GROQ_HINTS_DEFAULT)
+            hint_lang = self._last_detected_language or self._interface_language
+            hint = _GROQ_HINTS.get(hint_lang) if hint_lang else None
+            if hint:
                 kwargs["prompt"] = hint
         else:
             kwargs["prompt"] = _GROQ_HINTS.get(self.language, _GROQ_HINTS_DEFAULT)

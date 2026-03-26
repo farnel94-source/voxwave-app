@@ -188,19 +188,12 @@ class AudioProcessor:
 
         sorted_energies = sorted(energies)
         noise_floor = sorted_energies[len(sorted_energies) // 4]
-        threshold = max(noise_floor * 2, 0.0005)
+        threshold = max(noise_floor * 3, 0.001)
         logger.debug(f"VAD energie: noise_floor={noise_floor:.5f}, threshold={threshold:.5f}")
 
         speech_detected = any(e > threshold for e in energies)
         if not speech_detected:
-            duration_s = len(audio) / self.sample_rate
-            if duration_s >= 1.5:
-                logger.info(
-                    f"VAD energie: aucune parole detectee mais audio >= 1.5s "
-                    f"({duration_s:.2f}s), transcription quand meme"
-                )
-            else:
-                logger.info("Aucune parole detectee (VAD energie), audio ignore")
+            logger.info("Aucune parole detectee (VAD energie), audio ignore")
                 return np.array([], dtype=np.float32)
 
         start_frame = 0
