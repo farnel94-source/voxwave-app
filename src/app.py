@@ -1335,6 +1335,11 @@ class VoxWave:
             self._save_config("language", new_sys_lang)
             if self.tray:
                 self.tray.update_language(new_sys_lang)
+            # Mettre a jour le hint langue dans le moteur de transcription
+            if hasattr(self.engine, "_interface_language"):
+                self.engine._interface_language = new_sys_lang
+            if hasattr(self.engine, "_groq_engine") and self.engine._groq_engine:
+                self.engine._groq_engine._interface_language = new_sys_lang
             changes.append(f"Interface : {new_sys_lang}")
 
         # Dictation language
