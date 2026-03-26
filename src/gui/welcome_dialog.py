@@ -63,8 +63,8 @@ _TRANSLATIONS = {
         # Page 2 - Dictation language
         "dictation_lang_title": "Dictation language",
         "dictation_lang_subtitle": "Which language will you dictate in?",
-        "dictation_lang_auto": "Auto-detect (recommended)",
-        "dictation_lang_hint": "Auto-detect works great for most users. Pick a specific language only if needed.",
+        "dictation_lang_auto": "Auto-detect (multilingual)",
+        "dictation_lang_hint": "We recommend choosing your main language for best accuracy. Use Auto-detect only if you switch languages often.",
         # Page 3 - Motivation
         "motivation_title": "What brings you here?",
         "motivation_subtitle": "Select all that apply",
@@ -148,8 +148,8 @@ _TRANSLATIONS = {
         "lang_hint": "You can change this anytime in Settings",
         "dictation_lang_title": "Langue de dictee",
         "dictation_lang_subtitle": "Dans quelle langue allez-vous dicter ?",
-        "dictation_lang_auto": "Detection automatique (recommande)",
-        "dictation_lang_hint": "La detection automatique fonctionne bien pour la plupart des utilisateurs. Choisissez une langue specifique seulement si necessaire.",
+        "dictation_lang_auto": "Detection automatique (multilingue)",
+        "dictation_lang_hint": "Nous recommandons de choisir votre langue principale pour une meilleure precision. Utilisez la detection automatique seulement si vous changez souvent de langue.",
         "motivation_title": "Qu'est-ce qui vous amene ici ?",
         "motivation_subtitle": "Selectionnez tout ce qui vous correspond",
         "motiv_1_title": "J'en ai marre de taper toute la journee",
