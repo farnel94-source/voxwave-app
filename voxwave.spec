@@ -38,6 +38,10 @@ a = Analysis(
     datas=[
         (os.path.join(ROOT, 'config.yaml'), '.'),
         (os.path.join(ROOT, '.env'), '.'),
+        # silero_vad pour faster-whisper (vad_filter=True) — chemin attendu par faster_whisper
+        (os.path.join(ROOT, '.venv', 'lib', f'python{sys.version_info.major}.{sys.version_info.minor}',
+         'site-packages', 'faster_whisper', 'assets', 'silero_vad_v6.onnx'),
+         os.path.join('faster_whisper', 'assets')),
         # orb.html supprime — rendu QPainter natif (orb_widget.py)
         (os.path.join(ROOT, 'THIRD_PARTY_LICENSES.txt'), '.'),
         (os.path.join(ROOT, 'LICENSE'), '.'),
