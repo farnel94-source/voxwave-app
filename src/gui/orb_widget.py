@@ -226,6 +226,10 @@ class OrbWidget(QWidget):
         self._build_static_cache()
         self.show()
 
+        # Linux: appliquer le masque arrondi APRES show() (certains WM l'ignorent avant)
+        if not self._use_layered:
+            self._apply_linux_mask()
+
         # Win32: activer WS_EX_LAYERED apres show() pour que le HWND existe
         if self._use_layered:
             self._setup_layered_window()
@@ -248,12 +252,6 @@ class OrbWidget(QWidget):
             self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.setFixedSize(WIDGET_WIDTH, WIDGET_HEIGHT)
-        if not self._use_layered:
-            # Masque arrondi : coupe les pixels au niveau OS (pas de fond gris)
-            from PySide6.QtGui import QRegion
-            mask_path = QPainterPath()
-            mask_path.addRoundedRect(QRectF(0, 0, WIDGET_WIDTH, WIDGET_HEIGHT), 20, 20)
-            self.setMask(QRegion(mask_path.toFillPolygon().toPolygon()))
         self._center_bottom()
 
     def _setup_layered_window(self) -> None:
@@ -582,6 +580,20 @@ class OrbWidget(QWidget):
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
         self._paint_all(painter)
         painter.end()
+
+    def _apply_linux_mask(self) -> None:
+        """Applique un masque arrondi sur Linux (elimine le fond gris du WM)."""
+        bitmap = QPixmap(WIDGET_WIDTH, WIDGET_HEIGHT)
+        bitmap.fill(QColor(0, 0, 0, 0))  # Transparent
+        p = QPainter(bitmap)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setBrush(QColor(255, 255, 255))
+        p.setPen(Qt.NoPen)
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(0, 0, WIDGET_WIDTH, WIDGET_HEIGHT), 20, 20)
+        p.drawPath(path)
+        p.end()
+        self.setMask(bitmap.mask())
 
     def _paint_linux_background(self, painter: QPainter) -> None:
         """Fond opaque arrondi pour Linux (fallback sans compositeur)."""
