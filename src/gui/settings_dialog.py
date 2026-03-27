@@ -1150,11 +1150,16 @@ class SettingsDialog(QDialog):
         from PySide6.QtWidgets import QStackedWidget
         self._stack = QStackedWidget()
         for page in self._pages:
+            page.setObjectName("settings-page")
             scroll = QScrollArea()
             scroll.setWidget(page)
             scroll.setWidgetResizable(True)
             scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-            scroll.setStyleSheet("QScrollArea { background: transparent; }")
+            scroll.setStyleSheet(
+                "QScrollArea { background: #18181b; border: none; }"
+                "QScrollArea > QWidget > QWidget { background: #18181b; }"
+            )
+            scroll.viewport().setAutoFillBackground(False)
             self._stack.addWidget(scroll)
         self._content_stack.addWidget(self._stack)
 

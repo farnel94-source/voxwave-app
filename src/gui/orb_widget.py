@@ -248,8 +248,9 @@ class OrbWidget(QWidget):
             | Qt.WindowDoesNotAcceptFocus
         )
         if not self._use_layered:
-            # Linux: utiliser la transparence Qt native (fonctionne bien)
+            # Linux sans compositeur : WA_OpaquePaintEvent = on peint tout nous-memes
             self.setAttribute(Qt.WA_TranslucentBackground, True)
+            self.setAttribute(Qt.WA_OpaquePaintEvent, True)
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.setFixedSize(WIDGET_WIDTH, WIDGET_HEIGHT)
         self._center_bottom()
@@ -582,18 +583,20 @@ class OrbWidget(QWidget):
         painter.end()
 
     def _apply_linux_mask(self) -> None:
-        """Applique un masque arrondi sur Linux (elimine le fond gris du WM)."""
-        from PySide6.QtGui import QBitmap
-        mask = QBitmap(WIDGET_WIDTH, WIDGET_HEIGHT)
-        mask.fill(Qt.color0)  # Tout transparent
-        p = QPainter(mask)
-        p.setBrush(Qt.color1)  # Zone visible
-        p.setPen(Qt.NoPen)
-        path = QPainterPath()
-        path.addRoundedRect(QRectF(0, 0, WIDGET_WIDTH, WIDGET_HEIGHT), 20, 20)
-        p.drawPath(path)
-        p.end()
-        self.setMask(mask)
+        """Applique un masque arrondi sur Linux (QRegion natif X11)."""
+        from PySide6.QtGui import QRegion
+        r = 20  # rayon des coins
+        w, h = WIDGET_WIDTH, WIDGET_HEIGHT
+        # Construire un rectangle arrondi a partir de regions natives
+        region = QRegion(r, 0, w - 2 * r, h)          # bande centrale horizontale
+        region |= QRegion(0, r, w, h - 2 * r)          # bande centrale verticale
+        # 4 coins arrondis (ellipses inscrites dans 2r x 2r)
+        region |= QRegion(0, 0, 2 * r, 2 * r, QRegion.RegionType.Ellipse)
+        region |= QRegion(w - 2 * r, 0, 2 * r, 2 * r, QRegion.RegionType.Ellipse)
+        region |= QRegion(0, h - 2 * r, 2 * r, 2 * r, QRegion.RegionType.Ellipse)
+        region |= QRegion(w - 2 * r, h - 2 * r, 2 * r, 2 * r, QRegion.RegionType.Ellipse)
+        self.setMask(region)
+        self.update()
 
     def _paint_linux_background(self, painter: QPainter) -> None:
         """Fond opaque arrondi pour Linux (fallback sans compositeur)."""
