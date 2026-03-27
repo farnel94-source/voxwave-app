@@ -104,13 +104,17 @@ def build_linux() -> None:
         "Terminal=false\n"
     )
 
-    # Icon (simple placeholder PNG si pas d'icone)
+    # Icon (VoxWave logo 256x256)
     icon_src = ROOT / "assets" / "icon.png"
     icon_dst = appdir / "voxwave.png"
     if icon_src.exists():
         shutil.copy2(icon_src, icon_dst)
     else:
         _create_placeholder_icon(icon_dst)
+    # Symlink .DirIcon (requis par certains gestionnaires de fichiers Linux)
+    diricon = appdir / ".DirIcon"
+    if not diricon.exists():
+        os.symlink("voxwave.png", str(diricon))
 
     # AppRun script (avec check libxcb-cursor0 pour Qt 6.5+)
     apprun = appdir / "AppRun"

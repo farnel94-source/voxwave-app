@@ -583,17 +583,17 @@ class OrbWidget(QWidget):
 
     def _apply_linux_mask(self) -> None:
         """Applique un masque arrondi sur Linux (elimine le fond gris du WM)."""
-        bitmap = QPixmap(WIDGET_WIDTH, WIDGET_HEIGHT)
-        bitmap.fill(QColor(0, 0, 0, 0))  # Transparent
-        p = QPainter(bitmap)
-        p.setRenderHint(QPainter.Antialiasing)
-        p.setBrush(QColor(255, 255, 255))
+        from PySide6.QtGui import QBitmap
+        mask = QBitmap(WIDGET_WIDTH, WIDGET_HEIGHT)
+        mask.fill(Qt.color0)  # Tout transparent
+        p = QPainter(mask)
+        p.setBrush(Qt.color1)  # Zone visible
         p.setPen(Qt.NoPen)
         path = QPainterPath()
         path.addRoundedRect(QRectF(0, 0, WIDGET_WIDTH, WIDGET_HEIGHT), 20, 20)
         p.drawPath(path)
         p.end()
-        self.setMask(bitmap.mask())
+        self.setMask(mask)
 
     def _paint_linux_background(self, painter: QPainter) -> None:
         """Fond opaque arrondi pour Linux (fallback sans compositeur)."""
