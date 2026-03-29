@@ -51,6 +51,7 @@ AC_SRC_OVER = 0
 AC_SRC_ALPHA = 1
 
 
+
 # --- Win32 structures (module-level, definis une seule fois) ---
 
 if _IS_WIN32:
@@ -226,10 +227,6 @@ class OrbWidget(QWidget):
         self._build_static_cache()
         self.show()
 
-        # Linux: appliquer le masque arrondi APRES show() (certains WM l'ignorent avant)
-        if not self._use_layered:
-            self._apply_linux_mask()
-
         # Win32: activer WS_EX_LAYERED apres show() pour que le HWND existe
         if self._use_layered:
             self._setup_layered_window()
@@ -248,9 +245,8 @@ class OrbWidget(QWidget):
             | Qt.WindowDoesNotAcceptFocus
         )
         if not self._use_layered:
-            # Linux sans compositeur : WA_OpaquePaintEvent = on peint tout nous-memes
             self.setAttribute(Qt.WA_TranslucentBackground, True)
-            self.setAttribute(Qt.WA_OpaquePaintEvent, True)
+            self.setAttribute(Qt.WA_NoSystemBackground, True)
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.setFixedSize(WIDGET_WIDTH, WIDGET_HEIGHT)
         self._center_bottom()
@@ -573,48 +569,17 @@ class OrbWidget(QWidget):
         _update_layered_window(self._hwnd, image)
 
     def paintEvent(self, event) -> None:
-        """Fallback pour Linux (WA_TranslucentBackground fonctionne)."""
+        """Rendu Linux : transparence native via WA_TranslucentBackground."""
         if self._use_layered:
-            return  # Sur Windows, on utilise _render_layered
+            return
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
         self._paint_all(painter)
         painter.end()
 
-    def _apply_linux_mask(self) -> None:
-        """Applique un masque arrondi sur Linux (QRegion natif X11)."""
-        from PySide6.QtGui import QRegion
-        r = 20  # rayon des coins
-        w, h = WIDGET_WIDTH, WIDGET_HEIGHT
-        # Construire un rectangle arrondi a partir de regions natives
-        region = QRegion(r, 0, w - 2 * r, h)          # bande centrale horizontale
-        region |= QRegion(0, r, w, h - 2 * r)          # bande centrale verticale
-        # 4 coins arrondis (ellipses inscrites dans 2r x 2r)
-        region |= QRegion(0, 0, 2 * r, 2 * r, QRegion.RegionType.Ellipse)
-        region |= QRegion(w - 2 * r, 0, 2 * r, 2 * r, QRegion.RegionType.Ellipse)
-        region |= QRegion(0, h - 2 * r, 2 * r, 2 * r, QRegion.RegionType.Ellipse)
-        region |= QRegion(w - 2 * r, h - 2 * r, 2 * r, 2 * r, QRegion.RegionType.Ellipse)
-        self.setMask(region)
-        self.update()
-
-    def _paint_linux_background(self, painter: QPainter) -> None:
-        """Fond opaque arrondi pour Linux (fallback sans compositeur)."""
-        bg = QColor(20, 20, 30, 255)
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(bg))
-        path = QPainterPath()
-        path.addRoundedRect(QRectF(0, 0, WIDGET_WIDTH, WIDGET_HEIGHT), 20, 20)
-        painter.drawPath(path)
-
     def _paint_all(self, painter: QPainter) -> None:
         """Dessine l'orbe complet dans le painter donne."""
-        if not _IS_WIN32:
-            clip_path = QPainterPath()
-            clip_path.addRoundedRect(QRectF(0, 0, WIDGET_WIDTH, WIDGET_HEIGHT), 20, 20)
-            painter.setClipPath(clip_path)
-            self._paint_linux_background(painter)
-
         logo_cx = 58.0
         logo_cy = WIDGET_HEIGHT / 2.0
 

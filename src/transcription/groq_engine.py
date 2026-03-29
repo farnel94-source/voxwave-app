@@ -214,12 +214,13 @@ class GroqWhisperEngine:
                 if no_speech > 0.7:
                     logger.warning("Probable silence détecté par Whisper, texte peu fiable")
                     return ""
+                # Toujours vérifier les hallucinations connues (quel que soit le logprob)
+                if is_hallucination(text):
+                    logger.warning(
+                        f"Hallucination détectée (logprob={avg_logprob:.2f}), rejeté: '{text}'"
+                    )
+                    return ""
                 if avg_logprob < -0.7:
-                    if is_hallucination(text):
-                        logger.warning(
-                            f"Confiance basse ({avg_logprob:.2f}) + hallucination détectée, rejeté: '{text}'"
-                        )
-                        return ""
                     logger.info(
                         f"Confiance basse ({avg_logprob:.2f}) mais texte conservé (no_speech={no_speech:.2f})"
                     )
@@ -239,6 +240,10 @@ class GroqWhisperEngine:
                 logger.info(f"Langue détectée: {detected_lang} (config: {self.language})")
 
         text = strip_hallucination_tails(text)
+        # Si le strip a tout supprimé, c'était une hallucination complète
+        if not text.strip():
+            logger.warning(f"Texte entièrement supprimé par strip_hallucination_tails")
+            return ""
         if self._circuit:
             self._circuit.record_success()
         elapsed = time.time() - start

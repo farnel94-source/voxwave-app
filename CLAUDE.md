@@ -31,8 +31,8 @@ voxwave/
 │   │   ├── feedback.py         # Sons feedback (start/stop/complete/error)
 │   │   └── processor.py        # Traitement audio (chunking, validation duree, _iter_frames)
 │   ├── transcription/
-│   │   ├── whisper_engine.py    # Moteur faster-whisper (local) — condition_on_previous_text=False (évite hallucinations)
-│   │   ├── groq_engine.py      # Moteur Groq API (cloud) — flag _available, circuit breaker, rejet avg_logprob+hallucination combiné, hint auto langue via prompt=
+│   │   ├── whisper_engine.py    # Moteur faster-whisper (local) — model=small, condition_on_previous_text=False, interface_language fallback
+│   │   ├── groq_engine.py      # Moteur Groq API (cloud) — flag _available, circuit breaker, is_hallucination() TOUJOURS vérifié (quel que soit logprob), hint auto langue via prompt=
 │   │   ├── hybrid_engine.py    # Hybride: Groq → Whisper local, callback on_fallback
 │   │   └── hallucinations.py   # Detection hallucinations Whisper
 │   ├── cleaning/
@@ -86,7 +86,8 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 - Sans cle API : flag `_available = False`, pas de crash (ValueError supprime)
 - Check connectivite au demarrage : ping Groq/OpenAI (timeout 3s), pre-ouverture circuit si injoignable
 - Notification tray lors d'un fallback : "Transcription : mode local (cloud indisponible)"
-- **Rejet Groq** : `avg_logprob < -0.7` seul = warning (texte conservé). `avg_logprob < -0.7` + `is_hallucination()` = rejeté. Ne JAMAIS rejeter sur un seul signal.
+- **Rejet Groq** : `is_hallucination()` vérifié TOUJOURS (quel que soit le logprob). `avg_logprob < -0.7` seul = warning (texte conservé). `strip_hallucination_tails()` retourne vide si tout le texte est une hallucination. Hallucinations connues ajoutées : "Pas de sous-titres", "Sous-titrage Société Radio-Canada", "Merci d'avoir regardé mon promenage".
+- **PIEGE Whisper local** : le modèle `base` (74M) est catastrophique en détection de langue multilingue (détecte russe/allemand au lieu de français). Utiliser `small` (244M) minimum. `WhisperEngine` a un paramètre `interface_language` : fallback vers la langue d'interface quand confiance < 0.7 et pas de langue connue précédente.
 - **Mode auto langue** : En `whisper.language: auto`, Groq reçoit un hint `prompt=` (PAS `language=`) basé sur `_last_detected_language` ou `_interface_language` (langue d'interface). Évite le biais anglais de Whisper sans forcer de langue. `_GROQ_HINTS` contient des prompts localisés pour 15 langues.
 - **Trim audio** : `prepare_for_whisper()` utilise `pad_ms=500` (pas 300) pour garder les fins de phrase à voix décroissante.
 - **`_iter_frames()`** (processor.py) : itère sur TOUS les frames audio y compris le dernier (zero-padded si incomplet). PIEGE : ne JAMAIS utiliser `range(0, len(audio) - frame_size, frame_size)` — ça ignore le dernier frame et coupe les fins de phrase.
@@ -105,7 +106,9 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
   - **DWM** : desactiver coins arrondis (`DWMWA_WINDOW_CORNER_PREFERENCE`), backdrop (`DWMWA_SYSTEMBACKDROP_TYPE`), NC rendering (`DWMWA_NCRENDERING_POLICY`)
   - **DPR** : rendre le QImage a `width*dpr × height*dpr` puis `painter.scale(dpr, dpr)` pour dessiner en coordonnees logiques
   - **`QImage.constBits()`** : sur Python 3.14/PySide6 6.11, retourne `bytes` pas un pointeur — utiliser `bytes(image.constBits())` pour `ctypes.memmove`
-  - **Linux** : `WA_TranslucentBackground` fonctionne toujours — pas besoin de UpdateLayeredWindow
+  - **Linux** : `WA_TranslucentBackground` + `WA_NoSystemBackground` uniquement. Pas de UpdateLayeredWindow, pas de fond opaque, pas de masque QRegion.
+  - **PIEGE Linux** : ne JAMAIS utiliser `WA_OpaquePaintEvent` — conflit direct avec `WA_TranslucentBackground` (cree un rectangle opaque). Ne pas dependre de `xprop` (pas installe par defaut sur Linux Mint). Ne pas utiliser `QScreen.format()` (n'existe pas dans certaines versions PySide6 → crash).
+  - **PIEGE Linux** : ne JAMAIS ajouter de fond opaque (`_paint_linux_background`) ni de masque QRegion — ca recree le carre noir. L'orb doit etre 100% transparent, seuls le logo et l'aura sont peints.
 - **Etats visuels** (QPainter) :
   - **Idle** : logo seul avec bordure grise fine (1.5px), flash vert de succes apres transcription
   - **Recording** : logo + aura reactive (5 couches: shadow, outer, core glow, particules, edge ring) + timer
@@ -318,12 +321,14 @@ black src/ tests/
 - **PIL ICO multi-tailles** : utiliser `images[-1].save('icon.ico', format='ICO', append_images=images[:-1])`, pas `sizes=`
 - **Cache icones Windows** : apres recompilation, `taskkill /IM explorer.exe /F` + `explorer.exe` pour voir la nouvelle icone
 
-## Lancement — Avancement (24 mars 2026)
+## Lancement — Avancement (25 mars 2026)
 - [x] Repo GitHub public
-- [x] Build Windows + Linux + Release v0.1.0 (mise a jour 24 mars : rebuild QPainter 103 MB + AppImage 157 MB)
-- [x] Mettre a jour liens download dans landing (8 corrections dans 5 fichiers : download, footer, open-source, features, guide)
+- [x] Build Windows + Linux + Release v0.1.0 (rebuild QPainter 103 MB + AppImage 157 MB)
+- [x] Mettre a jour liens download dans landing (8 corrections dans 5 fichiers)
 - [x] Changelog landing mis a jour (fausses versions 1.x → vraie v0.1.0)
-- [ ] Deployer landing page sur Vercel + acheter domaine
+- [x] Landing page deployee sur Vercel : https://voxwave-landing.vercel.app/
+- [x] Landing page repo GitHub prive : https://github.com/farnel94-source/voxwave-landing
+- [ ] Acheter domaine custom (voxwave.app ou autre) et configurer sur Vercel
 - [ ] Configurer LemonSqueezy (non bloquant, lancement gratuit possible)
 - [ ] Code signing Windows (optionnel, certificat ~$70-200/an)
 - [ ] Newsletter : connecter le formulaire a un backend (FastAPI + SQLite pour stocker les emails)

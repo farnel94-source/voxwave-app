@@ -700,6 +700,7 @@ class VoxWave:
                 model=self.config["whisper"]["model"],
                 language=language,
                 sample_rate=sample_rate,
+                interface_language=interface_lang,
             )
 
     def _toggle_waveform(self) -> None:

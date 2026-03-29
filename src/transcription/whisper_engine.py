@@ -25,6 +25,7 @@ class WhisperEngine:
         language: str = "fr",
         compute_type: Optional[str] = None,
         sample_rate: int = 16000,
+        interface_language: Optional[str] = None,
     ) -> None:
         if model not in self.SUPPORTED_MODELS:
             raise ValueError(f"Modèle '{model}' non supporté. Choix : {self.SUPPORTED_MODELS}")
@@ -33,6 +34,7 @@ class WhisperEngine:
         self.sample_rate = sample_rate
         self.compute_type = compute_type or self._detect_compute_type()
         self._model = None
+        self._interface_language = interface_language
         self._last_detected_language: Optional[str] = None
         self._last_known_language: Optional[str] = None  # dernière langue avec confiance ≥ 0.7
         logger.info(f"WhisperEngine: model={model}, lang={language}, compute={self.compute_type}")
@@ -83,12 +85,13 @@ class WhisperEngine:
         text = " ".join(seg.text for seg in segments).strip()
         detected = getattr(info, "language", self.language)
         lang_prob = getattr(info, "language_probability", 1.0)
-        if self.language == "auto" and lang_prob < 0.7 and self._last_known_language:
+        fallback_lang = self._last_known_language or self._interface_language
+        if self.language == "auto" and lang_prob < 0.7 and fallback_lang:
             logger.warning(
                 f"Langue '{detected}' détectée avec confiance {lang_prob:.2f} < 0.7, "
-                f"fallback → {self._last_known_language}"
+                f"fallback → {fallback_lang}"
             )
-            self._last_detected_language = self._last_known_language
+            self._last_detected_language = fallback_lang
         else:
             self._last_detected_language = detected
             if self.language == "auto" and detected and lang_prob >= 0.7:
