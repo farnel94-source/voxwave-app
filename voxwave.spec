@@ -14,6 +14,23 @@ is_linux = sys.platform == "linux"
 is_windows = sys.platform == "win32"
 is_darwin = sys.platform == "darwin"
 
+# Chemin site-packages (different Linux vs Windows)
+# Linux : .venv/lib/python3.X/site-packages/
+# Windows : detecte automatiquement via le module importé
+if is_windows:
+    import importlib
+    _fw_spec = importlib.util.find_spec('faster_whisper')
+    if _fw_spec and _fw_spec.origin:
+        _site_packages = os.path.dirname(os.path.dirname(_fw_spec.origin))
+    else:
+        _site_packages = os.path.join(sys.prefix, 'Lib', 'site-packages')
+else:
+    _site_packages = os.path.join(
+        ROOT, '.venv', 'lib',
+        f'python{sys.version_info.major}.{sys.version_info.minor}',
+        'site-packages',
+    )
+
 # Icone : .ico pour Windows, .png pour Linux, .icns pour macOS
 icon_file = None
 if is_windows:
@@ -30,17 +47,14 @@ a = Analysis(
     pathex=[ROOT],
     binaries=([
         # webrtcvad-wheels : inclure manuellement (hook PyInstaller incompatible avec webrtcvad-wheels)
-        (os.path.join(ROOT, '.venv', 'lib', f'python{sys.version_info.major}.{sys.version_info.minor}',
-         'site-packages', f'_webrtcvad.cpython-{sys.version_info.major}{sys.version_info.minor}-x86_64-linux-gnu.so'), '.'),
-        (os.path.join(ROOT, '.venv', 'lib', f'python{sys.version_info.major}.{sys.version_info.minor}',
-         'site-packages', 'webrtcvad.py'), '.'),
+        (os.path.join(_site_packages, f'_webrtcvad.cpython-{sys.version_info.major}{sys.version_info.minor}-x86_64-linux-gnu.so'), '.'),
+        (os.path.join(_site_packages, 'webrtcvad.py'), '.'),
     ] if is_linux else []),
     datas=[
         (os.path.join(ROOT, 'config.yaml'), '.'),
         (os.path.join(ROOT, '.env'), '.'),
         # silero_vad pour faster-whisper (vad_filter=True) — chemin attendu par faster_whisper
-        (os.path.join(ROOT, '.venv', 'lib', f'python{sys.version_info.major}.{sys.version_info.minor}',
-         'site-packages', 'faster_whisper', 'assets', 'silero_vad_v6.onnx'),
+        (os.path.join(_site_packages, 'faster_whisper', 'assets', 'silero_vad_v6.onnx'),
          os.path.join('faster_whisper', 'assets')),
         # orb.html supprime — rendu QPainter natif (orb_widget.py)
         (os.path.join(ROOT, 'THIRD_PARTY_LICENSES.txt'), '.'),

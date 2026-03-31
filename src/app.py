@@ -16,9 +16,12 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 # Fix encodage Unicode sur Windows (emojis dans le terminal)
+# sys.stdout/stderr peuvent etre None en mode windowed (PyInstaller --noconsole)
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
+    if sys.stdout is not None:
+        sys.stdout.reconfigure(encoding="utf-8")
+    if sys.stderr is not None:
+        sys.stderr.reconfigure(encoding="utf-8")
 
 import click
 import sentry_sdk

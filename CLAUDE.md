@@ -320,6 +320,10 @@ black src/ tests/
 - **Inno Setup** : `SetupIconFile` doit pointer vers un `.ico` (pas `.png`) — actuellement `assets/icon.ico`
 - **PIL ICO multi-tailles** : utiliser `images[-1].save('icon.ico', format='ICO', append_images=images[:-1])`, pas `sizes=`
 - **Cache icones Windows** : apres recompilation, `taskkill /IM explorer.exe /F` + `explorer.exe` pour voir la nouvelle icone
+- **site-packages cross-platform** : Linux = `.venv/lib/python3.X/site-packages/`, Windows = `C:\Python314\Lib\site-packages/` (pas de `.venv` sur Windows de Farnel). Le `.spec` utilise `importlib.util.find_spec('faster_whisper')` sur Windows pour trouver le bon chemin automatiquement.
+- **`sys.stdout` None en mode windowed** : PyInstaller `--noconsole` met `sys.stdout = None`. Toujours `if sys.stdout is not None:` avant `reconfigure()`.
+- **`config.yaml` bundle** : PyInstaller copie le `config.yaml` du projet tel quel. Ne JAMAIS laisser `first_launch: false` dedans — ca skip l'onboarding pour tous les utilisateurs. Le config source ne doit PAS contenir `first_launch` (le defaut `True` vient de `DEFAULT_CONFIG`).
+- **`silero_vad_v6.onnx`** : necessaire pour `faster_whisper` avec `vad_filter=True`. Doit etre bundle dans `faster_whisper/assets/` du build.
 
 ## Lancement — Avancement (25 mars 2026)
 - [x] Repo GitHub public
