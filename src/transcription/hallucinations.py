@@ -15,9 +15,13 @@ KNOWN_HALLUCINATIONS: Set[str] = {
     "sous-titrage societe radio-canada",
     "sous-titrage société radio-canada",
     "sous-titrage st", "sous-titrage stl",
+    "pas de sous-titres", "pas de sous-titres.",
     "merci d'avoir regarde", "merci d'avoir regarde !",
+    "merci d'avoir regardé", "merci d'avoir regardé !",
     "merci d'avoir regarde cette video",
     "merci d'avoir regarde cette video !",
+    "merci d'avoir regardé mon promenage",
+    "merci d'avoir regardé mon promenage.",
     "merci de votre attention",
     "merci de votre attention.",
     "a bientot", "a bientot.",
@@ -32,6 +36,7 @@ KNOWN_HALLUCINATIONS: Set[str] = {
     "et oui.", "et oui", "et non",
     "subtitles", "subtitle", "subtitles.", "no subtitles", "no subtitles.",
     "music", "musique",
+    "c'est bon.", "c'est bon",
     "\u266a", "\U0001f3b5",
 }
 
@@ -106,6 +111,4 @@ def strip_hallucination_tails(text: str) -> str:
         Texte nettoye, ou le texte original si le nettoyage le vide.
     """
     cleaned = HALLUCINATION_TAILS.sub("", text).strip()
-    if cleaned:
-        return cleaned
-    return text
+    return cleaned

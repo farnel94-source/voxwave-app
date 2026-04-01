@@ -24,6 +24,41 @@ def resource_path(relative_path: str) -> str:
     return os.path.join(base_path, relative_path)
 
 
+def user_config_path() -> str:
+    """Retourne le chemin vers le config.yaml utilisateur (lecture/ecriture).
+
+    - Dev (non frozen) : config.yaml a la racine du projet
+    - Linux frozen : ~/.config/voxwave/config.yaml (XDG)
+    - Windows frozen : %APPDATA%/VoxWave/config.yaml
+
+    Au premier lancement frozen, copie le config.yaml du bundle.
+    """
+    import shutil
+
+    if not getattr(sys, "frozen", False):
+        return resource_path("config.yaml")
+
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA", os.path.expanduser("~"))
+        config_dir = os.path.join(base, "VoxWave")
+    else:
+        xdg = os.environ.get(
+            "XDG_CONFIG_HOME",
+            os.path.join(os.path.expanduser("~"), ".config"),
+        )
+        config_dir = os.path.join(xdg, "voxwave")
+
+    config_file = os.path.join(config_dir, "config.yaml")
+
+    if not os.path.exists(config_file):
+        os.makedirs(config_dir, exist_ok=True)
+        bundled = resource_path("config.yaml")
+        if os.path.exists(bundled):
+            shutil.copy2(bundled, config_file)
+
+    return config_file
+
+
 def get_display_server() -> str:
     """Retourne le type de serveur d'affichage.
 

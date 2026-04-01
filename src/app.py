@@ -16,19 +16,23 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 # Fix encodage Unicode sur Windows (emojis dans le terminal)
+# sys.stdout/stderr peuvent etre None en mode windowed (PyInstaller --noconsole)
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
+    if sys.stdout is not None:
+        sys.stdout.reconfigure(encoding="utf-8")
+    if sys.stderr is not None:
+        sys.stderr.reconfigure(encoding="utf-8")
 
 import click
 import sentry_sdk
 import yaml
 from dotenv import load_dotenv
 
+from src.utils.platform import resource_path
 from src.transcription.hallucinations import is_hallucination, strip_hallucination_tails
 from src.utils.window_detector import get_active_exe, get_app_profile
 
-load_dotenv()
+load_dotenv(resource_path(".env"))
 
 # --- Sentry : crash reporting automatique ---
 # Envoie les erreurs non-catchées à Sentry pour qu'on voie les bugs
@@ -152,10 +156,10 @@ def load_config(config_path: str = "config.yaml") -> dict:
     """
     from src.config.validator import ConfigValidator
     from src.config.defaults import DEFAULT_CONFIG
-    from src.utils.platform import resource_path
+    from src.utils.platform import user_config_path
 
-    # En mode PyInstaller, config.yaml est dans le bundle
-    resolved_path = resource_path(config_path)
+    # En mode frozen, utilise le config utilisateur (~/.config/voxwave/)
+    resolved_path = user_config_path()
 
     try:
         with open(resolved_path, "r") as f:
@@ -699,6 +703,7 @@ class VoxWave:
                 model=self.config["whisper"]["model"],
                 language=language,
                 sample_rate=sample_rate,
+                interface_language=interface_lang,
             )
 
     def _toggle_waveform(self) -> None:
@@ -1334,6 +1339,11 @@ class VoxWave:
             self._save_config("language", new_sys_lang)
             if self.tray:
                 self.tray.update_language(new_sys_lang)
+            # Mettre a jour le hint langue dans le moteur de transcription
+            if hasattr(self.engine, "_interface_language"):
+                self.engine._interface_language = new_sys_lang
+            if hasattr(self.engine, "_groq_engine") and self.engine._groq_engine:
+                self.engine._groq_engine._interface_language = new_sys_lang
             changes.append(f"Interface : {new_sys_lang}")
 
         # Dictation language
@@ -1429,9 +1439,9 @@ class VoxWave:
             key: Cle de premier niveau a mettre a jour.
             value: Nouvelle valeur.
         """
-        from src.utils.platform import resource_path
+        from src.utils.platform import user_config_path
 
-        config_path = resource_path("config.yaml")
+        config_path = user_config_path()
         try:
             with open(config_path, "r") as f:
                 lines = f.readlines()
@@ -1466,9 +1476,9 @@ class VoxWave:
             key: Cle dans la section (ex: "mode").
             value: Nouvelle valeur.
         """
-        from src.utils.platform import resource_path
+        from src.utils.platform import user_config_path
 
-        config_path = resource_path("config.yaml")
+        config_path = user_config_path()
         try:
             with open(config_path, "r") as f:
                 data = yaml.safe_load(f) or {}
@@ -1564,6 +1574,25 @@ class VoxWave:
             print("VoxWave n'est pas supporte sur macOS.")
             print("Plateformes supportees : Windows, Linux.")
             sys.exit(1)
+
+        # Lock file anti-double-instance
+        self._lock_file = None
+        lock_path = os.path.join(
+            os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+            "voxwave", ".lock",
+        )
+        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+        self._lock_file = open(lock_path, "w")
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+                msvcrt.locking(self._lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(self._lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, OSError):
+            logger.warning("VoxWave est deja en cours d'execution, fermeture")
+            sys.exit(0)
 
         from PySide6.QtCore import QTimer
         from PySide6.QtWidgets import QApplication

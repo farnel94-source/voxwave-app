@@ -97,6 +97,7 @@ class HybridTranscriptionEngine:
                     model=self._local_model,
                     language=self.language,
                     sample_rate=self.sample_rate,
+                    interface_language=self._interface_language,
                 )
                 self._local_engine.preload()
                 logger.info("Whisper local chargé (fallback)")

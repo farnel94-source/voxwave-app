@@ -51,6 +51,7 @@ AC_SRC_OVER = 0
 AC_SRC_ALPHA = 1
 
 
+
 # --- Win32 structures (module-level, definis une seule fois) ---
 
 if _IS_WIN32:
@@ -244,8 +245,8 @@ class OrbWidget(QWidget):
             | Qt.WindowDoesNotAcceptFocus
         )
         if not self._use_layered:
-            # Linux: utiliser la transparence Qt native (fonctionne bien)
             self.setAttribute(Qt.WA_TranslucentBackground, True)
+            self.setAttribute(Qt.WA_NoSystemBackground, True)
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.setFixedSize(WIDGET_WIDTH, WIDGET_HEIGHT)
         self._center_bottom()
@@ -568,14 +569,27 @@ class OrbWidget(QWidget):
         _update_layered_window(self._hwnd, image)
 
     def paintEvent(self, event) -> None:
-        """Fallback pour Linux (WA_TranslucentBackground fonctionne)."""
+        """Rendu Linux : offscreen QImage identique a Windows."""
         if self._use_layered:
-            return  # Sur Windows, on utilise _render_layered
-        painter = QPainter(self)
+            return
+        dpr = self.devicePixelRatioF()
+        pw = int(WIDGET_WIDTH * dpr)
+        ph = int(WIDGET_HEIGHT * dpr)
+
+        image = QImage(pw, ph, QImage.Format_ARGB32_Premultiplied)
+        image.fill(Qt.transparent)
+
+        painter = QPainter(image)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        painter.scale(dpr, dpr)
         self._paint_all(painter)
         painter.end()
+
+        wp = QPainter(self)
+        wp.setCompositionMode(QPainter.CompositionMode_Source)
+        wp.drawImage(self.rect(), image)
+        wp.end()
 
     def _paint_all(self, painter: QPainter) -> None:
         """Dessine l'orbe complet dans le painter donne."""
@@ -616,16 +630,20 @@ class OrbWidget(QWidget):
         if self._state != "recording":
             return
 
-        # Dessiner directement sur le painter (pas de base_opacity global)
-        # pour matcher le rendu de orb.html qui dessine chaque couche independamment
+        # Compensation compositeur X11 : xfwm4/X11 amplifie les pixels
+        # semi-transparents (~2.5x plus lumineux que DWM sur Windows).
+        # Diagnostique prouve : le QImage brut est correct, c'est l'affichage
+        # par le compositeur qui sature les couleurs.
+        af = 0.25 if not _IS_WIN32 else 1.0
+
         aura_center = QPointF(cx, cy)
 
-        # Layer 0: Shadow (cercle de contraste pour fond blanc)
+        # Layer 0: Shadow (cercle de contraste)
         shadow_radius = CORE_BASE_RADIUS + 5 + intensity * 15
         shadow_grad = QRadialGradient(aura_center, shadow_radius)
         shadow_grad.setFocalRadius(CORE_BASE_RADIUS * 0.5)
-        sa0 = int(min(255, (0.10 + intensity * 0.15) * 255))
-        sa1 = int(min(255, (0.05 + intensity * 0.08) * 255))
+        sa0 = int(min(255, (0.10 + intensity * 0.15) * 255 * af))
+        sa1 = int(min(255, (0.05 + intensity * 0.08) * 255 * af))
         shadow_grad.setColorAt(0.0, QColor(0, 0, 0, sa0))
         shadow_grad.setColorAt(0.6, QColor(0, 0, 0, sa1))
         shadow_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
@@ -633,30 +651,30 @@ class OrbWidget(QWidget):
         painter.setPen(Qt.NoPen)
         painter.drawEllipse(aura_center, shadow_radius, shadow_radius)
 
-        # Layer 1: Outer aura (valeurs orb.html exactes)
+        # Layer 1: Outer aura
         outer_radius = CORE_BASE_RADIUS + 8 + breathe * 4 + intensity * 20
         outer_grad = QRadialGradient(aura_center, outer_radius)
         outer_grad.setFocalRadius(CORE_BASE_RADIUS)
-        oa0 = int(min(255, (0.08 + intensity * 0.45) * 255))
-        oa1 = int(min(255, (0.04 + intensity * 0.25) * 255))
+        oa0 = int(min(255, (0.08 + intensity * 0.45) * 255 * af))
+        oa1 = int(min(255, (0.04 + intensity * 0.25) * 255 * af))
         outer_grad.setColorAt(0.0, QColor(99, 102, 241, oa0))
         outer_grad.setColorAt(0.5, QColor(59, 130, 246, oa1))
         outer_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
         painter.setBrush(QBrush(outer_grad))
         painter.drawEllipse(aura_center, outer_radius, outer_radius)
 
-        # Layer 2: Core glow (valeurs orb.html exactes)
+        # Layer 2: Core glow
         core_radius = CORE_BASE_RADIUS + intensity * 35
         core_grad = QRadialGradient(aura_center, core_radius)
-        ca0 = int(min(255, (0.4 + intensity * 0.6) * 255))
-        ca1 = int(min(255, (0.15 + intensity * 0.5) * 255))
+        ca0 = int(min(255, (0.4 + intensity * 0.6) * 255 * af))
+        ca1 = int(min(255, (0.15 + intensity * 0.5) * 255 * af))
         core_grad.setColorAt(0.0, QColor(34, 211, 238, ca0))
         core_grad.setColorAt(0.6, QColor(59, 130, 246, ca1))
         core_grad.setColorAt(1.0, QColor(59, 130, 246, 0))
         painter.setBrush(QBrush(core_grad))
         painter.drawEllipse(aura_center, core_radius, core_radius)
 
-        # Layer 3: Particles (valeurs orb.html exactes)
+        # Layer 3: Particles
         t = self._anim_time
         for i in range(PARTICLE_COUNT):
             angle = (i / PARTICLE_COUNT) * 2 * math.pi + t * 0.5 + i * 132.5
@@ -665,7 +683,7 @@ class OrbWidget(QWidget):
             py = cy + math.sin(angle) * dist
             dot_size = 1.5 + intensity * 1.5
             dot_alpha = 0.2 + intensity * 0.7 + math.sin(t * 4 + i * 27) * 0.15
-            dot_alpha = max(0.0, min(1.0, dot_alpha))
+            dot_alpha = max(0.0, min(1.0, dot_alpha)) * af
             painter.setBrush(QBrush(QColor(147, 197, 253, int(dot_alpha * 255))))
             painter.setPen(Qt.NoPen)
             painter.drawEllipse(QPointF(px, py), dot_size, dot_size)
@@ -674,7 +692,7 @@ class OrbWidget(QWidget):
         edge_radius = outer_radius - 1
         if edge_radius > 5:
             painter.setBrush(Qt.NoBrush)
-            painter.setPen(QPen(QColor(0, 0, 0, 38), 1.5))
+            painter.setPen(QPen(QColor(0, 0, 0, int(38 * af)), 1.5))
             painter.drawEllipse(aura_center, edge_radius, edge_radius)
 
     # ================================================================

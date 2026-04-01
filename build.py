@@ -104,19 +104,46 @@ def build_linux() -> None:
         "Terminal=false\n"
     )
 
-    # Icon (simple placeholder PNG si pas d'icone)
+    # Icon (VoxWave logo 256x256)
     icon_src = ROOT / "assets" / "icon.png"
     icon_dst = appdir / "voxwave.png"
     if icon_src.exists():
         shutil.copy2(icon_src, icon_dst)
     else:
         _create_placeholder_icon(icon_dst)
+    # Symlink .DirIcon (requis par certains gestionnaires de fichiers Linux)
+    diricon = appdir / ".DirIcon"
+    if not diricon.exists():
+        os.symlink("voxwave.png", str(diricon))
 
-    # AppRun script
+    # AppRun script (avec check libxcb-cursor0 pour Qt 6.5+)
     apprun = appdir / "AppRun"
     apprun.write_text(
         "#!/bin/bash\n"
         'HERE="$(dirname "$(readlink -f "$0")")"\n'
+        "\n"
+        "# Verifier libxcb-cursor0 (requis par Qt 6.5+)\n"
+        "if ! ldconfig -p 2>/dev/null | grep -q libxcb-cursor; then\n"
+        '    echo ""\n'
+        '    echo "ERREUR: libxcb-cursor0 est requis mais non installe."\n'
+        '    echo "Installez-le avec :"\n'
+        '    echo "  Ubuntu/Debian/Mint : sudo apt install libxcb-cursor0"\n'
+        '    echo "  Fedora             : sudo dnf install xcb-util-cursor"\n'
+        '    echo "  Arch               : sudo pacman -S xcb-util-cursor"\n'
+        '    echo ""\n'
+        "    # Tenter quand meme (la detection peut echouer)\n"
+        "fi\n"
+        "\n"
+        "# Verifier les outils d'injection texte (clipboard + paste)\n"
+        'MISSING=""\n'
+        'command -v xclip >/dev/null 2>&1 || MISSING="$MISSING xclip"\n'
+        'command -v xdotool >/dev/null 2>&1 || MISSING="$MISSING xdotool"\n'
+        'if [ -n "$MISSING" ]; then\n'
+        '    echo "ATTENTION: Outils manquants pour le copier-coller :$MISSING"\n'
+        '    echo "Installez-les : sudo apt install$MISSING"\n'
+        '    echo ""\n'
+        "fi\n"
+        "\n"
         'exec "$HERE/usr/bin/VoxWave" "$@"\n'
     )
     apprun.chmod(0o755)
