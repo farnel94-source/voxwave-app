@@ -69,6 +69,19 @@ Download the latest release from [Releases](https://github.com/farnel94-source/v
 - **Windows**: `VoxWave-Setup.exe`
 - **Linux**: `VoxWave.AppImage`
 
+#### Linux dependencies
+
+Before running the AppImage, install these system packages:
+
+```bash
+# Ubuntu / Debian / Linux Mint
+sudo apt install libxcb-cursor0 xclip xdotool
+```
+
+- `libxcb-cursor0` — required for the Qt interface
+- `xclip` — required for clipboard operations
+- `xdotool` — fallback for text injection on X11
+
 ### From source
 
 ```bash
@@ -122,6 +135,18 @@ OPENAI_API_KEY=your_key_here
 
 Without API keys, VoxWave runs fully local (Whisper + Ollama + regex).
 
+### Local mode tips
+
+When using **local mode** (no API keys), the Whisper `small` model handles transcription on your CPU. Two important things to know:
+
+1. **Set your dictation language manually** — Auto-detect works well in cloud mode (Groq), but the local Whisper model is less accurate at detecting language automatically, especially on short sentences. Go to **Settings > General** and select your language for much better results.
+
+2. **Whisper model choice** — VoxWave uses `base` by default (fast, ~74MB). For better accuracy (especially multilingual), switch to `small` (~244MB):
+   ```bash
+   python -m voxwave --model small
+   ```
+   Or in `config.yaml`: set `whisper.model: small`. The `small` model is slower but significantly more accurate for language detection and transcription quality.
+
 ## Building
 
 ```bash
@@ -140,7 +165,7 @@ python build.py all
 | Transcription (local) | faster-whisper |
 | Cleaning (cloud) | OpenAI GPT-4o-mini |
 | Cleaning (local) | Ollama (gemma3:4b) + regex |
-| GUI | PySide6 + QWebEngineView |
+| GUI | PySide6 + QPainter (native) |
 | Audio | sounddevice + webrtcvad + Silero VAD |
 | Hotkeys | pynput |
 | Packaging | PyInstaller + Inno Setup (Win) + AppImage (Linux) |
@@ -160,9 +185,11 @@ pytest tests/ --cov=src --cov-report=html
 
 ## Platforms
 
-- **Windows 10+** — Full support
-- **Linux** — Full support (AppImage)
+- **Windows 10+** — Full support (installer + portable)
+- **Linux** — Full support (AppImage, X11 recommended)
 - macOS — Not supported (by design)
+
+> **Note:** Wayland support is experimental. For the best experience on Linux, use an X11 session.
 
 ## License
 

@@ -4,7 +4,25 @@ All notable changes to VoxWave will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.0.0] — 2026-03-22
+## [0.1.1] — 2026-04-01
+
+### Fixed
+- Orb widget transparency on Linux (offscreen QImage rendering with X11 alpha compensation)
+- Clipboard injection on X11 with xclip verification and xdotool fallback
+- Whisper language detection: neutral hints on first call, interface language fallback
+- PyInstaller windowed mode crash (sys.stdout None guard)
+- Cross-platform build: automatic site-packages detection for Windows and Linux
+- Dark background for settings dialog on Linux
+- Orb corner clipping using native X11 QRegion
+- Hallucination detection with new patterns
+
+### Added
+- Single-instance lock to prevent double-launch (Linux + Windows)
+- Bundled Silero VAD model in AppImage for reliable voice activity detection
+- AppImage icon discovery via .DirIcon symlink
+- Interface language parameter for local Whisper provider
+
+## [0.1.0] — 2026-03-23
 
 ### Added
 - Hybrid transcription: Groq cloud (whisper-large-v3-turbo) + local Whisper fallback
