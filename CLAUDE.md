@@ -6,7 +6,7 @@ Parle → Transcrit (Whisper) → Nettoie (regex + LLM) → Colle le texte propr
 
 ## Stack
 - Python 3.11+
-- PySide6 + QWebEngineView (GUI : widget flottant, tray icon, onboarding, parametres)
+- PySide6 + QPainter natif (GUI : widget flottant, tray icon, onboarding, parametres)
 - faster-whisper (transcription locale, fallback)
 - Groq API + whisper-large-v3-turbo (transcription cloud, prioritaire)
 - OpenAI GPT-4o-mini (nettoyage cloud, prioritaire)
@@ -308,12 +308,27 @@ black src/ tests/
 
 ## Release & Distribution
 - **GitHub** : https://github.com/farnel94-source/voxwave-app (public, master)
+- **Release v0.1.1** (latest) : https://github.com/farnel94-source/voxwave-app/releases/tag/v0.1.1
+  - `VoxWave-Setup-0.1.1.exe` (109 MB) — installateur Windows (Inno Setup)
+  - `VoxWave-x86_64.AppImage` (148 MB) — Linux
 - **Release v0.1.0** : https://github.com/farnel94-source/voxwave-app/releases/tag/v0.1.0
-  - `VoxWave-Setup-0.1.0.exe` (103 MB) — installateur Windows (Inno Setup)
-  - `VoxWave-windows.zip` (~170 MB) — portable Windows
-  - `VoxWave-x86_64.AppImage` (157 MB) — Linux
 - **Python Windows** : 3.14.2 (`C:\Python314`) — surveiller compatibilite libs
+- **Python WSL** : 3.12.3 (`/usr/bin/python3`) — virtualenv `.venv` pour build
 - **Icone** : `assets/icon.ico` genere depuis `create_icon("idle")` dans `icons.py` (cercle bleu fonce + vagues blanches). Ne PAS utiliser `logo.png` (ancien logo).
+
+## Dependances Linux
+```bash
+sudo apt install libxcb-cursor0 xclip xdotool
+```
+- `libxcb-cursor0` — requis pour l'interface Qt
+- `xclip` — requis pour les operations clipboard sur X11
+- `xdotool` — fallback injection texte sur X11
+
+## Mode local — Conseils utilisateur
+- Recommander de **fixer la langue de dictee** (pas auto-detect) en mode local
+- Le modele Whisper `base` est mauvais en auto-detection de langue mais OK avec langue fixee
+- Le modele `small` est plus precis mais trop lent sur CPU sans GPU (RTF 5-11)
+- Auto-detect fonctionne bien en mode cloud (Groq)
 
 ## Build — Pieges connus
 - **webrtcvad-wheels** : ajouter `webrtcvad` dans `excludes` ET `hiddenimports` du `.spec` (hook PyInstaller incompatible avec `webrtcvad-wheels`)
@@ -325,14 +340,24 @@ black src/ tests/
 - **`config.yaml` bundle** : PyInstaller copie le `config.yaml` du projet tel quel. Ne JAMAIS laisser `first_launch: false` dedans — ca skip l'onboarding pour tous les utilisateurs. Le config source ne doit PAS contenir `first_launch` (le defaut `True` vient de `DEFAULT_CONFIG`).
 - **`silero_vad_v6.onnx`** : necessaire pour `faster_whisper` avec `vad_filter=True`. Doit etre bundle dans `faster_whisper/assets/` du build.
 
-## Lancement — Avancement (25 mars 2026)
+## Lancement — Avancement (2 avril 2026)
 - [x] Repo GitHub public
 - [x] Build Windows + Linux + Release v0.1.0 (rebuild QPainter 103 MB + AppImage 157 MB)
 - [x] Mettre a jour liens download dans landing (8 corrections dans 5 fichiers)
 - [x] Changelog landing mis a jour (fausses versions 1.x → vraie v0.1.0)
 - [x] Landing page deployee sur Vercel : https://voxwave-landing.vercel.app/
 - [x] Landing page repo GitHub prive : https://github.com/farnel94-source/voxwave-landing
+- [x] Fixes Linux : branche fix/linux-bugs mergee dans master (16 commits, 15 fichiers)
+- [x] Release v0.1.1 publiee (Windows 109 MB + Linux 148 MB)
+- [x] README + CHANGELOG mis a jour (deps Linux, tips mode local, v0.1.1)
+- [x] Landing mise a jour (changelog v0.1.1, guide Linux, tips mode local, liens download)
+- [x] Backend deploye sur Render (free tier) + Neon PostgreSQL : https://voxwave-backend.onrender.com
+- [x] Repo backend GitHub prive : https://github.com/farnel94-source/voxwave-backend
+- [x] Newsletter connectee (landing → backend → Neon)
+- [x] Download tracking connecte (landing → backend → Neon)
 - [ ] Acheter domaine custom (voxwave.app ou autre) et configurer sur Vercel
 - [ ] Configurer LemonSqueezy (non bloquant, lancement gratuit possible)
 - [ ] Code signing Windows (optionnel, certificat ~$70-200/an)
-- [ ] Newsletter : connecter le formulaire a un backend (FastAPI + SQLite pour stocker les emails)
+- [ ] Endpoints proxy v0.2.0 : POST /api/v1/transcribe + /api/v1/clean (securise les cles API)
+- [ ] Integration telemetrie dans l'app VoxWave (activate, heartbeat, error, feedback dialog, opt-out)
+- [ ] Rendre la version configurable dans build.py (actuellement renomme manuellement)
