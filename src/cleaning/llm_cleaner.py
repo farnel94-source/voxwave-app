@@ -407,13 +407,15 @@ class LLMCleaner:
 class ProxyLLMCleaner:
     """Nettoyeur via backend proxy (forward vers OpenAI)."""
 
-    def __init__(self, proxy_url: str) -> None:
+    def __init__(self, proxy_url: str, app_token: str = "") -> None:
         """Initialise le cleaner proxy.
 
         Args:
             proxy_url: URL du backend proxy.
+            app_token: Token applicatif pour authentification.
         """
         self.proxy_url = proxy_url.rstrip("/")
+        self._app_token = app_token
         self._circuit: Optional[object] = None
 
     def set_circuit_breaker(self, circuit: "CircuitBreaker") -> None:
@@ -449,6 +451,10 @@ class ProxyLLMCleaner:
 
         import requests
 
+        headers: dict[str, str] = {}
+        if self._app_token:
+            headers["X-App-Token"] = self._app_token
+
         try:
             resp = requests.post(
                 f"{self.proxy_url}/api/v1/clean",
@@ -457,6 +463,7 @@ class ProxyLLMCleaner:
                     "mode": "quality",
                     "context_profile": context_profile,
                 },
+                headers=headers,
                 timeout=15,
             )
         except requests.exceptions.Timeout:
@@ -488,6 +495,30 @@ class ProxyLLMCleaner:
         logger.info("Nettoyage via proxy (backend)")
         return result
 
+    def clean_streaming(self, text: str, context_profile: str = "default") -> Iterator[str]:
+        """Nettoie le texte via proxy et yield le résultat en un bloc.
+
+        Le proxy ne supporte pas le streaming token-par-token, donc on
+        retourne le résultat complet en un seul yield. Compatible avec
+        l'interface de CloudLLMCleaner.clean_streaming().
+
+        Args:
+            text: Texte brut à nettoyer.
+            context_profile: Profil contextuel.
+
+        Yields:
+            Texte nettoyé (en un seul bloc).
+        """
+        if not text or not text.strip():
+            return
+        try:
+            result = self.clean(text, context_profile=context_profile)
+            if result:
+                yield result
+        except Exception as e:
+            logger.warning(f"Proxy streaming fallback: {e}")
+            yield text
+
 
 class CleaningPipeline:
     """Pipeline regex + LLM avec fallback : cloud → local → regex."""
@@ -503,6 +534,7 @@ class CleaningPipeline:
         on_fallback: Optional[Callable[[str], None]] = None,
         ollama_host: Optional[str] = None,
         proxy_url: Optional[str] = None,
+        proxy_app_token: str = "",
     ) -> None:
         """Initialise le pipeline de nettoyage.
 
@@ -533,7 +565,7 @@ class CleaningPipeline:
         self._local_circuit = CircuitBreaker(name="ollama", failure_threshold=1, cooldown_seconds=60.0)
 
         if cleaning_provider == "proxy" and proxy_url:
-            self._proxy_cleaner = ProxyLLMCleaner(proxy_url=proxy_url)
+            self._proxy_cleaner = ProxyLLMCleaner(proxy_url=proxy_url, app_token=proxy_app_token)
             self._proxy_cleaner.set_circuit_breaker(self._proxy_circuit)
             logger.info(f"ProxyLLMCleaner initialisé ({proxy_url})")
 

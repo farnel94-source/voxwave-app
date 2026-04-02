@@ -30,6 +30,7 @@ class ProxyTranscriptionEngine:
         language: str = "fr",
         sample_rate: int = 16000,
         interface_language: Optional[str] = None,
+        app_token: str = "",
     ) -> None:
         """Initialise le moteur proxy.
 
@@ -38,11 +39,13 @@ class ProxyTranscriptionEngine:
             language: Langue de transcription.
             sample_rate: Taux d'échantillonnage audio.
             interface_language: Langue d'interface (hint initial en mode auto).
+            app_token: Token applicatif pour authentification.
         """
         self.proxy_url = proxy_url.rstrip("/")
         self.language = language
         self.sample_rate = sample_rate
         self._interface_language = interface_language
+        self._app_token = app_token
         self._circuit: Optional[object] = None
         self._last_detected_language: Optional[str] = None
 
@@ -118,11 +121,16 @@ class ProxyTranscriptionEngine:
             if hint:
                 data["prompt"] = hint
 
+        headers: dict[str, str] = {}
+        if self._app_token:
+            headers["X-App-Token"] = self._app_token
+
         try:
             resp = requests.post(
                 f"{self.proxy_url}/api/v1/transcribe",
                 files={"file": ("audio.wav", wav_buf, "audio/wav")},
                 data=data,
+                headers=headers,
                 timeout=30,
             )
         except requests.exceptions.Timeout:

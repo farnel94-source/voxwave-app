@@ -28,6 +28,7 @@ class HybridTranscriptionEngine:
         interface_language: Optional[str] = None,
         transcription_provider: str = "hybrid",
         proxy_url: Optional[str] = None,
+        proxy_app_token: str = "",
     ) -> None:
         """Initialise les engines cloud et local.
 
@@ -52,6 +53,7 @@ class HybridTranscriptionEngine:
         self._local_model = local_model
         self._transcription_provider = transcription_provider
         self._proxy_url = proxy_url
+        self._proxy_app_token = proxy_app_token
         self._last_detected_language: Optional[str] = None
         self._circuit = CircuitBreaker(name="groq", failure_threshold=3, cooldown_seconds=30.0)
 
@@ -92,6 +94,7 @@ class HybridTranscriptionEngine:
                 language=self.language,
                 sample_rate=self.sample_rate,
                 interface_language=self._interface_language,
+                app_token=self._proxy_app_token,
             )
             self._proxy_engine.set_circuit_breaker(self._circuit)
             logger.info(f"Proxy transcription engine initialisé ({self._proxy_url})")
