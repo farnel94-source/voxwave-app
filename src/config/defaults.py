@@ -132,6 +132,7 @@ DEFAULT_CONFIG: dict = {
     },
     "transcription": {
         "provider": "hybrid",
+        "proxy_url": "https://voxwave-backend.onrender.com",
     },
     "whisper": {
         "model": "base",
@@ -146,6 +147,7 @@ DEFAULT_CONFIG: dict = {
     "cleaning": {
         "mode": "auto",
         "provider": "hybrid",
+        "proxy_url": "https://voxwave-backend.onrender.com",
         "cloud_model": "gpt-4o-mini",
         "llm_model": "gemma3:4b",
         "llm_timeout": 5,

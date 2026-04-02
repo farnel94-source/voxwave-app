@@ -404,6 +404,91 @@ class LLMCleaner:
         return cleaned
 
 
+class ProxyLLMCleaner:
+    """Nettoyeur via backend proxy (forward vers OpenAI)."""
+
+    def __init__(self, proxy_url: str) -> None:
+        """Initialise le cleaner proxy.
+
+        Args:
+            proxy_url: URL du backend proxy.
+        """
+        self.proxy_url = proxy_url.rstrip("/")
+        self._circuit: Optional[object] = None
+
+    def set_circuit_breaker(self, circuit: "CircuitBreaker") -> None:
+        """Attache un circuit breaker.
+
+        Args:
+            circuit: Instance de CircuitBreaker.
+        """
+        self._circuit = circuit
+
+    def clean(self, text: str, context_profile: str = "default") -> str:
+        """Nettoie le texte via le backend proxy.
+
+        Args:
+            text: Texte brut à nettoyer.
+            context_profile: Profil contextuel.
+
+        Returns:
+            Texte nettoyé.
+
+        Raises:
+            CleaningError: Si le proxy est indisponible.
+        """
+        if not text or not text.strip():
+            return ""
+
+        # Profil "code" : skip proxy, retourner texte brut
+        if _get_system_prompt(context_profile) is None:
+            return text
+
+        if self._circuit and not self._circuit.should_allow_request():
+            raise CleaningError("Proxy indisponible (circuit breaker ouvert)")
+
+        import requests
+
+        try:
+            resp = requests.post(
+                f"{self.proxy_url}/api/v1/clean",
+                json={
+                    "text": text,
+                    "mode": "quality",
+                    "context_profile": context_profile,
+                },
+                timeout=15,
+            )
+        except requests.exceptions.Timeout:
+            if self._circuit:
+                self._circuit.record_network_failure()
+            raise CleaningError("Proxy timeout (15s)")
+        except requests.exceptions.ConnectionError as e:
+            if self._circuit:
+                self._circuit.record_network_failure()
+            raise CleaningError(f"Proxy injoignable: {e}")
+        except Exception as e:
+            if self._circuit:
+                self._circuit.record_failure()
+            raise CleaningError(f"Proxy erreur: {e}")
+
+        if resp.status_code != 200:
+            if self._circuit:
+                self._circuit.record_failure()
+            raise CleaningError(f"Proxy HTTP {resp.status_code}: {resp.text[:200]}")
+
+        result = resp.json().get("text", "").strip()
+
+        if not _validate_output(text, result):
+            logger.warning("Sortie proxy rejetée, texte original conservé")
+            return text
+
+        if self._circuit:
+            self._circuit.record_success()
+        logger.info("Nettoyage via proxy (backend)")
+        return result
+
+
 class CleaningPipeline:
     """Pipeline regex + LLM avec fallback : cloud → local → regex."""
 
@@ -417,6 +502,7 @@ class CleaningPipeline:
         filler_words: Optional[list] = None,
         on_fallback: Optional[Callable[[str], None]] = None,
         ollama_host: Optional[str] = None,
+        proxy_url: Optional[str] = None,
     ) -> None:
         """Initialise le pipeline de nettoyage.
 
@@ -424,11 +510,12 @@ class CleaningPipeline:
             mode: Mode de nettoyage (quality ou fast).
             llm_model: Modèle Ollama local.
             cloud_model: Modèle OpenAI cloud.
-            cleaning_provider: Provider (hybrid, cloud, local).
+            cleaning_provider: Provider (hybrid, cloud, local, proxy).
             language: Code langue ISO 639-1 (depuis config.yaml).
             filler_words: Liste de mots de remplissage (override config).
             on_fallback: Callback appele lors d'un fallback (message str).
             ollama_host: URL de l'instance Ollama (ex: http://localhost:11435).
+            proxy_url: URL du backend proxy (requis si provider == "proxy").
         """
         from src.cleaning.regex_cleaner import RegexCleaner
         from src.utils.circuit_breaker import CircuitBreaker
@@ -439,9 +526,16 @@ class CleaningPipeline:
         self.on_fallback = on_fallback
         self.regex_cleaner = RegexCleaner(language=language, filler_words=filler_words)
         self._cloud_cleaner: Optional[CloudLLMCleaner] = None
+        self._proxy_cleaner: Optional[ProxyLLMCleaner] = None
         self._local_cleaner: Optional[LLMCleaner] = None
         self._cloud_circuit = CircuitBreaker(name="openai", failure_threshold=2, cooldown_seconds=30.0)
+        self._proxy_circuit = CircuitBreaker(name="proxy_clean", failure_threshold=2, cooldown_seconds=30.0)
         self._local_circuit = CircuitBreaker(name="ollama", failure_threshold=1, cooldown_seconds=60.0)
+
+        if cleaning_provider == "proxy" and proxy_url:
+            self._proxy_cleaner = ProxyLLMCleaner(proxy_url=proxy_url)
+            self._proxy_cleaner.set_circuit_breaker(self._proxy_circuit)
+            logger.info(f"ProxyLLMCleaner initialisé ({proxy_url})")
 
         if cleaning_provider in ("hybrid", "cloud"):
             try:
@@ -481,7 +575,17 @@ class CleaningPipeline:
         if self.mode not in ("auto", "verbatim", "quality"):
             return result
 
-        # Cloud d'abord
+        # Proxy d'abord (si configuré)
+        if self._proxy_cleaner is not None:
+            try:
+                result = self._proxy_cleaner.clean(result, context_profile=context_profile)
+                return result
+            except Exception as e:
+                logger.warning(f"Proxy LLM échec, fallback: {e}")
+                if self.on_fallback:
+                    self.on_fallback("Nettoyage : mode local (proxy indisponible)")
+
+        # Cloud ensuite
         if self._cloud_cleaner is not None:
             try:
                 result = self._cloud_cleaner.clean(result, context_profile=context_profile)

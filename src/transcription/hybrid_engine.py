@@ -26,6 +26,8 @@ class HybridTranscriptionEngine:
         sample_rate: int = 16000,
         on_fallback: Optional[Callable[[str], None]] = None,
         interface_language: Optional[str] = None,
+        transcription_provider: str = "hybrid",
+        proxy_url: Optional[str] = None,
     ) -> None:
         """Initialise les engines cloud et local.
 
@@ -36,19 +38,27 @@ class HybridTranscriptionEngine:
             sample_rate: Taux d'échantillonnage audio (depuis config.yaml).
             on_fallback: Callback appele lors d'un fallback (message str).
             interface_language: Langue d'interface (hint initial en mode auto).
+            transcription_provider: Provider (hybrid, cloud, local, proxy).
+            proxy_url: URL du backend proxy (requis si provider == "proxy").
         """
         self._language = language
         self.sample_rate = sample_rate
         self.on_fallback = on_fallback
         self._interface_language = interface_language
         self._groq_engine: Optional[object] = None
+        self._proxy_engine: Optional[object] = None
         self._local_engine: Optional[object] = None
         self._groq_model = groq_model
         self._local_model = local_model
+        self._transcription_provider = transcription_provider
+        self._proxy_url = proxy_url
         self._last_detected_language: Optional[str] = None
         self._circuit = CircuitBreaker(name="groq", failure_threshold=3, cooldown_seconds=30.0)
 
-        self._init_groq()
+        if transcription_provider == "proxy" and proxy_url:
+            self._init_proxy()
+        else:
+            self._init_groq()
         self._init_local()
 
     @property
@@ -59,6 +69,10 @@ class HybridTranscriptionEngine:
     def language(self, value: str) -> None:
         """Propage le changement de langue aux sous-moteurs."""
         self._language = value
+        if self._proxy_engine and hasattr(self._proxy_engine, "language"):
+            self._proxy_engine.language = value
+            if value == "auto" and hasattr(self._proxy_engine, "_last_detected_language"):
+                self._proxy_engine._last_detected_language = None
         if self._groq_engine and hasattr(self._groq_engine, "language"):
             self._groq_engine.language = value
             # Reset la détection pour garantir un 1er appel neutre en mode auto
@@ -68,6 +82,21 @@ class HybridTranscriptionEngine:
             self._local_engine.language = value
             if value == "auto" and hasattr(self._local_engine, "_last_known_language"):
                 self._local_engine._last_known_language = None
+
+    def _init_proxy(self) -> None:
+        """Tente d'initialiser le moteur proxy."""
+        try:
+            from src.transcription.proxy_engine import ProxyTranscriptionEngine
+            self._proxy_engine = ProxyTranscriptionEngine(
+                proxy_url=self._proxy_url,
+                language=self.language,
+                sample_rate=self.sample_rate,
+                interface_language=self._interface_language,
+            )
+            self._proxy_engine.set_circuit_breaker(self._circuit)
+            logger.info(f"Proxy transcription engine initialisé ({self._proxy_url})")
+        except Exception as e:
+            logger.warning(f"Proxy indisponible: {e}")
 
     def _init_groq(self) -> None:
         """Tente d'initialiser le moteur Groq."""
@@ -112,7 +141,7 @@ class HybridTranscriptionEngine:
             self._local_engine.preload()
 
     def transcribe(self, audio: np.ndarray) -> str:
-        """Transcrit en essayant Groq puis fallback local.
+        """Transcrit en essayant proxy/Groq puis fallback local.
 
         Args:
             audio: Buffer audio numpy float32, 16kHz mono.
@@ -120,6 +149,18 @@ class HybridTranscriptionEngine:
         Returns:
             Texte transcrit.
         """
+        # Proxy en priorité si configuré
+        if self._proxy_engine is not None:
+            try:
+                text = self._proxy_engine.transcribe(audio)
+                self._last_detected_language = self._proxy_engine.last_detected_language
+                logger.info("Transcription via proxy (backend)")
+                return text
+            except Exception as e:
+                logger.warning(f"Proxy échec, fallback: {e}")
+                if self.on_fallback:
+                    self.on_fallback("Transcription : mode local (proxy indisponible)")
+
         if self._groq_engine is not None:
             try:
                 text = self._groq_engine.transcribe(audio)
