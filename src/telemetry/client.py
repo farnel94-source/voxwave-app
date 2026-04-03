@@ -82,6 +82,10 @@ class TelemetryClient:
 
     def start(self) -> None:
         """Envoie l'événement activate et démarre le heartbeat périodique."""
+        if not self._enabled:
+            logger.info("Telemetrie desactivee par l'utilisateur")
+            return
+        logger.info("Telemetrie demarree (id=%s)", self._anonymous_id[:8])
         self._start_time = time.monotonic()
         self._send_activate()
         self._schedule_heartbeat()
@@ -194,6 +198,7 @@ class TelemetryClient:
     def _do_post(self, url: str, payload: dict, timeout: int) -> None:
         """Effectue la requête POST (appelé dans un thread)."""
         try:
-            requests.post(url, json=payload, timeout=timeout)
-        except Exception:
-            logger.debug("Échec envoi télémétrie vers %s", url)
+            resp = requests.post(url, json=payload, timeout=timeout)
+            logger.info("Telemetrie envoyee: %s -> HTTP %d", url.split("/")[-1], resp.status_code)
+        except Exception as e:
+            logger.debug("Echec envoi telemetrie vers %s: %s", url, e)
