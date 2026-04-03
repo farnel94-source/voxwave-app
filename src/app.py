@@ -1305,6 +1305,7 @@ class VoxWave:
             current_activation_method=self.config.get("activation_method", "both"),
             current_auto_stop_enabled=self.config.get("audio", {}).get("auto_stop_enabled", False),
             current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
+            current_telemetry_enabled=self.config.get("telemetry", {}).get("enabled", True),
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
             parent=None,
@@ -1340,6 +1341,7 @@ class VoxWave:
             current_activation_method=self.config.get("activation_method", "both"),
             current_auto_stop_enabled=self.config.get("audio", {}).get("auto_stop_enabled", False),
             current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
+            current_telemetry_enabled=self.config.get("telemetry", {}).get("enabled", True),
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
             parent=None,
@@ -1477,6 +1479,16 @@ class VoxWave:
             self._save_config_nested("audio", "auto_stop_silence_duration", new_auto_stop_dur)
             self.capture.update_auto_stop(new_auto_stop, new_auto_stop_dur)
             changes.append(f"Silence : {new_auto_stop_dur}s")
+
+        # Telemetrie
+        new_telemetry = dialog.telemetry_enabled
+        if new_telemetry != self.config.get("telemetry", {}).get("enabled", True):
+            self.config.setdefault("telemetry", {})["enabled"] = new_telemetry
+            self._save_config_nested("telemetry", "enabled", new_telemetry)
+            if self._telemetry:
+                self._telemetry.set_enabled(new_telemetry)
+            status = "activee" if new_telemetry else "desactivee"
+            changes.append(f"Telemetrie {status}")
 
         if changes and self.tray:
             self.tray.show_notification("VoxWave", "Parametres mis a jour")

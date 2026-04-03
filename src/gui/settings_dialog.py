@@ -78,6 +78,9 @@ _SETTINGS_T = {
         "help_report_title": "Report an issue",
         "help_report_hint": "Contact us: support@voxwave.app",
         "help_open_logs": "Open logs folder",
+        "section_telemetry": "TELEMETRY",
+        "label_telemetry": "Usage telemetry",
+        "hint_telemetry": "Sends anonymous stats (dictation count, session duration). No dictated text is sent.",
     },
     "fr": {
         "title": "Parametres",
@@ -127,6 +130,9 @@ _SETTINGS_T = {
         "help_report_title": "Signaler un probleme",
         "help_report_hint": "Contactez-nous : support@voxwave.app",
         "help_open_logs": "Ouvrir le dossier logs",
+        "section_telemetry": "TELEMETRIE",
+        "label_telemetry": "Telemetrie d'usage",
+        "hint_telemetry": "Envoie des statistiques anonymes (nombre de dictees, duree de session). Aucun texte dicte n'est envoye.",
     },
     "es": {
         "title": "Configuracion",
@@ -172,6 +178,9 @@ _SETTINGS_T = {
         "help_report_title": "Reportar un problema",
         "help_report_hint": "Contactenos: support@voxwave.app",
         "help_open_logs": "Abrir carpeta de logs",
+        "section_telemetry": "TELEMETRIA",
+        "label_telemetry": "Telemetria de uso",
+        "hint_telemetry": "Envia estadisticas anonimas (conteo de dictados, duracion de sesion). No se envia texto dictado.",
     },
     "de": {
         "title": "Einstellungen",
@@ -217,6 +226,9 @@ _SETTINGS_T = {
         "help_report_title": "Problem melden",
         "help_report_hint": "Kontakt: support@voxwave.app",
         "help_open_logs": "Log-Ordner offnen",
+        "section_telemetry": "TELEMETRIE",
+        "label_telemetry": "Nutzungstelemetrie",
+        "hint_telemetry": "Sendet anonyme Statistiken (Anzahl Diktate, Sitzungsdauer). Kein diktierter Text wird gesendet.",
     },
     "it": {
         "title": "Impostazioni",
@@ -262,6 +274,9 @@ _SETTINGS_T = {
         "help_report_title": "Segnala un problema",
         "help_report_hint": "Contattaci: support@voxwave.app",
         "help_open_logs": "Apri cartella log",
+        "section_telemetry": "TELEMETRIA",
+        "label_telemetry": "Telemetria di utilizzo",
+        "hint_telemetry": "Invia statistiche anonime (conteggio dettature, durata sessione). Nessun testo dettato viene inviato.",
     },
     "pt": {
         "title": "Configuracoes",
@@ -307,6 +322,9 @@ _SETTINGS_T = {
         "help_report_title": "Reportar um problema",
         "help_report_hint": "Contato: support@voxwave.app",
         "help_open_logs": "Abrir pasta de logs",
+        "section_telemetry": "TELEMETRIA",
+        "label_telemetry": "Telemetria de uso",
+        "hint_telemetry": "Envia estatisticas anonimas (contagem de ditados, duracao da sessao). Nenhum texto ditado e enviado.",
     },
     "nl": {
         "title": "Instellingen",
@@ -352,6 +370,9 @@ _SETTINGS_T = {
         "help_report_title": "Probleem melden",
         "help_report_hint": "Contact: support@voxwave.app",
         "help_open_logs": "Open logmap",
+        "section_telemetry": "TELEMETRIE",
+        "label_telemetry": "Gebruikstelemetrie",
+        "hint_telemetry": "Stuurt anonieme statistieken (aantal dictaten, sessieduur). Er wordt geen gedicteerde tekst verzonden.",
     },
     "ja": {
         "title": "設定",
@@ -397,6 +418,9 @@ _SETTINGS_T = {
         "help_report_title": "問題を報告",
         "help_report_hint": "お問い合わせ: support@voxwave.app",
         "help_open_logs": "ログフォルダを開く",
+        "section_telemetry": "テレメトリー",
+        "label_telemetry": "利用テレメトリー",
+        "hint_telemetry": "匿名の統計情報（音声入力回数、セッション時間）を送信します。入力テキストは送信されません。",
     },
     "ko": {
         "title": "설정",
@@ -442,6 +466,9 @@ _SETTINGS_T = {
         "help_report_title": "문제 신고",
         "help_report_hint": "문의: support@voxwave.app",
         "help_open_logs": "로그 폴더 열기",
+        "section_telemetry": "텔레메트리",
+        "label_telemetry": "사용 텔레메트리",
+        "hint_telemetry": "익명 통계(받아쓰기 횟수, 세션 시간)를 전송합니다. 받아쓴 텍스트는 전송되지 않습니다.",
     },
     "zh": {
         "title": "设置",
@@ -487,6 +514,9 @@ _SETTINGS_T = {
         "help_report_title": "报告问题",
         "help_report_hint": "联系我们: support@voxwave.app",
         "help_open_logs": "打开日志文件夹",
+        "section_telemetry": "遥测",
+        "label_telemetry": "使用遥测",
+        "hint_telemetry": "发送匿名统计数据（听写次数、会话时长）。不会发送听写文本。",
     },
     "ru": {
         "title": "Nastrojki",
@@ -532,6 +562,9 @@ _SETTINGS_T = {
         "help_report_title": "Soobshit o probleme",
         "help_report_hint": "Kontakt: support@voxwave.app",
         "help_open_logs": "Otkrit papku logov",
+        "section_telemetry": "ТЕЛЕМЕТРИЯ",
+        "label_telemetry": "Телеметрия использования",
+        "hint_telemetry": "Отправляет анонимную статистику (количество диктовок, длительность сессии). Текст диктовки не отправляется.",
     },
     "ar": {
         "title": "الإعدادات",
@@ -577,6 +610,9 @@ _SETTINGS_T = {
         "help_report_title": "الإبلاغ عن مشكلة",
         "help_report_hint": "تواصل معنا: support@voxwave.app",
         "help_open_logs": "فتح مجلد السجلات",
+        "section_telemetry": "القياس عن بعد",
+        "label_telemetry": "قياس الاستخدام",
+        "hint_telemetry": "يرسل إحصائيات مجهولة (عدد الإملاءات، مدة الجلسة). لا يتم إرسال النص المُملى.",
     },
     "tr": {
         "title": "Ayarlar",
@@ -622,6 +658,9 @@ _SETTINGS_T = {
         "help_report_title": "Sorun bildir",
         "help_report_hint": "Iletisim: support@voxwave.app",
         "help_open_logs": "Log klasorunu ac",
+        "section_telemetry": "TELEMETRI",
+        "label_telemetry": "Kullanim telemetrisi",
+        "hint_telemetry": "Anonim istatistikler gonderir (dikte sayisi, oturum suresi). Dikte edilen metin gonderilmez.",
     },
     "pl": {
         "title": "Ustawienia",
@@ -667,6 +706,9 @@ _SETTINGS_T = {
         "help_report_title": "Zglos problem",
         "help_report_hint": "Kontakt: support@voxwave.app",
         "help_open_logs": "Otworz folder logow",
+        "section_telemetry": "TELEMETRIA",
+        "label_telemetry": "Telemetria uzytkowania",
+        "hint_telemetry": "Wysyla anonimowe statystyki (liczba dyktowań, czas sesji). Żaden dyktowany tekst nie jest wysyłany.",
     },
     "sv": {
         "title": "Installningar",
@@ -712,6 +754,9 @@ _SETTINGS_T = {
         "help_report_title": "Rapportera ett problem",
         "help_report_hint": "Kontakt: support@voxwave.app",
         "help_open_logs": "Oppna loggmapp",
+        "section_telemetry": "TELEMETRI",
+        "label_telemetry": "Anvandningstelemetri",
+        "hint_telemetry": "Skickar anonym statistik (antal dikteringar, sessionslangd). Ingen dikterad text skickas.",
     },
 }
 
@@ -1049,6 +1094,7 @@ class SettingsDialog(QDialog):
         current_activation_method: str = "both",
         current_auto_stop_enabled: bool = False,
         current_auto_stop_silence_duration: float = 2.0,
+        current_telemetry_enabled: bool = True,
         on_quit: Optional[object] = None,
         on_activate_license: Optional[object] = None,
         parent: Optional[QWidget] = None,
@@ -1066,6 +1112,7 @@ class SettingsDialog(QDialog):
         self._activation_method = current_activation_method
         self._auto_stop_enabled = current_auto_stop_enabled
         self._auto_stop_silence_duration = current_auto_stop_silence_duration
+        self._telemetry_enabled = current_telemetry_enabled
         self._on_quit = on_quit
         self._on_activate_license = on_activate_license
 
@@ -1410,6 +1457,19 @@ class SettingsDialog(QDialog):
         hint_host.setWordWrap(True)
         layout.addWidget(hint_host)
 
+        # Telemetrie
+        layout.addSpacing(12)
+        layout.addWidget(self._section_title(t.get("section_telemetry", "TELEMETRY")))
+        self._telemetry_check = QCheckBox(t.get("label_telemetry", "Usage telemetry"))
+        self._telemetry_check.setChecked(self._telemetry_enabled)
+        self._telemetry_check.setStyleSheet("color: #c0c0c0; font-size: 13px;")
+        layout.addWidget(self._telemetry_check)
+        telemetry_hint = QLabel(t.get("hint_telemetry",
+            "Sends anonymous stats (dictation count, session duration). No dictated text is sent."))
+        telemetry_hint.setObjectName("hint")
+        telemetry_hint.setWordWrap(True)
+        layout.addWidget(telemetry_hint)
+
         layout.addStretch()
         return page
 
@@ -1708,3 +1768,8 @@ class SettingsDialog(QDialog):
     @property
     def auto_stop_silence_duration(self) -> float:
         return self._auto_stop_duration_spin.value()
+
+    @property
+    def telemetry_enabled(self) -> bool:
+        """Retourne l'etat du toggle telemetrie."""
+        return self._telemetry_check.isChecked()
