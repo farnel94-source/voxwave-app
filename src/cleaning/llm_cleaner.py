@@ -564,7 +564,7 @@ class CleaningPipeline:
         self._proxy_circuit = CircuitBreaker(name="proxy_clean", failure_threshold=2, cooldown_seconds=30.0)
         self._local_circuit = CircuitBreaker(name="ollama", failure_threshold=1, cooldown_seconds=60.0)
 
-        if cleaning_provider == "proxy" and proxy_url:
+        if proxy_url and cleaning_provider in ("proxy", "hybrid"):
             self._proxy_cleaner = ProxyLLMCleaner(proxy_url=proxy_url, app_token=proxy_app_token)
             self._proxy_cleaner.set_circuit_breaker(self._proxy_circuit)
             logger.info(f"ProxyLLMCleaner initialisé ({proxy_url})")

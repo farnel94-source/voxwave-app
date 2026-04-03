@@ -52,7 +52,7 @@ a = Analysis(
     ] if is_linux else []),
     datas=[
         (os.path.join(ROOT, 'config.yaml'), '.'),
-        (os.path.join(ROOT, '.env'), '.'),
+        # .env retiré du build : les clés API sont côté serveur (proxy)
         # silero_vad pour faster-whisper (vad_filter=True) — chemin attendu par faster_whisper
         (os.path.join(_site_packages, 'faster_whisper', 'assets', 'silero_vad_v6.onnx'),
          os.path.join('faster_whisper', 'assets')),

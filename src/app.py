@@ -701,6 +701,7 @@ class VoxWave:
         elif provider == "hybrid":
             from src.transcription.hybrid_engine import HybridTranscriptionEngine
             groq_model = self.config.get("groq", {}).get("model", "whisper-large-v3")
+            trans_config = self.config.get("transcription", {})
             return HybridTranscriptionEngine(
                 groq_model=groq_model,
                 local_model=self.config["whisper"]["model"],
@@ -708,6 +709,9 @@ class VoxWave:
                 sample_rate=sample_rate,
                 on_fallback=self._on_fallback,
                 interface_language=interface_lang,
+                transcription_provider="hybrid",
+                proxy_url=trans_config.get("proxy_url", ""),
+                proxy_app_token=trans_config.get("proxy_app_token", ""),
             )
         elif provider == "cloud":
             from src.transcription.groq_engine import GroqWhisperEngine
@@ -1057,6 +1061,7 @@ class VoxWave:
                 self.tray.set_state("processing")
 
             # --- Étape 3 : Nettoyage streaming + remplacement ---
+            proxy_cleaner = getattr(self.pipeline, "_proxy_cleaner", None)
             cloud_cleaner = getattr(self.pipeline, "_cloud_cleaner", None)
             if cloud_cleaner is not None and not cloud_cleaner._available:
                 logger.warning("[progressif] _cloud_cleaner indisponible — OPENAI_API_KEY manquante dans .env")
@@ -1080,17 +1085,31 @@ class VoxWave:
                     else:
                         self._prog_injector._stop_user_watch()
 
+                elif (proxy_cleaner is not None
+                      and self.pipeline._proxy_circuit.should_allow_request()):
+                    # Chemin rapide via proxy : backend forward vers OpenAI (~500ms) + remplacement
+                    if self.waveform:
+                        self.waveform.update_step(_app_t(lang, "cleaning"))
+                    t_clean = time.time()
+                    clean_gen = proxy_cleaner.clean_streaming(raw_text, context_profile=app_profile)
+                    self._prog_injector.replace_with_clean(raw_text, clean_gen)
+                    logger.info(
+                        f"[progressif] Remplacement nettoyé via proxy [{app_profile}]: "
+                        f"{(time.time()-t_clean)*1000:.0f}ms "
+                        f"(total: {(time.time()-t_start)*1000:.0f}ms)"
+                    )
+
                 elif (cloud_cleaner is not None
                       and cloud_cleaner._available
                       and self.pipeline._cloud_circuit.should_allow_request()):
-                    # Chemin rapide : OpenAI streaming contextuel (~300ms) + remplacement
+                    # Fallback : OpenAI streaming direct (~300ms) + remplacement
                     if self.waveform:
                         self.waveform.update_step(_app_t(lang, "cleaning"))
                     t_clean = time.time()
                     clean_gen = cloud_cleaner.clean_streaming(raw_text, context_profile=app_profile)
                     self._prog_injector.replace_with_clean(raw_text, clean_gen)
                     logger.info(
-                        f"[progressif] Remplacement nettoyé [{app_profile}]: "
+                        f"[progressif] Remplacement nettoyé via cloud [{app_profile}]: "
                         f"{(time.time()-t_clean)*1000:.0f}ms "
                         f"(total: {(time.time()-t_start)*1000:.0f}ms)"
                     )

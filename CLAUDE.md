@@ -379,3 +379,4 @@ sudo apt install libxcb-cursor0 xclip xdotool
 - [x] Mode proxy dans l'app : ProxyTranscriptionEngine + ProxyLLMCleaner + fallback local
 - [ ] Integration telemetrie dans l'app VoxWave (activate, heartbeat, error, feedback dialog, opt-out)
 - [ ] Rendre la version configurable dans build.py (actuellement renomme manuellement)
+- [ ] Optimiser latence nettoyage proxy (3s → ~1s) : streaming SSE backend, région Render, plan payant
