@@ -47,7 +47,7 @@ def _validate_hotkey(hotkey_str: str) -> bool:
 class ConfigValidator:
     """Valide et complète la configuration utilisateur."""
 
-    VALID_PROVIDERS = ("hybrid", "cloud", "local")
+    VALID_PROVIDERS = ("hybrid", "cloud", "local", "proxy")
     VALID_CLEANING_MODES = ("raw", "auto")
     VALID_INJECTION_MODES = ("paste", "type")
 
