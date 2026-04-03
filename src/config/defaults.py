@@ -169,4 +169,7 @@ DEFAULT_CONFIG: dict = {
         "free_daily_limit": 9999,
         "cache_duration": 86400,
     },
+    "telemetry": {
+        "enabled": True,
+    },
 }
