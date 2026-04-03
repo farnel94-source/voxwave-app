@@ -481,9 +481,11 @@ class VoxWave:
 
         # Telemetrie d'usage (activate, heartbeat, error)
         from src.telemetry.client import TelemetryClient
+        telemetry_config = self.config.get("telemetry", {})
         self._telemetry = TelemetryClient(
-            config=self.config,
-            app_version=__version__,
+            language=self.config.get("whisper", {}).get("language", "en"),
+            provider=self.config.get("transcription", {}).get("provider", "hybrid"),
+            enabled=telemetry_config.get("enabled", True),
         )
 
         # Bridge thread-safe : le listener pynput tourne dans un thread arrière-plan.
