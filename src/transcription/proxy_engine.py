@@ -131,12 +131,14 @@ class ProxyTranscriptionEngine:
                 files={"file": ("audio.wav", wav_buf, "audio/wav")},
                 data=data,
                 headers=headers,
-                timeout=30,
+                timeout=60,  # 60s pour absorber le cold start Render free tier
             )
         except requests.exceptions.Timeout:
             if self._circuit:
-                self._circuit.record_network_failure()
-            raise TranscriptionError("Proxy timeout (30s)")
+                # record_failure (pas network_failure) : un timeout peut être
+                # un cold start Render, on laisse 3 essais avant d'ouvrir
+                self._circuit.record_failure()
+            raise TranscriptionError("Proxy timeout (60s)")
         except requests.exceptions.ConnectionError as e:
             if self._circuit:
                 self._circuit.record_network_failure()

@@ -65,6 +65,9 @@ class ProgressiveInjector:
     et gère les backspaces de manière plateforme-agnostique.
     """
 
+    # Répertoires système autorisés pour les binaires externes
+    _SAFE_BIN_DIRS = ("/usr/bin", "/bin", "/usr/local/bin")
+
     def __init__(self, text_injector) -> None:
         """Initialise l'injecteur progressif.
 
@@ -75,18 +78,50 @@ class ProgressiveInjector:
         self._os_name = platform.system().lower()
         self._display_server: str = self._os_name
 
+        # Chemins absolus des binaires externes (résolus une seule fois à l'init)
+        self._xdotool_path: str | None = None
+        self._wtype_path: str | None = None
+        self._ydotool_path: str | None = None
+
         if self._os_name == "linux":
             try:
                 from src.utils.platform import get_display_server
                 self._display_server = get_display_server()
             except Exception:
                 self._display_server = "x11"  # fallback raisonnable sur Linux
+            self._resolve_linux_tools()
 
         # Garde-fous anti-effacement accidentel
         self._inject_time: float = 0.0
         self._user_acted: bool = False
         self._user_watch_kb_listener = None    # pynput keyboard listener
         self._user_watch_mouse_listener = None  # pynput mouse listener
+
+    def _resolve_tool(self, name: str) -> str | None:
+        """Résout le chemin absolu d'un binaire et vérifie qu'il est dans un répertoire sûr.
+
+        Args:
+            name: Nom du binaire (ex: 'xdotool').
+
+        Returns:
+            Chemin absolu ou None si non trouvé.
+        """
+        import os
+        path = shutil.which(name)
+        if path is not None:
+            parent = os.path.dirname(os.path.realpath(path))
+            if parent not in self._SAFE_BIN_DIRS:
+                logger.warning(
+                    "Binaire %s trouvé dans %s (hors répertoires sûrs %s)",
+                    name, parent, self._SAFE_BIN_DIRS,
+                )
+        return path
+
+    def _resolve_linux_tools(self) -> None:
+        """Résout les chemins absolus de tous les binaires Linux utilisés."""
+        self._xdotool_path = self._resolve_tool("xdotool")
+        self._wtype_path = self._resolve_tool("wtype")
+        self._ydotool_path = self._resolve_tool("ydotool")
 
     def _inject_direct(self, text: str) -> bool:
         """Injecte via clipboard + pynput Ctrl+V (fiable sur tous apps Windows).
@@ -303,9 +338,9 @@ class ProgressiveInjector:
 
     def _select_backward_x11(self, count: int) -> None:
         """Shift+Left × N via xdotool --repeat (X11)."""
-        if shutil.which("xdotool"):
+        if self._xdotool_path:
             subprocess.run(
-                ["xdotool", "key", "--clearmodifiers", "--repeat", str(count), "shift+Left"],
+                [self._xdotool_path, "key", "--clearmodifiers", "--repeat", str(count), "shift+Left"],
                 timeout=10, check=False,
             )
         else:
@@ -313,13 +348,13 @@ class ProgressiveInjector:
 
     def _select_backward_wayland(self, count: int) -> None:
         """Shift+Left × N via wtype ou ydotool (Wayland)."""
-        if shutil.which("wtype"):
-            args = ["wtype"] + ["-M", "shift", "-k", "Left", "-m", "shift"] * count
+        if self._wtype_path:
+            args = [self._wtype_path] + ["-M", "shift", "-k", "Left", "-m", "shift"] * count
             subprocess.run(args, timeout=10, check=False)
-        elif shutil.which("ydotool"):
+        elif self._ydotool_path:
             for _ in range(count):
                 subprocess.run(
-                    ["ydotool", "key", "42:1", "105:1", "105:0", "42:0"],
+                    [self._ydotool_path, "key", "42:1", "105:1", "105:0", "42:0"],
                     timeout=2, check=False,
                 )
         else:
@@ -369,15 +404,15 @@ class ProgressiveInjector:
     def _send_ctrl_v(self) -> None:
         """Envoie Ctrl+V selon la plateforme."""
         if self._os_name == "linux" and self._display_server == "wayland":
-            if shutil.which("wtype"):
-                subprocess.run(["wtype", "-M", "ctrl", "-k", "v", "-m", "ctrl"], timeout=3, check=False)
-            elif shutil.which("ydotool"):
-                subprocess.run(["ydotool", "key", "29:1", "47:1", "47:0", "29:0"], timeout=3, check=False)
+            if self._wtype_path:
+                subprocess.run([self._wtype_path, "-M", "ctrl", "-k", "v", "-m", "ctrl"], timeout=3, check=False)
+            elif self._ydotool_path:
+                subprocess.run([self._ydotool_path, "key", "29:1", "47:1", "47:0", "29:0"], timeout=3, check=False)
             else:
                 self._do_pynput_paste()
         elif self._os_name == "linux":
-            if shutil.which("xdotool"):
-                subprocess.run(["xdotool", "key", "--clearmodifiers", "ctrl+v"], timeout=3, check=False)
+            if self._xdotool_path:
+                subprocess.run([self._xdotool_path, "key", "--clearmodifiers", "ctrl+v"], timeout=3, check=False)
             else:
                 self._do_pynput_paste()
         else:
@@ -419,15 +454,15 @@ class ProgressiveInjector:
 
     def _backspace_wayland(self, count: int) -> None:
         """Backspaces via wtype sur Wayland (une seule commande pour tous)."""
-        if shutil.which("wtype"):
+        if self._wtype_path:
             # Construire la liste d'arguments : ["-k", "BackSpace"] × count
-            args = ["wtype"] + ["-k", "BackSpace"] * count
+            args = [self._wtype_path] + ["-k", "BackSpace"] * count
             subprocess.run(args, timeout=10, check=False)
-        elif shutil.which("ydotool"):
+        elif self._ydotool_path:
             # ydotool : keycode 14 = BackSpace
             for _ in range(count):
                 subprocess.run(
-                    ["ydotool", "key", "14:1", "14:0"],
+                    [self._ydotool_path, "key", "14:1", "14:0"],
                     timeout=2, check=False,
                 )
         else:
@@ -435,9 +470,9 @@ class ProgressiveInjector:
 
     def _backspace_x11(self, count: int) -> None:
         """Backspaces via xdotool --repeat sur X11 (plus rapide qu'un loop)."""
-        if shutil.which("xdotool"):
+        if self._xdotool_path:
             subprocess.run(
-                ["xdotool", "key", "--clearmodifiers", "--repeat", str(count), "BackSpace"],
+                [self._xdotool_path, "key", "--clearmodifiers", "--repeat", str(count), "BackSpace"],
                 timeout=10, check=False,
             )
         else:

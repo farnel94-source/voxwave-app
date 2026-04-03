@@ -53,19 +53,57 @@ def _with_timeout(func: Callable[..., T], timeout: float, default: T, *args: Any
 class TextInjector:
     """Injecte du texte dans l'app active."""
 
+    # Répertoires système autorisés pour les binaires externes
+    _SAFE_BIN_DIRS = ("/usr/bin", "/bin", "/usr/local/bin")
+
     def __init__(self, mode: Literal["paste", "type"] = "paste") -> None:
         self.mode = mode
         self.os_name = platform.system().lower()
         self._wayland_paste_tool: Optional[str] = None
         self._wayland_type_tool: Optional[str] = None
+        # Chemins absolus des binaires externes (résolus une seule fois à l'init)
+        self._xdotool_path: Optional[str] = None
+        self._xclip_path: Optional[str] = None
+        self._xsel_path: Optional[str] = None
+        self._wtype_path: Optional[str] = None
+        self._ydotool_path: Optional[str] = None
         if self.os_name == "linux":
             from src.utils.platform import get_display_server
             self._display_server = get_display_server()
+            self._resolve_linux_tools()
             self._check_clipboard_tools()
             if self._display_server == "wayland":
                 self._detect_wayland_tools()
         else:
             self._display_server = self.os_name
+
+    def _resolve_tool(self, name: str) -> Optional[str]:
+        """Résout le chemin absolu d'un binaire et vérifie qu'il est dans un répertoire sûr.
+
+        Args:
+            name: Nom du binaire (ex: 'xdotool').
+
+        Returns:
+            Chemin absolu ou None si non trouvé.
+        """
+        path = shutil.which(name)
+        if path is not None:
+            import os
+            parent = os.path.dirname(os.path.realpath(path))
+            if parent not in self._SAFE_BIN_DIRS:
+                logger.warning(
+                    "Binaire %s trouvé dans %s (hors répertoires sûrs %s)",
+                    name, parent, self._SAFE_BIN_DIRS,
+                )
+        return path
+
+    def _resolve_linux_tools(self) -> None:
+        """Résout les chemins absolus de tous les binaires Linux utilisés."""
+        self._xdotool_path = self._resolve_tool("xdotool")
+        self._xclip_path = self._resolve_tool("xclip")
+        self._xsel_path = self._resolve_tool("xsel")
+        self._wtype_path = self._resolve_tool("wtype")
+        self._ydotool_path = self._resolve_tool("ydotool")
 
     def _check_clipboard_tools(self) -> None:
         """Verifie que les outils clipboard sont disponibles sur Linux."""
@@ -75,18 +113,18 @@ class TextInjector:
                     "wl-copy non trouve. Installez wl-clipboard pour le support Wayland: "
                     "sudo apt install wl-clipboard"
                 )
-            if not shutil.which("wtype"):
+            if not self._wtype_path:
                 logger.warning(
                     "wtype non trouve. Installez wtype pour l'injection texte Wayland: "
                     "sudo apt install wtype"
                 )
         elif self._display_server == "x11":
-            if not shutil.which("xdotool"):
+            if not self._xdotool_path:
                 logger.warning(
                     "xdotool non trouve. Installez-le pour l'injection texte X11: "
                     "sudo apt install xdotool"
                 )
-            if not shutil.which("xclip") and not shutil.which("xsel"):
+            if not self._xclip_path and not self._xsel_path:
                 logger.warning(
                     "xclip/xsel non trouve. Installez xclip pour le clipboard X11: "
                     "sudo apt install xclip"
@@ -97,11 +135,12 @@ class TextInjector:
 
         Paste: wtype → ydotool → pynput (XWayland apps)
         Type:  wtype → ydotool → None (erreur explicite)
+        Utilise les chemins absolus résolus par _resolve_linux_tools().
         """
         # Cascade paste
-        if shutil.which("wtype"):
+        if self._wtype_path:
             self._wayland_paste_tool = "wtype"
-        elif shutil.which("ydotool"):
+        elif self._ydotool_path:
             self._wayland_paste_tool = "ydotool"
             logger.info("wtype non trouve, utilisation de ydotool pour le paste Wayland")
         else:
@@ -112,9 +151,9 @@ class TextInjector:
             )
 
         # Cascade type
-        if shutil.which("wtype"):
+        if self._wtype_path:
             self._wayland_type_tool = "wtype"
-        elif shutil.which("ydotool"):
+        elif self._ydotool_path:
             self._wayland_type_tool = "ydotool"
             logger.info("wtype non trouve, utilisation de ydotool pour la frappe Wayland")
         else:
@@ -162,7 +201,9 @@ class TextInjector:
         if content is not None:
             try:
                 import pyperclip
-                time.sleep(0.3)
+                # 20ms : réduire la fenêtre d'exposition du texte transcrit dans le clipboard
+                # (le Ctrl+V est déjà traité par l'app cible à ce stade)
+                time.sleep(0.02)
                 _with_timeout(pyperclip.copy, 2.0, None, content)
                 logger.debug("Clipboard restaure")
             except Exception:
@@ -180,8 +221,7 @@ class TextInjector:
             self._inject_paste(text)
         else:
             self._inject_type(text)
-        preview = text[:20] + "..." if len(text) > 20 else text
-        logger.debug("Texte injecte (%d chars): %s", len(text), preview)
+        logger.debug("Texte injecte (%d chars): %s", len(text), text)
 
     def _inject_paste(self, text: str) -> None:
         """Injecte via clipboard + paste selon la plateforme."""
@@ -229,13 +269,13 @@ class TextInjector:
 
             if self._wayland_paste_tool == "wtype":
                 subprocess.run(
-                    ["wtype", "-M", "ctrl", "v", "-m", "ctrl"],
+                    [self._wtype_path, "-M", "ctrl", "v", "-m", "ctrl"],
                     timeout=5, check=False,
                 )
             elif self._wayland_paste_tool == "ydotool":
                 # ydotool keycodes: ctrl=29, v=47
                 subprocess.run(
-                    ["ydotool", "key", "29:1", "47:1", "47:0", "29:0"],
+                    [self._ydotool_path, "key", "29:1", "47:1", "47:0", "29:0"],
                     timeout=5, check=False,
                 )
             elif self._wayland_paste_tool == "pynput":
@@ -263,9 +303,9 @@ class TextInjector:
                 clipboard_ok = False
 
             if clipboard_ok:
-                if shutil.which("xdotool"):
+                if self._xdotool_path:
                     subprocess.run(
-                        ["xdotool", "key", "ctrl+v"],
+                        [self._xdotool_path, "key", "ctrl+v"],
                         timeout=5, check=False,
                     )
                 else:
@@ -273,9 +313,9 @@ class TextInjector:
             else:
                 # Clipboard indisponible (xclip manquant) — fallback injection directe
                 logger.warning("Clipboard indisponible, fallback xdotool type")
-                if shutil.which("xdotool"):
+                if self._xdotool_path:
                     subprocess.run(
-                        ["xdotool", "type", "--clearmodifiers", "--delay", "12", text],
+                        [self._xdotool_path, "type", "--clearmodifiers", "--delay", "12", text],
                         timeout=10, check=False,
                     )
                 else:
@@ -316,9 +356,9 @@ class TextInjector:
         """Injection par frappe clavier."""
         if self.os_name == "linux" and self._display_server == "wayland":
             if self._wayland_type_tool == "wtype":
-                subprocess.run(["wtype", text], timeout=10, check=False)
+                subprocess.run([self._wtype_path, text], timeout=10, check=False)
             elif self._wayland_type_tool == "ydotool":
-                subprocess.run(["ydotool", "type", text], timeout=10, check=False)
+                subprocess.run([self._ydotool_path, "type", text], timeout=10, check=False)
             else:
                 logger.error(
                     "Aucun outil de frappe Wayland disponible. "

@@ -28,6 +28,9 @@ class LicenseStorage:
     def _get_or_create_fernet(self) -> Fernet:
         """Charge ou genere la cle de chiffrement locale.
 
+        Cree le fichier .key avec permissions 0o600 de maniere atomique
+        (os.O_EXCL empeche la race condition entre creation et chmod).
+
         Returns:
             Instance Fernet pour chiffrement/dechiffrement.
         """
@@ -35,21 +38,36 @@ class LicenseStorage:
             key = KEY_FILE.read_bytes()
         else:
             key = Fernet.generate_key()
-            KEY_FILE.write_bytes(key)
+            # Creer le fichier avec les bonnes permissions des le depart (pas de fenetre chmod)
+            fd = os.open(str(KEY_FILE), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             try:
-                os.chmod(KEY_FILE, 0o600)
-            except OSError:
-                pass
+                with os.fdopen(fd, "wb") as f:
+                    f.write(key)
+            except Exception:
+                # Si l'ecriture echoue, fd est deja ferme par fdopen
+                raise
         return Fernet(key)
 
     def save_license(self, license_data: dict) -> None:
         """Sauvegarde les donnees de licence chiffrees.
 
+        Ecrit le fichier avec permissions 0o600 de maniere atomique.
+
         Args:
             license_data: Dict contenant license_key, instance_id, etc.
         """
         encrypted = self._fernet.encrypt(json.dumps(license_data).encode())
-        LICENSE_FILE.write_bytes(encrypted)
+        # Ecriture avec permissions 0o600 des le depart (O_TRUNC car le fichier peut exister)
+        fd = os.open(
+            str(LICENSE_FILE),
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+            0o600,
+        )
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(encrypted)
+        except Exception:
+            raise
         logger.info("Licence sauvegardee localement")
 
     def load_license(self) -> Optional[dict]:
