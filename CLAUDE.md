@@ -146,6 +146,16 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
   - **PIEGE** : ne jamais appeler `force_taskbar_icon_win32` immediatement dans `__init__` — l'Explorateur n'a pas encore cree le bouton, l'icone est ignoree.
 - **`setQuitOnLastWindowClosed(False)`** : l'app ne quitte plus quand on ferme un dialog
 
+## Telemetrie d'usage (src/telemetry/client.py)
+- **TelemetryClient** : envoie des stats anonymes au backend (Render + Neon)
+- **UUID persistant** : `~/.voxwave/device_id` (genere au premier lancement)
+- **Evenements** : activate (demarrage), heartbeat (toutes les 15 min), error (fallback)
+- **Opt-out** : `config.yaml` → `telemetry.enabled: true` (defaut), toggle dans Settings > Avance
+- **HTTP** : daemon threads, timeout 5s (2s pour heartbeat final au shutdown), 0 retries
+- **Thread safety** : `threading.Lock` sur compteur dictees, `threading.Event` pour shutdown
+- **PIEGE constructeur** : `TelemetryClient(language, provider, enabled)` — PAS `config=` ni `app_version=`
+- **Stats** : `GET /api/admin/stats` avec header `Authorization: Bearer <ADMIN_API_KEY>`
+
 ## Plateforme
 - **Windows + Linux uniquement** — macOS non supporte (check au demarrage dans `app.py`, `sys.exit(1)`)
 - Warning dans `keyboard.py` et `orb_widget.py` si `sys.platform == "darwin"`
@@ -377,6 +387,6 @@ sudo apt install libxcb-cursor0 xclip xdotool
 - [x] Auth proxy : X-App-Token header, PROXY_APP_TOKEN sur Render
 - [x] Keep-alive backend : self-ping toutes les 14 min (plus de cold start Render)
 - [x] Mode proxy dans l'app : ProxyTranscriptionEngine + ProxyLLMCleaner + fallback local
-- [ ] Integration telemetrie dans l'app VoxWave (activate, heartbeat, error, feedback dialog, opt-out)
+- [x] Integration telemetrie dans l'app VoxWave (activate, heartbeat 15min, error, opt-out dans Settings)
 - [ ] Rendre la version configurable dans build.py (actuellement renomme manuellement)
 - [ ] Optimiser latence nettoyage proxy (3s → ~1s) : streaming SSE backend, région Render, plan payant
