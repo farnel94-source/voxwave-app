@@ -33,11 +33,12 @@ voxwave/
 │   ├── transcription/
 │   │   ├── whisper_engine.py    # Moteur faster-whisper (local) — model=small, condition_on_previous_text=False, interface_language fallback
 │   │   ├── groq_engine.py      # Moteur Groq API (cloud) — flag _available, circuit breaker, is_hallucination() TOUJOURS vérifié (quel que soit logprob), hint auto langue via prompt=
-│   │   ├── hybrid_engine.py    # Hybride: Groq → Whisper local, callback on_fallback
+│   │   ├── hybrid_engine.py    # Hybride: proxy → Groq → Whisper local, callback on_fallback
+│   │   ├── proxy_engine.py     # Moteur proxy (forward audio au backend via requests) — circuit breaker, hallucination check, X-App-Token auth
 │   │   └── hallucinations.py   # Detection hallucinations Whisper
 │   ├── cleaning/
 │   │   ├── regex_cleaner.py    # Nettoyage rapide regex (15 langues de filler words)
-│   │   └── llm_cleaner.py     # Nettoyage: mode raw/verbatim/quality — OpenAI cloud + Ollama local — circuit breaker
+│   │   └── llm_cleaner.py     # Nettoyage: mode raw/verbatim/quality — ProxyLLMCleaner + OpenAI cloud + Ollama local — circuit breaker
 │   ├── injection/
 │   │   ├── keyboard.py         # Injection texte (paste/type) Windows+Linux, warning macOS
 │   │   └── progressive_injector.py  # Injection en 2 temps : brut immédiat → nettoyé (Backspace×N + garde-fous)
@@ -75,9 +76,23 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 ## Mode hybride
 - **Transcription** : Groq API (whisper-large-v3-turbo) en priorite, fallback faster-whisper local
 - **Nettoyage** : OpenAI GPT-4o-mini en priorite, fallback Ollama local, fallback regex
-- Config `transcription.provider` et `cleaning.provider` : `hybrid` | `cloud` | `local`
+- Config `transcription.provider` et `cleaning.provider` : `hybrid` | `cloud` | `local` | `proxy`
 - Config `cleaning.mode` : `raw` (brut, zero traitement) | `verbatim` (naturel) | `quality` (professionnel)
 - Cles API dans `.env` : `GROQ_API_KEY`, `OPENAI_API_KEY`
+
+## Mode proxy (v0.2.0)
+- **Objectif** : securiser les cles API (Groq/OpenAI) cote serveur, l'app ne les contient plus
+- **Transcription** : App → Backend proxy → Groq API → retour texte
+- **Nettoyage** : App → Backend proxy → OpenAI API → retour texte nettoye
+- **Auth** : header `X-App-Token` (shared secret) — bloque les requetes sans token
+- **Fallback** : si proxy injoignable → circuit breaker → Whisper local / Ollama / regex
+- **Config app** : `transcription.provider: proxy`, `transcription.proxy_url`, `transcription.proxy_app_token`
+- **Config backend** : env vars `GROQ_API_KEY`, `OPENAI_API_KEY`, `PROXY_APP_TOKEN` sur Render
+- **Keep-alive** : self-ping asyncio toutes les 14 min (evite le sleep Render free tier)
+- **Rate limiting** : 20/min transcription, 40/min nettoyage (par IP)
+- **Endpoints** : `POST /api/v1/transcribe` (multipart audio) + `POST /api/v1/clean` (JSON texte)
+- **Context profiles** : le proxy respecte `context_profile` (code/casual/email/document/default) — prompt adapte cote serveur
+- **PIEGE** : `app.py._create_transcription_engine()` doit passer `transcription_provider`, `proxy_url` et `proxy_app_token` a `HybridTranscriptionEngine`. Idem pour `CleaningPipeline` dans `_rebuild_pipeline()`.
 
 ## Resilience hors-ligne
 - **Circuit breaker** (`src/utils/circuit_breaker.py`) : 3 etats (CLOSED → OPEN → HALF_OPEN), thread-safe
@@ -358,6 +373,9 @@ sudo apt install libxcb-cursor0 xclip xdotool
 - [ ] Acheter domaine custom (voxwave.app ou autre) et configurer sur Vercel
 - [ ] Configurer LemonSqueezy (non bloquant, lancement gratuit possible)
 - [ ] Code signing Windows (optionnel, certificat ~$70-200/an)
-- [ ] Endpoints proxy v0.2.0 : POST /api/v1/transcribe + /api/v1/clean (securise les cles API)
+- [x] Endpoints proxy v0.2.0 : POST /api/v1/transcribe + /api/v1/clean (securise les cles API)
+- [x] Auth proxy : X-App-Token header, PROXY_APP_TOKEN sur Render
+- [x] Keep-alive backend : self-ping toutes les 14 min (plus de cold start Render)
+- [x] Mode proxy dans l'app : ProxyTranscriptionEngine + ProxyLLMCleaner + fallback local
 - [ ] Integration telemetrie dans l'app VoxWave (activate, heartbeat, error, feedback dialog, opt-out)
 - [ ] Rendre la version configurable dans build.py (actuellement renomme manuellement)
