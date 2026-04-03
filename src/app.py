@@ -460,6 +460,8 @@ class VoxWave:
             filler_words=filler_words,
             ollama_host=cleaning_config.get("ollama_host", "http://localhost:11434"),
             on_fallback=self._on_fallback,
+            proxy_url=cleaning_config.get("proxy_url", ""),
+            proxy_app_token=cleaning_config.get("proxy_app_token", ""),
         )
 
         # Informer si mode auto actif sans clé OpenAI disponible
@@ -663,6 +665,8 @@ class VoxWave:
             filler_words=cleaning_config.get("filler_words"),
             ollama_host=cleaning_config.get("ollama_host", "http://localhost:11434"),
             on_fallback=self._on_fallback,
+            proxy_url=cleaning_config.get("proxy_url", ""),
+            proxy_app_token=cleaning_config.get("proxy_app_token", ""),
         )
         logger.info(f"Pipeline recréé : mode={cleaning_config['mode']}, provider={cleaning_config.get('provider', 'local')}")
 
@@ -679,7 +683,22 @@ class VoxWave:
         sample_rate = self.config["audio"]["sample_rate"]
         interface_lang = self.config.get("language", "en")
 
-        if provider == "hybrid":
+        if provider == "proxy":
+            from src.transcription.hybrid_engine import HybridTranscriptionEngine
+            trans_config = self.config.get("transcription", {})
+            groq_model = self.config.get("groq", {}).get("model", "whisper-large-v3")
+            return HybridTranscriptionEngine(
+                groq_model=groq_model,
+                local_model=self.config["whisper"]["model"],
+                language=language,
+                sample_rate=sample_rate,
+                on_fallback=self._on_fallback,
+                interface_language=interface_lang,
+                transcription_provider="proxy",
+                proxy_url=trans_config.get("proxy_url", ""),
+                proxy_app_token=trans_config.get("proxy_app_token", ""),
+            )
+        elif provider == "hybrid":
             from src.transcription.hybrid_engine import HybridTranscriptionEngine
             groq_model = self.config.get("groq", {}).get("model", "whisper-large-v3")
             return HybridTranscriptionEngine(
