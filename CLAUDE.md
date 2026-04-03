@@ -333,9 +333,10 @@ black src/ tests/
 
 ## Release & Distribution
 - **GitHub** : https://github.com/farnel94-source/voxwave-app (public, master)
-- **Release v0.1.1** (latest) : https://github.com/farnel94-source/voxwave-app/releases/tag/v0.1.1
-  - `VoxWave-Setup-0.1.1.exe` (109 MB) — installateur Windows (Inno Setup)
+- **Release v0.2.0** (latest) : https://github.com/farnel94-source/voxwave-app/releases/tag/v0.2.0
+  - `VoxWave-Setup-0.2.0.exe` (105 MB) — installateur Windows (Inno Setup)
   - `VoxWave-x86_64.AppImage` (148 MB) — Linux
+- **Release v0.1.1** : https://github.com/farnel94-source/voxwave-app/releases/tag/v0.1.1
 - **Release v0.1.0** : https://github.com/farnel94-source/voxwave-app/releases/tag/v0.1.0
 - **Python Windows** : 3.14.2 (`C:\Python314`) — surveiller compatibilite libs
 - **Python WSL** : 3.12.3 (`/usr/bin/python3`) — virtualenv `.venv` pour build
@@ -388,5 +389,7 @@ sudo apt install libxcb-cursor0 xclip xdotool
 - [x] Keep-alive backend : self-ping toutes les 14 min (plus de cold start Render)
 - [x] Mode proxy dans l'app : ProxyTranscriptionEngine + ProxyLLMCleaner + fallback local
 - [x] Integration telemetrie dans l'app VoxWave (activate, heartbeat 15min, error, opt-out dans Settings)
+- [x] Audit securite backend + desktop (11 failles corrigees, deploy Render)
+- [x] Release v0.2.0 publiee (Windows 105 MB + Linux 148 MB) avec proxy token embarque
 - [ ] Rendre la version configurable dans build.py (actuellement renomme manuellement)
 - [ ] Optimiser latence nettoyage proxy (3s → ~1s) : streaming SSE backend, région Render, plan payant
