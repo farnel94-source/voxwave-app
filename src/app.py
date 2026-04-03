@@ -384,6 +384,7 @@ class VoxWave:
         self._settings_dialog = None
         self._silero_vad = None
         self._prog_injector = None
+        self._telemetry = None
         self._hotkey_bridge = None
 
     def initialize(self) -> None:
@@ -477,6 +478,13 @@ class VoxWave:
         # Progressive injector : injection brut immédiat + remplacement par texte nettoyé
         from src.injection.progressive_injector import ProgressiveInjector
         self._prog_injector = ProgressiveInjector(self.injector)
+
+        # Telemetrie d'usage (activate, heartbeat, error)
+        from src.telemetry.client import TelemetryClient
+        self._telemetry = TelemetryClient(
+            config=self.config,
+            app_version=__version__,
+        )
 
         # Bridge thread-safe : le listener pynput tourne dans un thread arrière-plan.
         # Les signals Qt dispatchent _on_start/_on_stop vers le thread Qt principal.
@@ -913,6 +921,8 @@ class VoxWave:
             self.injector.inject(clean_text)
             self.feedback.play_complete()
             logger.info("Texte injecte !")
+            if self._telemetry:
+                self._telemetry.record_dictation()
         except Exception as e:
             had_error = True
             self.feedback.play_error()
@@ -1123,6 +1133,8 @@ class VoxWave:
 
             self.feedback.play_complete()
             logger.info(f"[progressif] Pipeline terminé en {(time.time()-t_start)*1000:.0f}ms")
+            if self._telemetry:
+                self._telemetry.record_dictation()
 
         except Exception as e:
             had_error = True
@@ -1539,6 +1551,8 @@ class VoxWave:
             message: Message de fallback a afficher.
         """
         logger.info(f"Fallback: {message}")
+        if self._telemetry:
+            self._telemetry.record_error("fallback", message)
         if self.tray:
             self.tray.show_notification("VoxWave", message)
 
@@ -1587,6 +1601,9 @@ class VoxWave:
             self.capture.stop()
         if self.waveform:
             self.waveform.show_idle()
+        # Telemetrie : envoyer le dernier heartbeat
+        if self._telemetry:
+            self._telemetry.stop()
         # Shutdown executor
         self._executor.shutdown(wait=False)
         # Stopper les health-checks
@@ -1690,6 +1707,9 @@ class VoxWave:
 
         if self.config.get("activation_method", "both") != "icon":
             self.listener.start()
+
+        if self._telemetry:
+            self._telemetry.start()
 
         # Signal handlers pour shutdown propre (Ctrl+C, SIGTERM)
         def _signal_handler(signum: int, frame: object) -> None:
