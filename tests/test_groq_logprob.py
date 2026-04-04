@@ -81,7 +81,7 @@ class TestExistingBehaviorUnchanged:
     def test_good_logprob_kept(self, engine):
         """avg_logprob=-0.3 avec texte normal → conservé (inchangé)."""
         transcription = _make_transcription(
-            text="Bonjour",
+            text="Bonjour, comment allez-vous aujourd'hui ?",
             avg_logprob=-0.3,
             no_speech_prob=0.0,
         )

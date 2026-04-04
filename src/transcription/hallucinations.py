@@ -111,4 +111,7 @@ def strip_hallucination_tails(text: str) -> str:
         Texte nettoye, ou le texte original si le nettoyage le vide.
     """
     cleaned = HALLUCINATION_TAILS.sub("", text).strip()
+    # Si le nettoyage vide tout le texte, garder l'original
+    if not cleaned:
+        return text.strip()
     return cleaned
