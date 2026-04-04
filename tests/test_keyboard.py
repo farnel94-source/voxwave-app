@@ -132,7 +132,7 @@ class TestTextInjectorWayland:
 
     @patch("platform.system", return_value="Linux")
     @patch("src.utils.platform.get_display_server", return_value="wayland")
-    @patch("shutil.which", return_value=None)
+    @patch("shutil.which", return_value="/usr/bin/ydotool")
     @patch("subprocess.run")
     @patch("pyperclip.paste", return_value="original")
     @patch("pyperclip.copy")
@@ -140,23 +140,26 @@ class TestTextInjectorWayland:
         from src.injection.keyboard import TextInjector
         injector = TextInjector(mode="paste")
         injector._wayland_paste_tool = "ydotool"
+        injector._ydotool_path = "/usr/bin/ydotool"
         injector._inject_paste_wayland("test")
         mock_run.assert_called_once()
         args = mock_run.call_args[0][0]
-        assert args[0] == "ydotool"
+        assert "ydotool" in args[0]
 
     @patch("platform.system", return_value="Linux")
     @patch("src.utils.platform.get_display_server", return_value="wayland")
-    @patch("shutil.which", return_value=None)
+    @patch("shutil.which", return_value="/usr/bin/ydotool")
     @patch("subprocess.run")
     def test_wayland_type_ydotool(self, mock_run, mock_which, mock_display, mock_sys):
         from src.injection.keyboard import TextInjector
         injector = TextInjector(mode="type")
         injector._wayland_type_tool = "ydotool"
+        injector._ydotool_path = "/usr/bin/ydotool"
         injector._inject_type("hello")
         mock_run.assert_called_once()
         args = mock_run.call_args[0][0]
-        assert args == ["ydotool", "type", "hello"]
+        assert "ydotool" in args[0]
+        assert args[1:] == ["type", "hello"]
 
 
 class TestTextInjectorX11:

@@ -98,7 +98,7 @@ class TestTextInjectorWayland:
         mock_copy.assert_any_call("test text")
         mock_run.assert_called_once()
         args = mock_run.call_args[0][0]
-        assert args[0] == "wtype"
+        assert "wtype" in args[0]
 
 
 class TestTextInjectorX11:
@@ -117,4 +117,4 @@ class TestTextInjectorX11:
         mock_copy.assert_any_call("test text")
         mock_run.assert_called_once()
         args = mock_run.call_args[0][0]
-        assert args[0] == "xdotool"
+        assert "xdotool" in args[0]
