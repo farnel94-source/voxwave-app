@@ -22,7 +22,6 @@ hotkey_debounce: 0.5
 transcription:
   provider: hybrid
   proxy_url: https://voxwave-backend.onrender.com
-  proxy_app_token: 7db7829a43efc6880dc30dd2f4a03612246395bd3630b3fac8d81b61650e8be3
 whisper:
   model: base
   beam_size: 5
@@ -34,7 +33,6 @@ cleaning:
   mode: verbatim
   provider: hybrid
   proxy_url: https://voxwave-backend.onrender.com
-  proxy_app_token: 7db7829a43efc6880dc30dd2f4a03612246395bd3630b3fac8d81b61650e8be3
   cloud_model: gpt-4o-mini
   llm_model: gemma3:4b
   llm_timeout: 30

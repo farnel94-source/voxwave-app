@@ -10,6 +10,7 @@ build/
 
 # Env
 .env
+config.production.yaml
 venv/
 .venv/
 

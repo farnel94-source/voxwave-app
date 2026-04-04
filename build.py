@@ -50,20 +50,73 @@ def clean() -> None:
     print("Clean termine.")
 
 
+def _inject_production_secrets() -> None:
+    """Injecte le proxy_app_token dans config.yaml pour le build distribue.
+
+    Lit config.production.yaml (jamais commite) et ajoute le token
+    dans les sections transcription et cleaning du config.yaml.
+    Le config.yaml est restaure apres le build via _restore_config().
+    """
+    import yaml
+
+    prod_file = ROOT / "config.production.yaml"
+    if not prod_file.exists():
+        print("WARNING: config.production.yaml introuvable — build sans proxy token")
+        return
+
+    with open(prod_file, "r") as f:
+        secrets = yaml.safe_load(f) or {}
+
+    token = secrets.get("proxy_app_token", "")
+    if not token:
+        print("WARNING: proxy_app_token vide dans config.production.yaml")
+        return
+
+    config_file = ROOT / "config.yaml"
+    # Sauvegarder l'original pour le restaurer apres le build
+    backup = ROOT / "config.yaml.bak"
+    shutil.copy2(config_file, backup)
+
+    with open(config_file, "r") as f:
+        config = yaml.safe_load(f) or {}
+
+    config.setdefault("transcription", {})["proxy_app_token"] = token
+    config.setdefault("cleaning", {})["proxy_app_token"] = token
+
+    with open(config_file, "w") as f:
+        yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+
+    print(f"Token proxy injecte dans config.yaml (depuis config.production.yaml)")
+
+
+def _restore_config() -> None:
+    """Restaure le config.yaml original apres le build."""
+    backup = ROOT / "config.yaml.bak"
+    config_file = ROOT / "config.yaml"
+    if backup.exists():
+        shutil.copy2(backup, config_file)
+        backup.unlink()
+        print("config.yaml restaure (token retire)")
+
+
 def build_pyinstaller() -> None:
     """Lance PyInstaller avec le spec."""
     print("Build VoxWave (PyInstaller)...")
-    cmd = [
-        sys.executable, "-m", "PyInstaller",
-        str(SPEC),
-        "--noconfirm",
-        "--clean",
-    ]
-    result = subprocess.run(cmd, cwd=str(ROOT))
-    if result.returncode != 0:
-        print("Build echoue !")
-        sys.exit(1)
-    print("Build PyInstaller termine.")
+    _inject_production_secrets()
+    try:
+        cmd = [
+            sys.executable, "-m", "PyInstaller",
+            str(SPEC),
+            "--noconfirm",
+            "--clean",
+        ]
+        result = subprocess.run(cmd, cwd=str(ROOT))
+        if result.returncode != 0:
+            print("Build echoue !")
+            sys.exit(1)
+        print("Build PyInstaller termine.")
+    finally:
+        _restore_config()
 
 
 def build_linux() -> None:
