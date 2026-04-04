@@ -1075,7 +1075,7 @@ class VoxWave:
             # --- Étape 3 : Nettoyage streaming + remplacement ---
             proxy_cleaner = getattr(self.pipeline, "_proxy_cleaner", None)
             cloud_cleaner = getattr(self.pipeline, "_cloud_cleaner", None)
-            if cloud_cleaner is not None and not cloud_cleaner._available:
+            if cloud_cleaner is not None and not cloud_cleaner._available and proxy_cleaner is None:
                 logger.warning("[progressif] _cloud_cleaner indisponible — OPENAI_API_KEY manquante dans .env")
 
             cleaning_mode = self.config.get("cleaning", {}).get("mode", "auto")
