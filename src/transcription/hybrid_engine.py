@@ -57,7 +57,7 @@ class HybridTranscriptionEngine:
         self._last_detected_language: Optional[str] = None
         self._circuit = CircuitBreaker(name="groq", failure_threshold=3, cooldown_seconds=30.0)
 
-        if proxy_url and transcription_provider in ("proxy", "hybrid"):
+        if proxy_url and transcription_provider in ("proxy", "hybrid", "cloud"):
             self._init_proxy()
         if transcription_provider in ("hybrid", "cloud"):
             self._init_groq()
