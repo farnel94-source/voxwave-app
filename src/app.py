@@ -91,6 +91,24 @@ _BUSY_T = {
     "sv": "Bearbetar, vänta...",
 }
 
+_NO_SPEECH_T = {
+    "en": ("No speech detected", "Check your microphone (muted or wrong device?)"),
+    "fr": ("Aucune parole détectée", "Vérifiez votre micro (muet ou mauvais périphérique ?)"),
+    "es": ("No se detectó voz", "Verifique su micrófono (silenciado o dispositivo incorrecto?)"),
+    "de": ("Keine Sprache erkannt", "Mikrofon prüfen (stumm oder falsches Gerät?)"),
+    "it": ("Nessun parlato rilevato", "Controlla il microfono (muto o dispositivo errato?)"),
+    "pt": ("Nenhuma fala detectada", "Verifique o microfone (mudo ou dispositivo errado?)"),
+    "nl": ("Geen spraak gedetecteerd", "Controleer uw microfoon (gedempt of verkeerd apparaat?)"),
+    "ja": ("音声が検出されません", "マイクを確認してください（ミュートまたは誤ったデバイス？）"),
+    "ko": ("음성이 감지되지 않음", "마이크를 확인하세요 (음소거 또는 잘못된 장치?)"),
+    "zh": ("未检测到语音", "请检查麦克风（静音或设备错误？）"),
+    "ru": ("Rech ne obnaruzhena", "Proverte mikrofon (vyklyuchen ili nepravilnoe ustroystvo?)"),
+    "ar": ("لم يتم اكتشاف كلام", "تحقق من الميكروفون (صامت أو جهاز خاطئ؟)"),
+    "tr": ("Konuşma algılanmadı", "Mikrofonu kontrol edin (sessiz veya yanlış cihaz?)"),
+    "pl": ("Nie wykryto mowy", "Sprawdź mikrofon (wyciszony lub zły sprzęt?)"),
+    "sv": ("Inget tal upptäcktes", "Kontrollera mikrofonen (tystad eller fel enhet?)"),
+}
+
 _UPDATE_NOTIF_T = {
     "en": "VoxWave v{version} is available! Click the tray menu to download.",
     "fr": "VoxWave v{version} est disponible ! Cliquez dans le menu tray pour telecharger.",
@@ -764,6 +782,27 @@ class VoxWave:
             self.waveform.show_recording()
         self.capture.start()
 
+    def _notify_no_speech(self) -> None:
+        """Feedback utilisateur quand aucune parole n'est détectée (mic muté, etc.).
+
+        Appelé depuis le thread worker pipeline. Tous les appels UI passent par des
+        signaux pour rester thread-safe (tray via _pipeline_bridge, orb via ses signaux
+        internes dans set_error_text/show_error/sig_hide_widget).
+        """
+        lang = self.config.get("language", "en")
+        title, body = _NO_SPEECH_T.get(lang, _NO_SPEECH_T["en"])
+        try:
+            self.feedback.play_error()
+        except Exception:
+            pass
+        self._pipeline_bridge.sig_tray_set_state.emit("error")
+        self._pipeline_bridge.sig_tray_notify.emit(f"VoxWave — {title}", body)
+        if self.waveform:
+            self.waveform.set_error_text(title)
+            self.waveform.show_error()
+            if self.config.get("activation_method", "both") == "hotkey":
+                self.waveform.sig_hide_widget.emit()
+
     def _on_stop(self) -> None:
         """Callback: fin enregistrement -> lance le pipeline dans un thread."""
         logger.info("_on_stop appelé")
@@ -885,6 +924,8 @@ class VoxWave:
             post_duration = len(audio) / audio_config["sample_rate"]
             if post_duration < min_duration:
                 logger.info(f"Aucune parole detectee apres trim ({post_duration:.2f}s), ignore")
+                had_error = True
+                self._notify_no_speech()
                 return
 
             # Verifier la taille apres preparation (limite Groq API : 25MB WAV)
@@ -1004,6 +1045,8 @@ class VoxWave:
             post_duration = len(audio) / audio_config["sample_rate"]
             if post_duration < min_duration:
                 logger.info(f"[progressif] Aucune parole detectee apres trim ({post_duration:.2f}s), ignore")
+                had_error = True
+                self._notify_no_speech()
                 return
 
             # --- Étape 1 : Transcription batch Groq (~500ms) ---
