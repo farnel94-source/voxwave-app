@@ -63,3 +63,6 @@ check_platform.py
 test_sync.txt
 app.py
 installers/
+
+# Nested repos (gardés à part)
+voxwave-backend/
