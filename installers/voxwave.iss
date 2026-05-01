@@ -3,7 +3,7 @@
 ; Necessite : Inno Setup 6+ (https://jrsoftware.org/isdown.php)
 
 #define MyAppName "VoxWave"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.2.1"
 #define MyAppPublisher "VoxWave"
 #define MyAppURL "https://voxwave.app"
 #define MyAppExeName "VoxWave.exe"

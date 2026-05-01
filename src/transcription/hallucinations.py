@@ -6,7 +6,23 @@ logique de detection et de nettoyage.
 """
 
 import re
+import unicodedata
 from typing import Set
+
+
+def _normalize(text: str) -> str:
+    """Normalise un texte pour comparaison robuste aux variantes Unicode.
+
+    - NFKC : forme composée standard (é = U+00E9, pas U+0065 + U+0301)
+    - Apostrophes typographiques (‘ ’) → apostrophe ASCII '
+    - Espaces insécables (   ) → espace normal
+    - lowercase + strip
+    """
+    text = unicodedata.normalize("NFKC", text)
+    text = text.replace("’", "'").replace("‘", "'")
+    text = text.replace(" ", " ").replace(" ", " ")
+    return text.strip().lower()
+
 
 # Hallucinations exactes (comparaison en lowercase, stripped)
 KNOWN_HALLUCINATIONS: Set[str] = {
@@ -39,6 +55,9 @@ KNOWN_HALLUCINATIONS: Set[str] = {
     "c'est bon.", "c'est bon",
     "\u266a", "\U0001f3b5",
 }
+
+# Pr\u00e9-normaliser le set au chargement pour comparaison robuste
+KNOWN_HALLUCINATIONS = {_normalize(h) for h in KNOWN_HALLUCINATIONS}
 
 # Mots generiques courts (comparaison sans ponctuation finale)
 GENERIC_SHORT: Set[str] = {
@@ -83,18 +102,18 @@ def is_hallucination(text: str) -> bool:
     Returns:
         True si c'est probablement une hallucination.
     """
-    text_lower = text.strip().lower()
+    text_norm = _normalize(text)
 
-    if text_lower in KNOWN_HALLUCINATIONS:
+    if text_norm in KNOWN_HALLUCINATIONS:
         return True
 
-    if len(text_lower) < 15 and text_lower.count(" ") <= 2:
-        stripped = text_lower.rstrip(".!? ")
+    if len(text_norm) < 15 and text_norm.count(" ") <= 2:
+        stripped = text_norm.rstrip(".!? ")
         if stripped in GENERIC_SHORT:
             return True
 
     # Même phrase répétée 3+ fois = hallucination
-    sentences = [s.strip() for s in re.split(r'[.!?]+', text_lower) if s.strip()]
+    sentences = [s.strip() for s in re.split(r'[.!?]+', text_norm) if s.strip()]
     if len(sentences) >= 3 and len(set(sentences)) == 1:
         return True
 

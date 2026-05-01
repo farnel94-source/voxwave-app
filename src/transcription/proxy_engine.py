@@ -156,6 +156,17 @@ class ProxyTranscriptionEngine:
         result = resp.json()
         text = result.get("text", "").strip()
 
+        # Vérifier les scores de confiance (même logique que groq_engine)
+        no_speech_prob = result.get("no_speech_prob")
+        avg_logprob = result.get("avg_logprob")
+        if no_speech_prob is not None and avg_logprob is not None:
+            logger.info(f"Proxy qualité: avg_logprob={avg_logprob:.2f}, no_speech_max={no_speech_prob:.2f}")
+            if no_speech_prob > 0.7:
+                logger.warning("Probable silence détecté via proxy, texte rejeté")
+                if self._circuit:
+                    self._circuit.record_success()
+                return ""
+
         # Mettre à jour la langue détectée
         detected_lang = result.get("language")
         if detected_lang:

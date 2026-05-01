@@ -4,6 +4,32 @@ All notable changes to VoxWave will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.1] — 2026-05-01
+
+### Fixed
+- Proxy transcription now rejects low-confidence audio (`no_speech_prob > 0.7`), aligning behavior with the direct Groq engine — silent or muted-mic audio no longer produces hallucinated text.
+- Hallucination detection is now Unicode-robust: typographic apostrophes (`’` → `'`), non-breaking spaces, and composed/decomposed accents are normalized (NFKC) before lookup, so Whisper outputs like "merci d'avoir regardé" are correctly matched against the known set.
+
+### Added
+- Tray notification when no speech is detected (mic muted or weak signal).
+
+## [0.2.0] — 2026-04-10
+
+### Added
+- Proxy mode: `transcribe` and `clean` endpoints route through the VoxWave backend so API keys (Groq, OpenAI) live server-side, never embedded in the desktop app.
+- App-token authentication (`X-App-Token` header) on every proxy request.
+- Anonymous usage telemetry (activate, heartbeat, error) with opt-out toggle in Settings → Advanced.
+- Build-time injection of `proxy_app_token` from `config.production.yaml` (token stays out of the public repo).
+
+### Fixed
+- Hybrid mode now uses the proxy when no API key is present (instead of bypassing it and exposing `cloud` mode).
+- `strip_hallucination_tails` returns the original text when stripping would empty it.
+- Subprocess paths (xclip, xdotool, ollama) resolved to absolute form for security and reliability.
+
+### Security
+- Removed `.env` and `proxy_app_token` from build artifacts; tokens are now injected at build time only.
+- Misleading `cloud_cleaner` warning suppressed when proxy is configured.
+
 ## [0.1.1] — 2026-04-01
 
 ### Fixed
