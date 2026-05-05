@@ -535,6 +535,7 @@ class CleaningPipeline:
         ollama_host: Optional[str] = None,
         proxy_url: Optional[str] = None,
         proxy_app_token: str = "",
+        openai_api_key: Optional[str] = None,
     ) -> None:
         """Initialise le pipeline de nettoyage.
 
@@ -548,6 +549,8 @@ class CleaningPipeline:
             on_fallback: Callback appele lors d'un fallback (message str).
             ollama_host: URL de l'instance Ollama (ex: http://localhost:11435).
             proxy_url: URL du backend proxy (requis si provider == "proxy").
+            proxy_app_token: Token X-App-Token pour authentifier les requêtes proxy.
+            openai_api_key: Clé OpenAI utilisateur (BYOK). Si fournie, bypass le proxy.
         """
         from src.cleaning.regex_cleaner import RegexCleaner
         from src.utils.circuit_breaker import CircuitBreaker
@@ -571,7 +574,10 @@ class CleaningPipeline:
 
         if cleaning_provider in ("hybrid", "cloud"):
             try:
-                self._cloud_cleaner = CloudLLMCleaner(model=cloud_model or "gpt-4o-mini")
+                self._cloud_cleaner = CloudLLMCleaner(
+                    model=cloud_model or "gpt-4o-mini",
+                    api_key=openai_api_key,
+                )
                 self._cloud_cleaner.set_circuit_breaker(self._cloud_circuit)
                 logger.info("CloudLLMCleaner initialisé")
             except Exception as e:

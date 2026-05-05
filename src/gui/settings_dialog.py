@@ -35,6 +35,7 @@ _SETTINGS_T = {
         "nav_general": "General",
         "nav_audio": "Audio",
         "nav_writing": "Writing",
+        "nav_apis": "Cloud APIs",
         "nav_account": "Account",
         "label_hotkey": "Keyboard shortcut",
         "hint_hotkey": "Click then press your combo (e.g. F8, Ctrl+Shift+V)",
@@ -81,12 +82,29 @@ _SETTINGS_T = {
         "section_telemetry": "TELEMETRY",
         "label_telemetry": "Usage telemetry",
         "hint_telemetry": "Sends anonymous stats (dictation count, session duration). No dictated text is sent.",
+        "section_apis_title": "CLOUD APIs (BYOK)",
+        "section_apis_desc": "Use your own API keys for direct, low-latency cloud access. When both keys are set, the app bypasses the proxy and calls Groq + OpenAI directly. Keys are encrypted locally.",
+        "label_groq_key": "Groq API key (transcription)",
+        "hint_groq_key": "Free tier, no credit card required.",
+        "groq_placeholder": "gsk_...",
+        "groq_get_link": "Get a Groq key →",
+        "label_openai_key": "OpenAI API key (cleaning) — optional",
+        "hint_openai_key": "Credit card required. If empty, cleaning falls back to local Ollama or regex.",
+        "openai_placeholder": "sk-...",
+        "openai_get_link": "Get an OpenAI key →",
+        "apis_show_password": "Show",
+        "apis_hide_password": "Hide",
+        "apis_save": "Save keys",
+        "apis_status_proxy": "No keys set — using managed proxy (default).",
+        "apis_status_byok_full": "BYOK active: Groq + OpenAI direct, no proxy.",
+        "apis_status_byok_groq_only": "BYOK partial: Groq direct, cleaning local fallback.",
     },
     "fr": {
         "title": "Parametres",
         "nav_general": "General",
         "nav_audio": "Audio",
         "nav_writing": "Ecriture",
+        "nav_apis": "Cles API",
         "nav_account": "Compte",
         "label_hotkey": "Raccourci clavier",
         "hint_hotkey": "Cliquez puis appuyez sur la combinaison souhaitee (ex: F8, Ctrl+Shift+V)",
@@ -133,11 +151,27 @@ _SETTINGS_T = {
         "section_telemetry": "TELEMETRIE",
         "label_telemetry": "Telemetrie d'usage",
         "hint_telemetry": "Envoie des statistiques anonymes (nombre de dictees, duree de session). Aucun texte dicte n'est envoye.",
+        "section_apis_title": "CLES API CLOUD (BYOK)",
+        "section_apis_desc": "Utilisez vos propres cles API pour un acces cloud direct et plus rapide. Quand les deux cles sont remplies, l'app contourne le proxy et appelle Groq + OpenAI directement. Les cles sont chiffrees localement.",
+        "label_groq_key": "Cle API Groq (transcription)",
+        "hint_groq_key": "Gratuit, sans carte bancaire.",
+        "groq_placeholder": "gsk_...",
+        "groq_get_link": "Obtenir une cle Groq →",
+        "label_openai_key": "Cle API OpenAI (nettoyage) — optionnelle",
+        "hint_openai_key": "Carte bancaire requise. Si vide, le nettoyage retombe sur Ollama local ou regex.",
+        "openai_placeholder": "sk-...",
+        "openai_get_link": "Obtenir une cle OpenAI →",
+        "apis_show_password": "Afficher",
+        "apis_hide_password": "Masquer",
+        "apis_save": "Enregistrer les cles",
+        "apis_status_proxy": "Aucune cle configuree — proxy gere par defaut.",
+        "apis_status_byok_full": "BYOK actif : Groq + OpenAI direct, sans proxy.",
+        "apis_status_byok_groq_only": "BYOK partiel : Groq direct, nettoyage local en fallback.",
     },
     "es": {
         "title": "Configuracion",
         "nav_general": "General", "nav_audio": "Audio",
-        "nav_writing": "Escritura", "nav_account": "Cuenta",
+        "nav_writing": "Escritura", "nav_apis": "Cloud APIs", "nav_account": "Cuenta",
         "label_hotkey": "Atajo de teclado",
         "hint_hotkey": "Haga clic y presione la combinacion (ej: F8, Ctrl+Shift+V)",
         "label_interface_lang": "Idioma de la interfaz",
@@ -185,7 +219,7 @@ _SETTINGS_T = {
     "de": {
         "title": "Einstellungen",
         "nav_general": "Allgemein", "nav_audio": "Audio",
-        "nav_writing": "Schreiben", "nav_account": "Konto",
+        "nav_writing": "Schreiben", "nav_apis": "Cloud APIs", "nav_account": "Konto",
         "label_hotkey": "Tastenkurzel",
         "hint_hotkey": "Klicken und Kombination drucken (z.B. F8, Strg+Umschalt+V)",
         "label_interface_lang": "Oberflachensprache",
@@ -233,7 +267,7 @@ _SETTINGS_T = {
     "it": {
         "title": "Impostazioni",
         "nav_general": "Generale", "nav_audio": "Audio",
-        "nav_writing": "Scrittura", "nav_account": "Account",
+        "nav_writing": "Scrittura", "nav_apis": "Cloud APIs", "nav_account": "Account",
         "label_hotkey": "Scorciatoia tastiera",
         "hint_hotkey": "Clicca e premi la combinazione (es: F8, Ctrl+Shift+V)",
         "label_interface_lang": "Lingua interfaccia",
@@ -281,7 +315,7 @@ _SETTINGS_T = {
     "pt": {
         "title": "Configuracoes",
         "nav_general": "Geral", "nav_audio": "Audio",
-        "nav_writing": "Escrita", "nav_account": "Conta",
+        "nav_writing": "Escrita", "nav_apis": "Cloud APIs", "nav_account": "Conta",
         "label_hotkey": "Atalho de teclado",
         "hint_hotkey": "Clique e pressione a combinacao (ex: F8, Ctrl+Shift+V)",
         "label_interface_lang": "Idioma da interface",
@@ -329,7 +363,7 @@ _SETTINGS_T = {
     "nl": {
         "title": "Instellingen",
         "nav_general": "Algemeen", "nav_audio": "Audio",
-        "nav_writing": "Schrijven", "nav_account": "Account",
+        "nav_writing": "Schrijven", "nav_apis": "Cloud APIs", "nav_account": "Account",
         "label_hotkey": "Sneltoets",
         "hint_hotkey": "Klik en druk op combinatie (bijv. F8, Ctrl+Shift+V)",
         "label_interface_lang": "Interfacetaal",
@@ -377,7 +411,7 @@ _SETTINGS_T = {
     "ja": {
         "title": "設定",
         "nav_general": "一般", "nav_audio": "音声",
-        "nav_writing": "書き方", "nav_account": "アカウント",
+        "nav_writing": "書き方", "nav_apis": "Cloud APIs", "nav_account": "アカウント",
         "label_hotkey": "ショートカットキー",
         "hint_hotkey": "クリックしてキーを押す (例: F8, Ctrl+Shift+V)",
         "label_interface_lang": "表示言語",
@@ -425,7 +459,7 @@ _SETTINGS_T = {
     "ko": {
         "title": "설정",
         "nav_general": "일반", "nav_audio": "오디오",
-        "nav_writing": "작성", "nav_account": "계정",
+        "nav_writing": "작성", "nav_apis": "Cloud APIs", "nav_account": "계정",
         "label_hotkey": "단축키",
         "hint_hotkey": "클릭 후 단축키 입력 (예: F8, Ctrl+Shift+V)",
         "label_interface_lang": "인터페이스 언어",
@@ -473,7 +507,7 @@ _SETTINGS_T = {
     "zh": {
         "title": "设置",
         "nav_general": "常规", "nav_audio": "音频",
-        "nav_writing": "写作", "nav_account": "账户",
+        "nav_writing": "写作", "nav_apis": "Cloud APIs", "nav_account": "账户",
         "label_hotkey": "快捷键",
         "hint_hotkey": "点击后按下组合键 (例: F8, Ctrl+Shift+V)",
         "label_interface_lang": "界面语言",
@@ -521,7 +555,7 @@ _SETTINGS_T = {
     "ru": {
         "title": "Nastrojki",
         "nav_general": "Obshie", "nav_audio": "Audio",
-        "nav_writing": "Pismo", "nav_account": "Akkaunt",
+        "nav_writing": "Pismo", "nav_apis": "Cloud APIs", "nav_account": "Akkaunt",
         "label_hotkey": "Gorjachaja klavisha",
         "hint_hotkey": "Nazhмite i vvedite kombinaciju (napr. F8, Ctrl+Shift+V)",
         "label_interface_lang": "Jazyk interfejsa",
@@ -569,7 +603,7 @@ _SETTINGS_T = {
     "ar": {
         "title": "الإعدادات",
         "nav_general": "عام", "nav_audio": "الصوت",
-        "nav_writing": "الكتابة", "nav_account": "الحساب",
+        "nav_writing": "الكتابة", "nav_apis": "Cloud APIs", "nav_account": "الحساب",
         "label_hotkey": "اختصار لوحة المفاتيح",
         "hint_hotkey": "انقر ثم اضغط المفاتيح (مثال: F8, Ctrl+Shift+V)",
         "label_interface_lang": "لغة الواجهة",
@@ -617,7 +651,7 @@ _SETTINGS_T = {
     "tr": {
         "title": "Ayarlar",
         "nav_general": "Genel", "nav_audio": "Ses",
-        "nav_writing": "Yazma", "nav_account": "Hesap",
+        "nav_writing": "Yazma", "nav_apis": "Cloud APIs", "nav_account": "Hesap",
         "label_hotkey": "Klavye kisayolu",
         "hint_hotkey": "Tiklayip kombinasyonu girin (orn: F8, Ctrl+Shift+V)",
         "label_interface_lang": "Arayuz dili",
@@ -665,7 +699,7 @@ _SETTINGS_T = {
     "pl": {
         "title": "Ustawienia",
         "nav_general": "Ogolne", "nav_audio": "Audio",
-        "nav_writing": "Pisanie", "nav_account": "Konto",
+        "nav_writing": "Pisanie", "nav_apis": "Cloud APIs", "nav_account": "Konto",
         "label_hotkey": "Skrot klawiszowy",
         "hint_hotkey": "Kliknij i nacisnij kombinacje (np. F8, Ctrl+Shift+V)",
         "label_interface_lang": "Jezyk interfejsu",
@@ -713,7 +747,7 @@ _SETTINGS_T = {
     "sv": {
         "title": "Installningar",
         "nav_general": "Allman", "nav_audio": "Ljud",
-        "nav_writing": "Skrivning", "nav_account": "Konto",
+        "nav_writing": "Skrivning", "nav_apis": "Cloud APIs", "nav_account": "Konto",
         "label_hotkey": "Kortkommando",
         "hint_hotkey": "Klicka och tryck kombinationen (t.ex. F8, Ctrl+Shift+V)",
         "label_interface_lang": "Grässnittssprak",
@@ -1095,6 +1129,8 @@ class SettingsDialog(QDialog):
         current_auto_stop_enabled: bool = False,
         current_auto_stop_silence_duration: float = 2.0,
         current_telemetry_enabled: bool = True,
+        current_groq_api_key: str = "",
+        current_openai_api_key: str = "",
         on_quit: Optional[object] = None,
         on_activate_license: Optional[object] = None,
         parent: Optional[QWidget] = None,
@@ -1113,6 +1149,8 @@ class SettingsDialog(QDialog):
         self._auto_stop_enabled = current_auto_stop_enabled
         self._auto_stop_silence_duration = current_auto_stop_silence_duration
         self._telemetry_enabled = current_telemetry_enabled
+        self._groq_api_key = current_groq_api_key or ""
+        self._openai_api_key = current_openai_api_key or ""
         self._on_quit = on_quit
         self._on_activate_license = on_activate_license
 
@@ -1159,12 +1197,13 @@ class SettingsDialog(QDialog):
         title.setStyleSheet("color: #ffffff; padding: 0 16px 12px 16px;")
         sidebar_layout.addWidget(title)
 
-        # Nav items (4 onglets)
+        # Nav items (5 onglets)
         self._nav_items: list[_NavItem] = []
         nav_labels = [
             (_st(self._sys_lang, "nav_general"), "\u2699"),
             (_st(self._sys_lang, "nav_audio"), "\u266b"),
             (_st(self._sys_lang, "nav_writing"), "\u270e"),
+            (_st(self._sys_lang, "nav_apis"), "\u2601"),
             (_st(self._sys_lang, "nav_account"), "\u2606"),
         ]
         for i, (label, icon) in enumerate(nav_labels):
@@ -1186,11 +1225,12 @@ class SettingsDialog(QDialog):
         self._content_stack = QVBoxLayout()
         self._content_stack.setContentsMargins(24, 20, 24, 20)
 
-        # Pages (4 onglets : General, Audio, Ecriture, Compte)
+        # Pages (5 onglets : General, Audio, Ecriture, Cloud APIs, Compte)
         self._pages: list[QWidget] = []
         self._pages.append(self._build_page_general())
         self._pages.append(self._build_page_audio())
         self._pages.append(self._build_page_writing())
+        self._pages.append(self._build_page_cloud_apis())
         self._pages.append(self._build_page_account())
 
         # On utilise un stacked widget avec scroll pour chaque page
@@ -1563,6 +1603,151 @@ class SettingsDialog(QDialog):
         self._auto_stop_duration_spin.setEnabled(checked)
 
     # ================================================================
+    # Page Cloud APIs (BYOK : clés Groq + OpenAI utilisateur)
+    # ================================================================
+
+    def _build_page_cloud_apis(self) -> QWidget:
+        t = _SETTINGS_T.get(self._sys_lang, _SETTINGS_T["en"])
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        # Section header
+        layout.addWidget(self._section_title(_st(self._sys_lang, "section_apis_title")))
+
+        desc = QLabel(_st(self._sys_lang, "section_apis_desc"))
+        desc.setObjectName("hint")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        # ---- Groq key field ----
+        layout.addSpacing(8)
+        layout.addWidget(self._field_label(_st(self._sys_lang, "label_groq_key")))
+
+        groq_row = QHBoxLayout()
+        self._groq_key_edit = QLineEdit()
+        self._groq_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self._groq_key_edit.setPlaceholderText(_st(self._sys_lang, "groq_placeholder"))
+        self._groq_key_edit.setText(self._groq_api_key)
+        self._groq_key_edit.setStyleSheet(
+            "QLineEdit { background: #1f1f2e; color: #e0e0e0; "
+            "border: 1px solid #3b3b5c; border-radius: 6px; padding: 8px; font-size: 13px; }"
+            "QLineEdit:focus { border-color: #60a5fa; }"
+        )
+        groq_row.addWidget(self._groq_key_edit, stretch=1)
+
+        self._groq_toggle_btn = QPushButton(_st(self._sys_lang, "apis_show_password"))
+        self._groq_toggle_btn.setCheckable(True)
+        self._groq_toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._groq_toggle_btn.setStyleSheet(
+            "QPushButton { background: #2a2a3e; color: #c0c0c0; border: 1px solid #3b3b5c; "
+            "border-radius: 6px; padding: 6px 12px; font-size: 12px; }"
+            "QPushButton:hover { background: #3b3b5c; }"
+            "QPushButton:checked { background: #3b82f6; color: white; }"
+        )
+        self._groq_toggle_btn.toggled.connect(
+            lambda checked: self._toggle_password_visibility(self._groq_key_edit, self._groq_toggle_btn, checked)
+        )
+        groq_row.addWidget(self._groq_toggle_btn)
+        layout.addLayout(groq_row)
+
+        groq_hint = QLabel(_st(self._sys_lang, "hint_groq_key"))
+        groq_hint.setObjectName("hint")
+        layout.addWidget(groq_hint)
+
+        groq_link = QLabel(
+            f'<a href="https://console.groq.com/keys" '
+            f'style="color: #60a5fa; text-decoration: none;">'
+            f'{_st(self._sys_lang, "groq_get_link")}</a>'
+        )
+        groq_link.setOpenExternalLinks(True)
+        groq_link.setStyleSheet("font-size: 12px;")
+        layout.addWidget(groq_link)
+
+        # ---- OpenAI key field ----
+        layout.addSpacing(16)
+        layout.addWidget(self._field_label(_st(self._sys_lang, "label_openai_key")))
+
+        openai_row = QHBoxLayout()
+        self._openai_key_edit = QLineEdit()
+        self._openai_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self._openai_key_edit.setPlaceholderText(_st(self._sys_lang, "openai_placeholder"))
+        self._openai_key_edit.setText(self._openai_api_key)
+        self._openai_key_edit.setStyleSheet(self._groq_key_edit.styleSheet())
+        openai_row.addWidget(self._openai_key_edit, stretch=1)
+
+        self._openai_toggle_btn = QPushButton(_st(self._sys_lang, "apis_show_password"))
+        self._openai_toggle_btn.setCheckable(True)
+        self._openai_toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._openai_toggle_btn.setStyleSheet(self._groq_toggle_btn.styleSheet())
+        self._openai_toggle_btn.toggled.connect(
+            lambda checked: self._toggle_password_visibility(self._openai_key_edit, self._openai_toggle_btn, checked)
+        )
+        openai_row.addWidget(self._openai_toggle_btn)
+        layout.addLayout(openai_row)
+
+        openai_hint = QLabel(_st(self._sys_lang, "hint_openai_key"))
+        openai_hint.setObjectName("hint")
+        openai_hint.setWordWrap(True)
+        layout.addWidget(openai_hint)
+
+        openai_link = QLabel(
+            f'<a href="https://platform.openai.com/api-keys" '
+            f'style="color: #60a5fa; text-decoration: none;">'
+            f'{_st(self._sys_lang, "openai_get_link")}</a>'
+        )
+        openai_link.setOpenExternalLinks(True)
+        openai_link.setStyleSheet("font-size: 12px;")
+        layout.addWidget(openai_link)
+
+        # ---- Status indicator ----
+        layout.addSpacing(20)
+        sep = QLabel()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet("background: #2a2a3e;")
+        layout.addWidget(sep)
+
+        layout.addSpacing(12)
+        self._apis_status_label = QLabel()
+        self._apis_status_label.setStyleSheet(
+            "color: #60a5fa; font-size: 12px; font-weight: 600; padding: 8px; "
+            "background: rgba(59,130,246,0.1); border-radius: 6px;"
+        )
+        self._apis_status_label.setWordWrap(True)
+        self._update_apis_status()
+        layout.addWidget(self._apis_status_label)
+
+        # Auto-update status when keys change
+        self._groq_key_edit.textChanged.connect(self._update_apis_status)
+        self._openai_key_edit.textChanged.connect(self._update_apis_status)
+
+        layout.addStretch()
+        return page
+
+    def _toggle_password_visibility(
+        self, edit: QLineEdit, btn: QPushButton, show: bool
+    ) -> None:
+        """Bascule l'affichage d'un champ mot de passe (visible / masqué)."""
+        if show:
+            edit.setEchoMode(QLineEdit.EchoMode.Normal)
+            btn.setText(_st(self._sys_lang, "apis_hide_password"))
+        else:
+            edit.setEchoMode(QLineEdit.EchoMode.Password)
+            btn.setText(_st(self._sys_lang, "apis_show_password"))
+
+    def _update_apis_status(self) -> None:
+        """Met à jour le label de statut BYOK selon les clés saisies."""
+        has_groq = bool(self._groq_key_edit.text().strip())
+        has_openai = bool(self._openai_key_edit.text().strip())
+        if has_groq and has_openai:
+            self._apis_status_label.setText(_st(self._sys_lang, "apis_status_byok_full"))
+        elif has_groq:
+            self._apis_status_label.setText(_st(self._sys_lang, "apis_status_byok_groq_only"))
+        else:
+            self._apis_status_label.setText(_st(self._sys_lang, "apis_status_proxy"))
+
+    # ================================================================
     # Page Compte (licence + aide + a propos + quitter)
     # ================================================================
 
@@ -1699,6 +1884,10 @@ class SettingsDialog(QDialog):
 
     def navigate_to_help(self) -> None:
         """Ouvre directement sur l'onglet Compte qui contient l'aide (appele depuis tray)."""
+        self._navigate(4)
+
+    def navigate_to_cloud_apis(self) -> None:
+        """Ouvre directement l'onglet 'Cloud APIs' (BYOK)."""
         self._navigate(3)
 
     # ================================================================
@@ -1773,3 +1962,13 @@ class SettingsDialog(QDialog):
     def telemetry_enabled(self) -> bool:
         """Retourne l'etat du toggle telemetrie."""
         return self._telemetry_check.isChecked()
+
+    @property
+    def groq_api_key(self) -> str:
+        """Retourne la cle Groq saisie (vide si non configuree)."""
+        return self._groq_key_edit.text().strip()
+
+    @property
+    def openai_api_key(self) -> str:
+        """Retourne la cle OpenAI saisie (vide si non configuree)."""
+        return self._openai_key_edit.text().strip()

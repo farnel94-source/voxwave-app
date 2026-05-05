@@ -404,6 +404,7 @@ class VoxWave:
         self._prog_injector = None
         self._telemetry = None
         self._hotkey_bridge = None
+        self._api_key_storage = None  # APIKeyStorage (BYOK), instancié dans initialize()
 
     def initialize(self) -> None:
         """Initialise tous les composants."""
@@ -413,6 +414,14 @@ class VoxWave:
         from src.cleaning.llm_cleaner import CleaningPipeline
         from src.injection.keyboard import TextInjector
         from src.hotkey.listener import HotkeyListener
+        from src.security.api_keys_storage import APIKeyStorage
+
+        # BYOK : stockage chiffré des clés API utilisateur (gracieux si filesystem read-only)
+        try:
+            self._api_key_storage = APIKeyStorage()
+        except Exception as e:
+            logger.warning(f"APIKeyStorage indisponible ({type(e).__name__}), BYOK désactivé")
+            self._api_key_storage = None
 
         logger.info("Initialisation VoxWave...")
 
@@ -458,7 +467,12 @@ class VoxWave:
         )
 
         # Choix du moteur de transcription
+        # BYOK : si clés utilisateur présentes, on force le mode "cloud" direct (bypass proxy)
         transcription_provider = self.config.get("transcription", {}).get("provider", "local")
+        byok_groq = self._api_key_storage.get_groq_key() if self._api_key_storage else None
+        if byok_groq:
+            logger.info("BYOK Groq: provider transcription forcé en 'cloud' direct")
+            transcription_provider = "cloud"
         self.engine = self._create_transcription_engine(transcription_provider)
 
         # Auto-détecter l'hôte Ollama au démarrage
@@ -470,6 +484,11 @@ class VoxWave:
         cleaning_provider = cleaning_config.get("provider", "local")
         cloud_model = cleaning_config.get("cloud_model", "gpt-4o-mini")
         filler_words = cleaning_config.get("filler_words")
+        # BYOK : si clé OpenAI présente, on force le cleaning en mode "cloud" direct (bypass proxy)
+        byok_openai = self._api_key_storage.get_openai_key() if self._api_key_storage else None
+        if byok_openai:
+            logger.info("BYOK OpenAI: provider cleaning forcé en 'cloud' direct")
+            cleaning_provider = "cloud"
         self.pipeline = CleaningPipeline(
             mode=cleaning_config["mode"],
             llm_model=cleaning_config["llm_model"],
@@ -481,6 +500,7 @@ class VoxWave:
             on_fallback=self._on_fallback,
             proxy_url=cleaning_config.get("proxy_url", ""),
             proxy_app_token=cleaning_config.get("proxy_app_token", ""),
+            openai_api_key=byok_openai,
         )
 
         # Informer si mode auto actif sans clé OpenAI disponible
@@ -680,26 +700,37 @@ class VoxWave:
 
         Appelé quand le mode ou le provider change en cours de session,
         pour garantir que les cleaners LLM sont bien initialisés.
+        Applique la logique BYOK : si une clé OpenAI utilisateur est présente,
+        on force le provider en "cloud" direct (bypass proxy).
         """
         from src.cleaning.llm_cleaner import CleaningPipeline
 
         cleaning_config = self.config.get("cleaning", {})
+        provider = cleaning_config.get("provider", "local")
+        byok_openai = self._api_key_storage.get_openai_key() if self._api_key_storage else None
+        if byok_openai:
+            provider = "cloud"
         self.pipeline = CleaningPipeline(
             mode=cleaning_config["mode"],
             llm_model=cleaning_config["llm_model"],
             cloud_model=cleaning_config.get("cloud_model", "gpt-4o-mini"),
-            cleaning_provider=cleaning_config.get("provider", "local"),
+            cleaning_provider=provider,
             language=self.config["whisper"]["language"],
             filler_words=cleaning_config.get("filler_words"),
             ollama_host=cleaning_config.get("ollama_host", "http://localhost:11434"),
             on_fallback=self._on_fallback,
             proxy_url=cleaning_config.get("proxy_url", ""),
             proxy_app_token=cleaning_config.get("proxy_app_token", ""),
+            openai_api_key=byok_openai,
         )
-        logger.info(f"Pipeline recréé : mode={cleaning_config['mode']}, provider={cleaning_config.get('provider', 'local')}")
+        byok_marker = " (BYOK)" if byok_openai else ""
+        logger.info(f"Pipeline recréé : mode={cleaning_config['mode']}, provider={provider}{byok_marker}")
 
     def _create_transcription_engine(self, provider: str) -> object:
         """Cree le moteur de transcription selon le provider configure.
+
+        Applique la logique BYOK : si une clé Groq utilisateur est présente,
+        elle est passée aux engines cloud/hybrid pour bypass le proxy.
 
         Args:
             provider: hybrid, cloud, ou local.
@@ -710,6 +741,8 @@ class VoxWave:
         language = self.config["whisper"]["language"]
         sample_rate = self.config["audio"]["sample_rate"]
         interface_lang = self.config.get("language", "en")
+        storage = getattr(self, "_api_key_storage", None)
+        byok_groq = storage.get_groq_key() if storage else None
 
         if provider == "proxy":
             from src.transcription.hybrid_engine import HybridTranscriptionEngine
@@ -725,6 +758,7 @@ class VoxWave:
                 transcription_provider="proxy",
                 proxy_url=trans_config.get("proxy_url", ""),
                 proxy_app_token=trans_config.get("proxy_app_token", ""),
+                groq_api_key=byok_groq,
             )
         elif provider == "hybrid":
             from src.transcription.hybrid_engine import HybridTranscriptionEngine
@@ -740,6 +774,7 @@ class VoxWave:
                 transcription_provider="hybrid",
                 proxy_url=trans_config.get("proxy_url", ""),
                 proxy_app_token=trans_config.get("proxy_app_token", ""),
+                groq_api_key=byok_groq,
             )
         elif provider == "cloud":
             from src.transcription.groq_engine import GroqWhisperEngine
@@ -747,6 +782,7 @@ class VoxWave:
             return GroqWhisperEngine(
                 model=groq_model, language=language, sample_rate=sample_rate,
                 interface_language=interface_lang,
+                api_key=byok_groq,
             )
         else:
             from src.transcription.whisper_engine import WhisperEngine
@@ -1351,6 +1387,8 @@ class VoxWave:
             current_auto_stop_enabled=self.config.get("audio", {}).get("auto_stop_enabled", False),
             current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
             current_telemetry_enabled=self.config.get("telemetry", {}).get("enabled", True),
+            current_groq_api_key=(self._api_key_storage.get_groq_key() or "") if self._api_key_storage else "",
+            current_openai_api_key=(self._api_key_storage.get_openai_key() or "") if self._api_key_storage else "",
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
             parent=None,
@@ -1387,6 +1425,8 @@ class VoxWave:
             current_auto_stop_enabled=self.config.get("audio", {}).get("auto_stop_enabled", False),
             current_auto_stop_silence_duration=self.config.get("audio", {}).get("auto_stop_silence_duration", 2.0),
             current_telemetry_enabled=self.config.get("telemetry", {}).get("enabled", True),
+            current_groq_api_key=(self._api_key_storage.get_groq_key() or "") if self._api_key_storage else "",
+            current_openai_api_key=(self._api_key_storage.get_openai_key() or "") if self._api_key_storage else "",
             on_quit=self._shutdown,
             on_activate_license=self._activate_license_dialog,
             parent=None,
@@ -1534,6 +1574,31 @@ class VoxWave:
                 self._telemetry.set_enabled(new_telemetry)
             status = "activee" if new_telemetry else "desactivee"
             changes.append(f"Telemetrie {status}")
+
+        # BYOK : clés API utilisateur
+        if self._api_key_storage is not None:
+            new_groq = dialog.groq_api_key
+            new_openai = dialog.openai_api_key
+            current_groq = self._api_key_storage.get_groq_key() or ""
+            current_openai = self._api_key_storage.get_openai_key() or ""
+            keys_changed = False
+            if new_groq != current_groq:
+                self._api_key_storage.set_groq_key(new_groq or None)
+                changes.append("Cle Groq mise a jour" if new_groq else "Cle Groq retiree")
+                keys_changed = True
+            if new_openai != current_openai:
+                self._api_key_storage.set_openai_key(new_openai or None)
+                changes.append("Cle OpenAI mise a jour" if new_openai else "Cle OpenAI retiree")
+                keys_changed = True
+            if keys_changed:
+                # Hot-reload : recreer engine + pipeline avec la nouvelle config BYOK.
+                # Sous _processing_lock pour eviter qu'une dictee en cours utilise un
+                # engine intermediaire (ex: transcribe avec ancien proxy + clean avec
+                # nouveau cloud direct → mismatch d'etat de langue).
+                trans_provider = self.config.get("transcription", {}).get("provider", "local")
+                with self._processing_lock:
+                    self.engine = self._create_transcription_engine(trans_provider)
+                    self._rebuild_pipeline()
 
         if changes and self.tray:
             self.tray.show_notification("VoxWave", "Parametres mis a jour")

@@ -29,6 +29,7 @@ class HybridTranscriptionEngine:
         transcription_provider: str = "hybrid",
         proxy_url: Optional[str] = None,
         proxy_app_token: str = "",
+        groq_api_key: Optional[str] = None,
     ) -> None:
         """Initialise les engines cloud et local.
 
@@ -41,6 +42,8 @@ class HybridTranscriptionEngine:
             interface_language: Langue d'interface (hint initial en mode auto).
             transcription_provider: Provider (hybrid, cloud, local, proxy).
             proxy_url: URL du backend proxy (requis si provider == "proxy").
+            proxy_app_token: Token X-App-Token pour authentifier les requêtes proxy.
+            groq_api_key: Clé Groq utilisateur (BYOK). Si fournie, bypass le proxy.
         """
         self._language = language
         self.sample_rate = sample_rate
@@ -54,10 +57,14 @@ class HybridTranscriptionEngine:
         self._transcription_provider = transcription_provider
         self._proxy_url = proxy_url
         self._proxy_app_token = proxy_app_token
+        self._groq_api_key = groq_api_key
         self._last_detected_language: Optional[str] = None
         self._circuit = CircuitBreaker(name="groq", failure_threshold=3, cooldown_seconds=30.0)
 
-        if proxy_url and transcription_provider in ("proxy", "hybrid", "cloud"):
+        # BYOK : si une clé Groq utilisateur est fournie, on bypass le proxy entièrement
+        # (même en mode hybrid). Sinon, on garde le routage proxy → groq → local classique.
+        skip_proxy = bool(groq_api_key)
+        if proxy_url and not skip_proxy and transcription_provider in ("proxy", "hybrid", "cloud"):
             self._init_proxy()
         if transcription_provider in ("hybrid", "cloud"):
             self._init_groq()
@@ -110,6 +117,7 @@ class HybridTranscriptionEngine:
                 language=self.language,
                 sample_rate=self.sample_rate,
                 interface_language=self._interface_language,
+                api_key=self._groq_api_key,
             )
             self._groq_engine.set_circuit_breaker(self._circuit)
             logger.info("Groq engine initialisé")
