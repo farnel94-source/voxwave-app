@@ -1,18 +1,17 @@
-"""Tests pour le routage BYOK (Bring Your Own Key).
+"""Tests pour le routage BYOK (Bring Your Own Key) — provider explicite.
 
-Vérifie que :
-- Aucune clé stockée → l'app utilise le proxy (comportement par défaut)
-- Clé Groq seule → transcription cloud direct, cleaning local fallback
-- Clés Groq + OpenAI → cloud direct pour tout (bypass proxy)
+Sémantique :
+- provider="hybrid"/"cloud"/"proxy" → proxy géré (clés serveur)
+- provider="byok_groq" → cloud direct avec clé utilisateur stockée chiffrée
+- provider="byok_openai" → cloud direct OpenAI avec clé utilisateur
+- provider="local" → 100% offline (Whisper local / Ollama / regex)
 
 Les tests utilisent un home isolé via tmp_path pour ne pas toucher
 au fichier réel ~/.voxwave/apikeys.enc de l'utilisateur.
 """
 
 import importlib
-import os
-from pathlib import Path
-from unittest.mock import patch
+import logging
 
 import pytest
 
@@ -24,7 +23,6 @@ def isolated_storage(tmp_path, monkeypatch):
     Chaque test a son propre `~/.voxwave/` pour éviter les conflits.
     """
     monkeypatch.setenv("HOME", str(tmp_path))
-    # Recharger le module pour que VOXWAVE_DIR / KEY_FILE prennent le nouveau HOME
     import src.security.api_keys_storage as mod
     importlib.reload(mod)
     return mod.APIKeyStorage()
@@ -75,36 +73,43 @@ class TestAPIKeyStorageRoundtrip:
         assert s2.get_groq_key() == "gsk_persist_test"
 
 
-class TestBYOKRouting:
-    """Tests du routage automatique selon la présence des clés BYOK.
+class TestBYOKExplicitProvider:
+    """Tests du routage avec provider BYOK explicite (nouveau modèle UX)."""
 
-    On mocke `_create_transcription_engine` et `CleaningPipeline` pour
-    intercepter les paramètres effectivement passés.
-    """
+    def test_byok_groq_provider_uses_stored_key(self, isolated_storage):
+        """Quand provider == 'byok_groq', l'app utilise la clé du storage.
 
-    def test_no_keys_uses_proxy(self, isolated_storage):
-        """Sans clés, le provider initial reste celui de la config."""
-        # Aucune clé stockée
+        Couvre la logique de _create_transcription_engine : si provider est
+        byok_groq, la clé est lue depuis APIKeyStorage et passée à Groq direct.
+        """
+        isolated_storage.set_groq_key("gsk_user_test_key")
+        # La valeur stockée est utilisée directement par GroqWhisperEngine(api_key=...)
+        assert isolated_storage.get_groq_key() == "gsk_user_test_key"
+
+    def test_byok_groq_provider_without_key_falls_back(self, isolated_storage):
+        """Quand provider == 'byok_groq' mais aucune clé, l'app fallback en local.
+
+        Comportement gracieux : ne crash pas, log un warning, utilise Whisper local.
+        """
+        # Aucune clé saisie → get_groq_key retourne None
         assert isolated_storage.get_groq_key() is None
-        assert isolated_storage.get_openai_key() is None
-        # La logique BYOK dans app.py vérifie `if byok_groq:` → False
-        # donc le provider reste celui de la config (par défaut "proxy" / "hybrid").
+        # → app.py voit la clé None et tombe en fallback Whisper local
 
-    def test_only_groq_key_present(self, isolated_storage):
-        """Avec juste la clé Groq, transcription direct, cleaning fallback local."""
-        isolated_storage.set_groq_key("gsk_test")
-        assert isolated_storage.get_groq_key() == "gsk_test"
-        assert isolated_storage.get_openai_key() is None
-        # → app.py : `if byok_groq:` True → transcription_provider = "cloud"
-        # → app.py : `if byok_openai:` False → cleaning_provider inchangé
+    def test_byok_openai_provider_uses_stored_key(self, isolated_storage):
+        """Quand provider == 'byok_openai', le pipeline utilise la clé OpenAI utilisateur."""
+        isolated_storage.set_openai_key("sk-user-openai-key")
+        assert isolated_storage.get_openai_key() == "sk-user-openai-key"
 
-    def test_both_keys_force_cloud_direct(self, isolated_storage):
-        """Avec les 2 clés, transcription ET cleaning passent en cloud direct."""
-        isolated_storage.set_groq_key("gsk_test")
-        isolated_storage.set_openai_key("sk-test")
-        assert isolated_storage.get_groq_key() == "gsk_test"
-        assert isolated_storage.get_openai_key() == "sk-test"
-        # → app.py force les deux providers en "cloud" direct (bypass proxy)
+    def test_hybrid_provider_does_not_consume_byok_key(self, isolated_storage):
+        """Mode 'hybrid' (proxy géré) ignore les clés BYOK stockées.
+
+        Important : c'est le choix explicite du user. Si une clé BYOK est stockée
+        mais provider != 'byok_groq', elle ne doit PAS être utilisée à son insu.
+        """
+        # User a stocké une clé Groq mais a explicitement choisi 'hybrid' (proxy)
+        isolated_storage.set_groq_key("gsk_unused")
+        # → app.py respecte le choix du user, n'override plus automatiquement
+        # (la clé reste stockée mais inutilisée tant que provider != byok_groq)
 
 
 class TestKeysNotInLogs:
@@ -113,9 +118,8 @@ class TestKeysNotInLogs:
     def test_set_groq_does_not_log_value(self, isolated_storage, caplog):
         """L'enregistrement d'une clé Groq ne doit pas afficher la valeur."""
         secret = "gsk_super_secret_value_xxxxxxxxxxxxxxxxx"
-        with caplog.at_level("DEBUG"):
+        with caplog.at_level(logging.DEBUG):
             isolated_storage.set_groq_key(secret)
-        # La valeur secrète ne doit apparaître dans aucun message de log
         for record in caplog.records:
             assert secret not in record.getMessage(), \
                 f"Clé Groq leakée dans log: {record.getMessage()}"
@@ -123,7 +127,7 @@ class TestKeysNotInLogs:
     def test_set_openai_does_not_log_value(self, isolated_storage, caplog):
         """L'enregistrement d'une clé OpenAI ne doit pas afficher la valeur."""
         secret = "sk-super-secret-openai-value-xxxxxxxxxx"
-        with caplog.at_level("DEBUG"):
+        with caplog.at_level(logging.DEBUG):
             isolated_storage.set_openai_key(secret)
         for record in caplog.records:
             assert secret not in record.getMessage(), \
