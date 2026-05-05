@@ -81,14 +81,14 @@ _SETTINGS_T = {
         "section_telemetry": "TELEMETRY",
         "label_telemetry": "Usage telemetry",
         "hint_telemetry": "Sends anonymous stats (dictation count, session duration). No dictated text is sent.",
-        "trans_voxwave_cloud": "VoxWave Cloud (Groq, free)",
+        "trans_hybrid": "VoxWave Cloud + Local fallback (recommended)",
+        "trans_voxwave_cloud": "VoxWave Cloud only (Groq, free)",
         "trans_byok_groq": "Your own Groq API key",
         "trans_local": "Local Whisper (offline)",
-        "trans_hybrid": "Hybrid (cloud + local fallback)",
-        "clean_voxwave_cloud": "VoxWave Cloud (OpenAI, free)",
+        "clean_hybrid": "VoxWave Cloud + Local fallback (recommended)",
+        "clean_voxwave_cloud": "VoxWave Cloud only (OpenAI, free)",
         "clean_byok_openai": "Your own OpenAI API key",
         "clean_local": "Local Ollama (offline)",
-        "clean_hybrid": "Hybrid (cloud + local fallback)",
         "clean_regex": "Regex only (no AI)",
         "byok_groq_label": "Your Groq API key",
         "byok_groq_hint": "Free, no credit card required.",
@@ -150,14 +150,14 @@ _SETTINGS_T = {
         "section_telemetry": "TELEMETRIE",
         "label_telemetry": "Telemetrie d'usage",
         "hint_telemetry": "Envoie des statistiques anonymes (nombre de dictees, duree de session). Aucun texte dicte n'est envoye.",
-        "trans_voxwave_cloud": "VoxWave Cloud (Groq, gratuit)",
+        "trans_hybrid": "VoxWave Cloud + Local en fallback (recommandé)",
+        "trans_voxwave_cloud": "VoxWave Cloud uniquement (Groq, gratuit)",
         "trans_byok_groq": "Ma propre cle Groq",
         "trans_local": "Whisper local (hors ligne)",
-        "trans_hybrid": "Hybride (cloud + local en fallback)",
-        "clean_voxwave_cloud": "VoxWave Cloud (OpenAI, gratuit)",
+        "clean_hybrid": "VoxWave Cloud + Local en fallback (recommandé)",
+        "clean_voxwave_cloud": "VoxWave Cloud uniquement (OpenAI, gratuit)",
         "clean_byok_openai": "Ma propre cle OpenAI",
         "clean_local": "Ollama local (hors ligne)",
-        "clean_hybrid": "Hybride (cloud + local en fallback)",
         "clean_regex": "Regex uniquement (sans IA)",
         "byok_groq_label": "Votre cle API Groq",
         "byok_groq_hint": "Gratuit, sans carte bancaire.",
@@ -1436,14 +1436,15 @@ class SettingsDialog(QDialog):
         layout.addWidget(self._field_label(t["label_trans_provider"]))
         self._trans_combo = QComboBox()
         trans_options = [
-            ("hybrid", _st(self._sys_lang, "trans_voxwave_cloud")),
+            ("hybrid", _st(self._sys_lang, "trans_hybrid")),
+            ("cloud", _st(self._sys_lang, "trans_voxwave_cloud")),
             ("byok_groq", _st(self._sys_lang, "trans_byok_groq")),
             ("local", _st(self._sys_lang, "trans_local")),
         ]
         current_trans_idx = 0
-        # Compatibilite : ancien provider "cloud" mappe vers "hybrid" (proxy gere)
+        # Compatibilite : ancien "proxy" mappe sur "hybrid" (meme comportement client)
         effective_trans = self._transcription_provider
-        if effective_trans == "cloud" or effective_trans == "proxy":
+        if effective_trans == "proxy":
             effective_trans = "hybrid"
         for i, (val, label) in enumerate(trans_options):
             self._trans_combo.addItem(label, val)
@@ -1472,15 +1473,16 @@ class SettingsDialog(QDialog):
         layout.addWidget(self._field_label(t["label_clean_provider"]))
         self._clean_combo = QComboBox()
         clean_options = [
-            ("hybrid", _st(self._sys_lang, "clean_voxwave_cloud")),
+            ("hybrid", _st(self._sys_lang, "clean_hybrid")),
+            ("cloud", _st(self._sys_lang, "clean_voxwave_cloud")),
             ("byok_openai", _st(self._sys_lang, "clean_byok_openai")),
             ("local", _st(self._sys_lang, "clean_local")),
             ("regex", _st(self._sys_lang, "clean_regex")),
         ]
         current_clean_idx = 0
-        # Compatibilite : ancien "cloud"/"proxy" -> "hybrid"
+        # Compatibilite : ancien "proxy" -> "hybrid"
         effective_clean = self._cleaning_provider
-        if effective_clean == "cloud" or effective_clean == "proxy":
+        if effective_clean == "proxy":
             effective_clean = "hybrid"
         for i, (val, label) in enumerate(clean_options):
             self._clean_combo.addItem(label, val)
