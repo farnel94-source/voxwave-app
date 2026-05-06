@@ -93,6 +93,7 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 - **Endpoints** : `POST /api/v1/transcribe` (multipart audio) + `POST /api/v1/clean` (JSON texte)
 - **Context profiles** : le proxy respecte `context_profile` (code/casual/email/document/default) — prompt adapte cote serveur
 - **PIEGE** : `app.py._create_transcription_engine()` doit passer `transcription_provider`, `proxy_url` et `proxy_app_token` a `HybridTranscriptionEngine`. Idem pour `CleaningPipeline` dans `_rebuild_pipeline()`.
+- **PIEGE dev runtime (v0.2.2)** : en dev (non frozen), `build.py:_inject_production_secrets()` n'est jamais executé donc le token n'est pas dans `config.yaml`. `load_config()` (`src/app.py:166`) lit alors `config.production.yaml` à côté de `config.yaml` ET injecte `proxy_app_token` dans les sections `transcription` + `cleaning`. Mirroir exact de `build.py`. Si `config.production.yaml` n'existe pas → fallback gracieux silent vers regex/local. Sans ce mécanisme : header `X-App-Token` vide → backend renvoie 422 → warning "Proxy streaming fallback".
 
 ## BYOK — Bring Your Own Key (feat/byok-settings)
 - **Objectif** : permettre à l'utilisateur de coller sa propre clé Groq / OpenAI dans Settings et bypasser le proxy. Coexiste avec Hybrid (recommandé) sans rien changer aux modes existants.
@@ -395,6 +396,14 @@ sudo apt install libxcb-cursor0 xclip xdotool
 - **`sys.stdout` None en mode windowed** : PyInstaller `--noconsole` met `sys.stdout = None`. Toujours `if sys.stdout is not None:` avant `reconfigure()`.
 - **`config.yaml` bundle** : PyInstaller copie le `config.yaml` du projet tel quel. Ne JAMAIS laisser `first_launch: false` dedans — ca skip l'onboarding pour tous les utilisateurs. Le config source ne doit PAS contenir `first_launch` (le defaut `True` vient de `DEFAULT_CONFIG`).
 - **`silero_vad_v6.onnx`** : necessaire pour `faster_whisper` avec `vad_filter=True`. Doit etre bundle dans `faster_whisper/assets/` du build.
+- **Bump version (v0.2.2+)** : 4 endroits a synchroniser avant chaque release :
+  - `src/__init__.py` : `__version__ = "X.Y.Z"`
+  - `setup.py` : `version="X.Y.Z"`
+  - `installers/voxwave.iss` : `#define MyAppVersion "X.Y.Z"` (sinon `OutputBaseFilename=VoxWave-Setup-{#MyAppVersion}` sort avec l'ancienne version)
+  - `CHANGELOG.md` : nouvelle entree datee
+  - **PIEGE** : `installers/` est dans `.gitignore`. Pour committer le bump iss : `git add -f installers/voxwave.iss`.
+  - TODO : centraliser dans `build.py` (lire `__version__` et generer `voxwave.iss` a la volee).
+- **Strings de version dans l'UI (v0.2.2+)** : `src/gui/settings_dialog.py` (sidebar + onglet Aide) et `src/gui/tray_icon.py` (notification About) doivent utiliser `from src import __version__` + `f"VoxWave v{__version__}"`. Anciennement codes en dur "VoxWave v2.1" → l'UI affichait l'ancienne version meme apres bump. Verifier au build : `grep -n "VoxWave v[0-9]" src/gui/` ne doit retourner que des f-strings.
 
 ## Lancement — Avancement (2 avril 2026)
 - [x] Repo GitHub public
