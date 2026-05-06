@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="voxwave",
-    version="0.2.1",
+    version="0.2.2",
     description="Dictée vocale intelligente - Parle, transcrit, nettoie, colle.",
     author="VoxWave",
     python_requires=">=3.11",

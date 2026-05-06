@@ -4,6 +4,16 @@ All notable changes to VoxWave will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.2] — 2026-05-06
+
+### Added
+- **BYOK (Bring Your Own Key)** — Users can paste their own Groq or OpenAI API keys in Settings → Advanced. Keys are stored locally encrypted (Fernet, `~/.voxwave/apikeys.enc`, 0o600), never logged in cleartext, never sent anywhere except to the provider. Useful for power users who want to bypass the VoxWave proxy quota or use their own billing.
+- New transcription provider option: **Your own Groq API key** (free tier, no card required).
+- New cleaning provider option: **Your own OpenAI API key** (card required).
+
+### Fixed
+- **Dev runtime: proxy `X-App-Token` header is now sent.** When running from source (non-frozen), `load_config()` reads `config.production.yaml` and injects `proxy_app_token` into `transcription` and `cleaning` sections — mirroring the build-time injection. Production builds are unchanged.
+
 ## [0.2.1] — 2026-05-01
 
 ### Fixed
