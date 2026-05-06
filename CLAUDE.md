@@ -94,6 +94,36 @@ Hotkey (start) → Capture audio → Hotkey (stop) → Transcription (Groq → W
 - **Context profiles** : le proxy respecte `context_profile` (code/casual/email/document/default) — prompt adapte cote serveur
 - **PIEGE** : `app.py._create_transcription_engine()` doit passer `transcription_provider`, `proxy_url` et `proxy_app_token` a `HybridTranscriptionEngine`. Idem pour `CleaningPipeline` dans `_rebuild_pipeline()`.
 
+## BYOK — Bring Your Own Key (feat/byok-settings)
+- **Objectif** : permettre à l'utilisateur de coller sa propre clé Groq / OpenAI dans Settings et bypasser le proxy. Coexiste avec Hybrid (recommandé) sans rien changer aux modes existants.
+- **Stockage chiffré** : `src/security/api_keys_storage.py` → `APIKeyStorage` (Fernet)
+  - Clé Fernet partagée avec `LicenseStorage` : `~/.voxwave/.key` (0o600, créée atomiquement via `os.O_EXCL`)
+  - Fichier des clés : `~/.voxwave/apikeys.enc` (chiffré JSON `{groq_api_key, openai_api_key}`, 0o600 atomique via `O_CREAT|O_TRUNC`)
+  - API : `get_groq_key()` / `get_openai_key()` retournent `None` si vide ou absent ; `set_*_key(None)` supprime ; `clear_all()` efface le fichier
+  - Les clés ne sont JAMAIS loguées en clair (logs disent juste "clé Groq mise à jour (BYOK)")
+- **UI Settings — onglet Avancé** : les choix BYOK sont des items dans les dropdowns existants (PAS d'onglet séparé)
+  - Dropdown transcription : `byok_groq` (clé Groq utilisateur) en plus de `hybrid` / `proxy` / `cloud` / `local`
+  - Dropdown nettoyage : `byok_openai` (clé OpenAI utilisateur) en plus de `hybrid` / `proxy` / `cloud` / `local` / `regex`
+  - Champs clé : `_byok_groq_container` / `_byok_openai_container` visibles UNIQUEMENT quand le provider correspondant est sélectionné (`_update_byok_visibility`)
+  - Champ password masqué par défaut (`QLineEdit.Password`) + bouton Show/Hide + lien "Get a key →"
+  - Helper de construction : `_build_byok_field(label, field, hint, link_text, link_url)` dans `settings_dialog.py`
+- **Routage app.py — `_create_transcription_engine()`** :
+  - `provider == "byok_groq"` → `GroqWhisperEngine` direct avec `api_key=storage.get_groq_key()`. Si clé absente → fallback Whisper local + warning log.
+  - Les autres modes (`proxy`, `hybrid`, `cloud`) ne reçoivent JAMAIS la clé BYOK Groq (`byok_groq = None`) — pas d'override implicite, séparation stricte.
+- **Routage app.py — `CleaningPipeline` (`initialize()` + `_rebuild_pipeline()`)** :
+  - `cleaning_provider == "byok_openai"` → bascule en interne sur `effective_clean_provider = "cloud"` ET passe `openai_api_key=storage.get_openai_key()` au pipeline.
+  - `CleaningPipeline.openai_api_key` (`llm_cleaner.py:553`) : si fourni, instancie `CloudOpenAICleaner` direct avec cette clé et bypass le `ProxyLLMCleaner`.
+- **Sauvegarde Settings (`_on_settings`, app.py:1595+)** :
+  - Lit la clé du champ uniquement si le provider correspondant est sélectionné — sinon ne touche pas au storage (un user qui change de mode sans toucher la clé conserve sa clé).
+  - Après sauvegarde : recrée le moteur de transcription (`_create_transcription_engine`) et le pipeline (`_rebuild_pipeline`) pour appliquer la nouvelle clé sans relancer l'app.
+- **Tests** : `tests/test_byok_routing.py` (134 lignes) couvre :
+  - storage round-trip + suppression via `set_*_key(None)`
+  - routage `byok_groq` → `GroqWhisperEngine` avec la bonne clé
+  - routage `byok_openai` → `CleaningPipeline(openai_api_key=...)` + `effective_clean_provider == "cloud"`
+  - fallback Whisper local quand `byok_groq` sélectionné sans clé
+- **PIEGE** : si `_api_key_storage = None` (filesystem read-only au démarrage), l'app continue mais BYOK désactivé silencieusement → `get_*_key()` retourne `None` partout, fallback automatique vers Whisper local / regex. Vérifier `getattr(self, "_api_key_storage", None)` avant utilisation.
+- **PIEGE refactor** : Hybrid avait été retiré comme option dropdown puis restauré (commit `2290a3c`) — c'est le défaut recommandé, NE PAS le supprimer. BYOK est un complément, pas un remplacement.
+
 ## Resilience hors-ligne
 - **Circuit breaker** (`src/utils/circuit_breaker.py`) : 3 etats (CLOSED → OPEN → HALF_OPEN), thread-safe
 - Groq : 3 echecs consecutifs → skip cloud pendant 60s → fallback Whisper local
