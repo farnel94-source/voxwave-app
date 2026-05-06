@@ -189,6 +189,24 @@ def load_config(config_path: str = "config.yaml") -> dict:
         logger.error(f"Erreur parsing config: {e}, utilisation des defauts")
         user_config = {}
 
+    # En dev (non frozen) : injecte le proxy_app_token de config.production.yaml si présent.
+    # Reproduit le comportement de build.py:_inject_production_secrets() pour que
+    # les chemins proxy/hybrid soient testables en dev sans committer le secret.
+    # En prod (frozen), le token est déjà dans le bundle, donc on skip.
+    if not getattr(sys, "frozen", False):
+        prod_path = os.path.join(os.path.dirname(resolved_path), "config.production.yaml")
+        if os.path.exists(prod_path):
+            try:
+                with open(prod_path, "r") as f:
+                    secrets = yaml.safe_load(f) or {}
+                token = secrets.get("proxy_app_token", "")
+                if token:
+                    user_config.setdefault("transcription", {})["proxy_app_token"] = token
+                    user_config.setdefault("cleaning", {})["proxy_app_token"] = token
+                    logger.info("proxy_app_token chargé depuis config.production.yaml (dev)")
+            except yaml.YAMLError as e:
+                logger.warning(f"config.production.yaml invalide: {e}")
+
     return ConfigValidator.validate_and_merge(user_config)
 
 
