@@ -5,6 +5,7 @@ import os
 import sys
 from typing import Optional
 
+from src import __version__
 from src.config.defaults import WHISPER_LANGUAGES
 
 from PySide6.QtCore import Qt, Signal
@@ -1214,7 +1215,7 @@ class SettingsDialog(QDialog):
         sidebar_layout.addStretch()
 
         # Version
-        version = QLabel("VoxWave v2.1")
+        version = QLabel(f"VoxWave v{__version__}")
         version.setStyleSheet("color: rgba(255,255,255,0.25); font-size: 10px; padding: 0 16px;")
         sidebar_layout.addWidget(version)
 
@@ -1722,7 +1723,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(sep2)
 
         # -- Section A propos --
-        version_label = QLabel("VoxWave v2.1")
+        version_label = QLabel(f"VoxWave v{__version__}")
         version_label.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px;")
         layout.addWidget(version_label)
 

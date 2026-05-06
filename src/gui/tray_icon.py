@@ -8,6 +8,7 @@ from typing import Callable, Optional
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
+from src import __version__
 from src.gui.icons import IconState, create_qicon
 
 logger = logging.getLogger(__name__)
@@ -282,7 +283,7 @@ class TrayIcon:
 
     def _on_about(self) -> None:
         """Affiche les infos sur VoxWave."""
-        self.show_notification("VoxWave", "VoxWave v2.1 — Dictee vocale intelligente")
+        self.show_notification("VoxWave", f"VoxWave v{__version__} — Dictee vocale intelligente")
 
     def _on_quit_click(self) -> None:
         """Quitte l'application."""
