@@ -171,7 +171,7 @@ class OrbWidget(QWidget):
     sig_set_error_text = Signal(str)
     sig_show_preview = Signal(str)
     sig_hide_widget = Signal()
-    sig_hide_widget_delayed = Signal(str)
+    sig_hide_widget_delayed = Signal()
 
     def __init__(
         self,
@@ -466,7 +466,7 @@ class OrbWidget(QWidget):
     def _do_show_preview(self, text: str) -> None:
         self._preview_text = text.replace("\n", " ")
 
-    @Slot(str)
+    @Slot()
     def _do_hide_delayed(self) -> None:
         QTimer.singleShot(900, self.hide)
 
@@ -567,6 +567,15 @@ class OrbWidget(QWidget):
         painter.end()
 
         _update_layered_window(self._hwnd, image)
+
+    def showEvent(self, event) -> None:
+        """Re-apply Win32 layered setup on every show() — without this, any
+        show() after __init__ (e.g. _check_orb_health, Settings close) lets
+        Qt reclaim painting and the opaque widget rectangle becomes visible."""
+        super().showEvent(event)
+        if self._use_layered:
+            self._setup_layered_window()
+            self._render_layered()
 
     def paintEvent(self, event) -> None:
         """Rendu Linux : offscreen QImage identique a Windows."""
